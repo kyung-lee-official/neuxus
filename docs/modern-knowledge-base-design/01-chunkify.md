@@ -41,13 +41,44 @@ Child size tracks **embedding precision**; parent size tracks **useful context**
 
 **Tree:** page →\* parent →\* child. Children never cross a parent boundary; overlap (if any) stays inside one parent. Persistence FKs and page replace-on-edit: [appendix-a](./appendix-a-data-model.md). Query expand: [appendix-b](./appendix-b-vector-search.md).
 
+## Lex
+
+**Lex** turns normalized `body` into an ordered list of **blocks** (heading, paragraph, fence, list, …), each with `start` / `end` into that string.
+
+It does not decide parent or child size. It only classifies source regions so later packing can work on whole blocks. Fences and image-desc win over paragraph rules; interior of an unclosed fence is not re-classified as headings or lists.
+
+Block kinds and edge rules: [Atomic blocks](#atomic-blocks-and-edge-cases).
+
+## Packing
+
+At query time a hit on a child loads its parent via the link already stored. **Packing is not that lookup.** It is how those linked units are **built** from lexed blocks.
+
+Lex only yields source blocks (heading, paragraph, fence, …). Packing decides which neighbors share one parent and which share one child (one embedding), under the size knobs, without cutting atomics.
+
+Without packing you would have to pick a blunt default:
+
+| Default                  | Result                |
+| ------------------------ | --------------------- |
+| One child per lex block  | Tiny, weak embeddings |
+| One child = whole parent | Blurry embeddings     |
+| Slice every N characters | Cuts fences / lists   |
+
+Packing is the middle path: concatenate neighboring blocks toward `childTargetTokens` / `parentMaxTokens`, stop before overflow, keep glue groups together.
+
+```text
+Lex:     [## Tips] [para] [fence] [para] [fence]
+Pack:    └── child 0 (search unit) ──┘ └── child 1 ──┘
+         └──────────── parent 0 (LLM context) ────────┘
+```
+
+Rules for how parents and children are packed: [Pipeline](#pipeline).
+
 ## Parser and tokens
 
-| Concern | Decision                                                                  |
-| ------- | ------------------------------------------------------------------------- |
-| Dialect | GFM                                                                       |
-| Lex     | Source lexer that yields blocks with exact offsets into normalized `body` |
-| Count   | A stable tokenizer API (`count(text)`); encoding id is a knob             |
+| Concern | Decision                                                      |
+| ------- | ------------------------------------------------------------- |
+| Dialect | GFM                                                           |
+| Count   | A stable tokenizer API (`count(text)`); encoding id is a knob |
 
 ## Knobs
 
