@@ -1,29 +1,27 @@
 # Appendix B — Vector search (question → parents)
 
-After children are embedded ([01-chunkify.md](./01-chunkify.md), [appendix-a-data-model.md](./appendix-a-data-model.md)), answer retrieval uses **pgvector in SQL** on `kb_children.embedding`. Prisma Client is not used for similarity.
+Similarity on `kb_children.embedding` via **pgvector SQL** (not Prisma Client). Schema/index: [appendix-a-data-model.md](./appendix-a-data-model.md). Chunk roles: [01-chunkify.md](./01-chunkify.md).
 
-## End-to-end flow
+## Flow
 
 ```text
-1. Embed the user question with the same model and dimensions as children
-2. Similarity-search child rows (vector index)
-3. Resolve each hit’s parent (and page title / slug)
-4. Dedupe / merge overlapping parents
-5. Apply a character / parent budget
-6. Send parent texts to the LLM (not child snippets alone)
+1. Embed the question (same model / dims as children)
+2. Similarity-search children
+3. Resolve parents (+ page title / slug)
+4. Dedupe parents; keep best child score per parent
+5. Cap by max parents / max characters
+6. LLM gets parent texts (+ title / slug) — not child windows alone
 ```
 
-Optional: hybrid rank later (keyword FTS on page/child text + vector RRF). v1 can be vector-only.
+v1: vector-only. Optional later: hybrid FTS + RRF.
 
-## Embed the question
+## Question embed
 
-- Same provider and model string stored on `children.embedding_model`
-- Same dimension as `vector(N)`
-- Optional same title-style prefix policy as ingest if you used one at embed time; keep query and document sides consistent
+Same provider/model as `children.embedding_model` and `vector(N)`. If ingest prefixes child text (e.g. `Title: …`), use the same policy on the query side.
 
 ## Similarity SQL (cosine)
 
-Cosine **distance** operator: `<=>` (lower is closer). Score for display can be `1 - distance`.
+`<=>` = cosine distance (lower is closer). Display score: `1 - distance`. Prefer HNSW with `vector_cosine_ops` ([appendix-a](./appendix-a-data-model.md)).
 
 ```sql
 SELECT
@@ -38,15 +36,11 @@ ORDER BY c.embedding <=> $1::vector
 LIMIT $2;
 ```
 
-Bind `$1` as a pgvector literal built from the question embedding (for example `'[0.12,0.03,…]'`). Prefer an HNSW index with `vector_cosine_ops` when using cosine.
-
-| Operator | Use                                           |
-| -------- | --------------------------------------------- |
-| `<=>`    | Cosine distance (typical for text embeddings) |
-| `<->`    | L2 distance                                   |
-| `<#>`    | Inner product (mind sign conventions)         |
-
-Run this via `postgres.js` or `prisma.$queryRaw` — not `prisma.knowledgeChild.findMany`.
+| Operator | Use                        |
+| -------- | -------------------------- |
+| `<=>`    | Cosine distance            |
+| `<->`    | L2                         |
+| `<#>`    | Inner product (watch sign) |
 
 ## Expand to parents
 
@@ -57,15 +51,6 @@ JOIN kb_pages pg ON pg.id = p.page_id
 WHERE p.id = ANY($1::text[]);
 ```
 
-Then:
-
-1. Preserve best child score per parent (or max score among that parent’s hit children).
-2. Drop duplicate parents.
-3. Cap by max parents and max total characters (same role as today’s hydrate budgets).
-4. Build the synthesis prompt from **parent** text + page title/slug.
-
-Never send only the tiny child window as the sole LLM context when a parent exists.
-
 ## Stale vectors
 
-If `embedding` is null or `embedding_model` does not match the configured model, exclude from search (or repair first via a higher-layer re-embed path; see incremental updates in [01-chunkify.md](./01-chunkify.md)).
+Null `embedding` or mismatched `embedding_model` → exclude from search (or repair via re-embed; [01-chunkify incremental updates](./01-chunkify.md#incremental-updates-page-hash)).

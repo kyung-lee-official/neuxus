@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "bun --env-file=../../.env --watch run src/index.ts",
     "seed": "bun --env-file=../../.env run scripts/seed.ts",
+    "test": "bun test",
     "prisma": "bun --env-file=../../.env ./node_modules/prisma/build/index.js",
     "prisma:generate": "bun --env-file=../../.env ./node_modules/prisma/build/index.js generate",
     "check-types": "tsc --noEmit"
@@ -13,6 +14,7 @@
     "@elysiajs/cors": "^1.4.2",
     "@prisma/adapter-pg": "^7.9.0",
     "@prisma/client": "^7.9.0",
+    "ai-tokenizer": "^1.0.6",
     "elysia": "^1.4.29",
     "pg": "^8.22.0",
     "postgres": "^3.4.7"
