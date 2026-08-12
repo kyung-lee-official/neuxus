@@ -1,6 +1,6 @@
 import { cors } from "@elysiajs/cors";
 import { Elysia, status } from "elysia";
-import { serverPort } from "./config.ts";
+import { serverPort } from "./shared/config.ts";
 import { admin } from "./modules/admin/index.ts";
 import { health } from "./modules/health/index.ts";
 import { query } from "./modules/query/index.ts";

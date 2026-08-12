@@ -1,4 +1,4 @@
-import type { AppMemory, AppMessage } from "./db.ts";
+import type { AppMemory, AppMessage } from "../../shared/db.ts";
 
 const MAX_CONTEXT_CHARS = 12_000;
 

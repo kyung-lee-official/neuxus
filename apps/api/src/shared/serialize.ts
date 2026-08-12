@@ -1,4 +1,4 @@
-import type { AppUser } from "../db.ts";
+import type { AppUser } from "./db.ts";
 
 export function isoFromDate(
   value: Date | string | undefined | null,

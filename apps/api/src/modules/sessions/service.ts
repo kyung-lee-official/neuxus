@@ -1,10 +1,10 @@
 import { status } from "elysia";
-import type { AppUser } from "../../db.ts";
+import type { AppUser } from "../../shared/db.ts";
 import {
   createSession,
   listSessionsForUser,
   updateSessionTitle,
-} from "../../db.ts";
+} from "../../shared/db.ts";
 import { sessionJson } from "../../shared/serialize.ts";
 import type { SessionsModel } from "./model.ts";
 

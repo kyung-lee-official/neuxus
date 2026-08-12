@@ -1,7 +1,5 @@
 import { status } from "elysia";
-import { answerFromContext } from "../../answer.ts";
-import { slugForMemoryNote } from "../../context.ts";
-import type { AppUser } from "../../db.ts";
+import type { AppUser } from "../../shared/db.ts";
 import {
   getOrCreateSession,
   getSessionOwnedByUser,
@@ -9,8 +7,10 @@ import {
   insertMessage,
   listRecentMessages,
   searchMemoriesByUser,
-} from "../../db.ts";
+} from "../../shared/db.ts";
 import { isHttpStatus } from "../../shared/http.ts";
+import { answerFromContext } from "./answer.ts";
+import { slugForMemoryNote } from "./context.ts";
 import type { QueryModel } from "./model.ts";
 
 export abstract class Query {

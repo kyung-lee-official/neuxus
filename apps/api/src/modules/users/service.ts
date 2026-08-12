@@ -11,7 +11,7 @@ import {
   listSessionsForUser,
   listUsers,
   updateUserApiKey,
-} from "../../db.ts";
+} from "../../shared/db.ts";
 import { isoFromDate, sessionJson, userJson } from "../../shared/serialize.ts";
 import { Auth } from "../auth/service.ts";
 import type { UsersModel } from "./model.ts";

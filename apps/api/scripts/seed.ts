@@ -1,8 +1,8 @@
 /**
  * Upsert demo users into app_users (requires Prisma-migrated app schema).
  */
-import { SEED_USER_IDS } from "../src/config.ts";
-import { closeDb, seedAppUsers } from "../src/db.ts";
+import { SEED_USER_IDS } from "../src/shared/config.ts";
+import { closeDb, seedAppUsers } from "../src/shared/db.ts";
 
 async function main(): Promise<void> {
   console.log("Seeding app users...");

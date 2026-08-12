@@ -1,5 +1,5 @@
 import { status } from "elysia";
-import { nukeDatabases } from "../../db.ts";
+import { nukeDatabases } from "../../shared/db.ts";
 import type { AdminModel } from "./model.ts";
 
 export abstract class Admin {

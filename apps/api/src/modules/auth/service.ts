@@ -1,5 +1,5 @@
 import { status } from "elysia";
-import { type AppUser, getUserByApiKey } from "../../db.ts";
+import { type AppUser, getUserByApiKey } from "../../shared/db.ts";
 
 export abstract class Auth {
   static async resolveUserFromHeaders(
