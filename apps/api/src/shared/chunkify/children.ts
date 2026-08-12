@@ -129,9 +129,10 @@ function pickCutIndex(
   const window = text.slice(0, Math.min(text.length, Math.max(best, 1)));
   const sentenceEnds: number[] = [];
   for (const re of [/\. /g, /\? /g, /! /g]) {
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(window)) !== null) {
+    let m = re.exec(window);
+    while (m !== null) {
       sentenceEnds.push(m.index + m[0].length);
+      m = re.exec(window);
     }
   }
   sentenceEnds.sort((a, b) => a - b);
