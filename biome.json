@@ -1,0 +1,89 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.5/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": [
+      "**/*.{ts,tsx,js,jsx,json,css}",
+      "!.git",
+      "!.turbo",
+      "!node_modules",
+      "!dist",
+      "!build",
+      "!.next",
+      "!bun.lock"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 80,
+    "lineEnding": "lf"
+  },
+  "linter": {
+    "enabled": true,
+    "domains": {
+      "next": "recommended",
+      "react": "recommended"
+    },
+    "rules": {
+      "preset": "recommended",
+      "nursery": {
+        "useSortedClasses": {
+          "level": "warn",
+          "fix": "safe"
+        }
+      },
+      "correctness": {
+        "noUnusedVariables": "off",
+        "noUnusedFunctionParameters": "off",
+        "noUnusedImports": {
+          "level": "warn",
+          "fix": "safe"
+        }
+      },
+      "complexity": {
+        "noStaticOnlyClass": "off"
+      },
+      "suspicious": {
+        "noUnknownAtRules": "off"
+      },
+      "a11y": {
+        "noSvgWithoutTitle": "off",
+        "useKeyWithMouseEvents": "warn",
+        "useKeyWithClickEvents": "off",
+        "noStaticElementInteractions": "off",
+        "useButtonType": "off",
+        "noLabelWithoutControl": "off"
+      },
+      "style": {
+        "useImportType": "off"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double"
+    },
+    "parser": {
+      "unsafeParameterDecoratorsEnabled": true
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  }
+}

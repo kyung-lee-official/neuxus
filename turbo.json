@@ -1,0 +1,15 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "seed": {
+      "cache": false
+    },
+    "check-types": {
+      "dependsOn": ["^check-types"]
+    }
+  }
+}

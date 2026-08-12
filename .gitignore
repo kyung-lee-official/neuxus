@@ -1,0 +1,20 @@
+# bun / turbo
+node_modules/
+.turbo/
+.next/
+
+# Secrets
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+.cursor/
+
+# Prisma Client (generated)
+apps/api/src/generated/

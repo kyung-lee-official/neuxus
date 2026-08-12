@@ -1,0 +1,67 @@
+// Neuxus Postgres schema (`DATABASE_URL`, database name `neuxus`).
+// Apply yourself, e.g. from apps/api:
+//   bun run prisma -- migrate dev --name init
+// Do not run migrate / db push from the agent.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id
+  apiKey    String   @unique @map("api_key")
+  /// `admin` | `member` — haewon (seed) or first created account is admin.
+  role      String   @default("member")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  memories Memory[]
+  sessions Session[]
+
+  @@map("app_users")
+}
+
+model Memory {
+  id        BigInt   @id @default(autoincrement())
+  userId    String   @map("user_id")
+  slug      String
+  content   String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, slug])
+  @@index([userId, createdAt(sort: Desc)], map: "app_memories_user_id_idx")
+  @@map("app_memories")
+}
+
+model Session {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id")
+  title     String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@map("app_sessions")
+}
+
+/// Stored as TEXT with CHECK (role IN ('user', 'assistant')) — matches existing schema.
+model Message {
+  id        BigInt   @id @default(autoincrement())
+  sessionId String   @map("session_id") @db.Uuid
+  role      String
+  content   String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt], map: "app_messages_session_id_idx")
+  @@map("app_messages")
+}
