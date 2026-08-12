@@ -43,11 +43,11 @@ Child size tracks **embedding precision**; parent size tracks **useful context**
 
 ## Parser and tokens
 
-| Concern | Decision                                                                             |
-| ------- | ------------------------------------------------------------------------------------ |
-| Dialect | GFM                                                                                  |
-| Lex     | **v1:** source lexer for exact offsets (`Bun.markdown` lacks positions — open issue) |
-| Count   | `ai-tokenizer`                                                                       |
+| Concern | Decision                                                                     |
+| ------- | ---------------------------------------------------------------------------- |
+| Dialect | GFM                                                                          |
+| Lex     | Source lexer for exact offsets (`Bun.markdown` lacks positions — open issue) |
+| Count   | `ai-tokenizer`                                                               |
 
 ## Knobs
 
@@ -100,7 +100,7 @@ Same normalized `body` + knobs ⇒ same spans. Every region is exactly one block
 | Indented code  | ≥4 spaces / tab run                              | Yes                    |
 | List           | Items until list ends (loose blanks stay inside) | Yes                    |
 | Table          | GFM header + delimiter + rows                    | Yes                    |
-| Blockquote     | Contiguous `>` (opaque in v1)                    | Yes                    |
+| Blockquote     | Contiguous `>` (opaque nested structure)         | Yes                    |
 | Thematic break | `---` / `***` / `___` alone                      | Yes                    |
 | HTML block     | CommonMark HTML (except image-desc markers)      | Yes                    |
 | Paragraph      | Otherwise                                        | No (splittable)        |
@@ -108,7 +108,7 @@ Same normalized `body` + knobs ⇒ same spans. Every region is exactly one block
 
 ### Glue groups
 
-Adjacent blocks that must share one parent and one child. v1: **image + image-desc** (optional blank between).
+Adjacent blocks that must share one parent and one child. Currently: **image + image-desc** (optional blank between).
 
 ### Code fences
 

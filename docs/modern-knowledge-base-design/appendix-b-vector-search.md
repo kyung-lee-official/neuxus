@@ -13,7 +13,7 @@ Similarity on `kb_children.embedding` via **pgvector SQL** (not Prisma Client). 
 6. LLM gets parent texts (+ title / slug) — not child windows alone
 ```
 
-v1: vector-only. Optional later: hybrid FTS + RRF.
+Vector-only for now. Optional later: hybrid FTS + RRF.
 
 ## Question embed
 

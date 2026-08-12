@@ -80,18 +80,4 @@ CREATE INDEX kb_children_embedding_hnsw
 
 ## Chunk knobs table
 
-Nullable columns; **defaults live in app code** ([01-chunkify.md](./01-chunkify.md#knobs)), not SQL `DEFAULT`. Shape open (single row vs key/value):
-
-```prisma
-model KnowledgeChunkSettings {
-  id                      String  @id @default("default")
-  childTargetTokens       Int?
-  childHardMaxTokens      Int?
-  childOverlapTokens      Int?
-  childCrumbMinTokens     Int?
-  parentMaxTokens         Int?
-  fenceIntroGlueMaxTokens Int?
-  tokenizerEncoding       String?
-  @@map("kb_chunk_settings")
-}
-```
+Nullable columns; **defaults live in app code** ([01-chunkify.md](./01-chunkify.md#knobs)), not SQL `DEFAULT`. Shape: single row `id = "default"` (see `KnowledgeChunkSettings` in `apps/api/prisma/schema.prisma`). No app load/save code yet — schema only until ingest wires it.
