@@ -65,3 +65,19 @@ model Message {
   @@index([sessionId, createdAt], map: "app_messages_session_id_idx")
   @@map("app_messages")
 }
+
+/// Chunkify knobs (`kb_chunk_settings`). Nullable columns — app defaults live in code
+/// (`CHUNKIFY_DEFAULTS`), not SQL DEFAULT. Single row: id = `"default"`.
+model KnowledgeChunkSettings {
+  id String @id @default("default")
+
+  childTargetTokens       Int?    @map("child_target_tokens")
+  childHardMaxTokens      Int?    @map("child_hard_max_tokens")
+  childOverlapTokens      Int?    @map("child_overlap_tokens")
+  childCrumbMinTokens     Int?    @map("child_crumb_min_tokens")
+  parentMaxTokens         Int?    @map("parent_max_tokens")
+  fenceIntroGlueMaxTokens Int?    @map("fence_intro_glue_max_tokens")
+  tokenizerEncoding       String? @map("tokenizer_encoding")
+
+  @@map("kb_chunk_settings")
+}
