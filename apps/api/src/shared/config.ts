@@ -12,9 +12,9 @@ export function requireDatabaseUrl(): string {
 }
 
 export function serverPort(): number {
-  const raw = process.env.PORT ?? "3132";
+  const raw = process.env.PORT ?? "3001";
   const port = Number.parseInt(raw, 10);
-  if (!Number.isFinite(port) || port <= 0) return 3132;
+  if (!Number.isFinite(port) || port <= 0) return 3001;
   return port;
 }
 

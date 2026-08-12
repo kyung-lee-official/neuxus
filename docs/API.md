@@ -1,22 +1,22 @@
 # Bun HTTP API
 
-Base URL: `http://localhost:3132` (override with `PORT`).
+Base URL: `http://localhost:3001` (override with `PORT`).
 
 All responses are JSON (`Content-Type: application/json`).
 
 ## Auth
 
-| Endpoint                                                 | Auth                                                 |
-| -------------------------------------------------------- | ---------------------------------------------------- |
-| `GET /health`                                            | none                                                 |
-| `POST /admin/nuke`                                       | none (sandbox; wipe DB `public` schema)              |
-| `GET /users`, `GET /users/:id`                           | none (sandbox convenience)                           |
-| `GET /users/:id/data`                                    | `Authorization: Bearer <api-key>`                    |
-| `DELETE /users/:id/memories/:memoryId`                   | `Authorization: Bearer <api-key>`                    |
-| `GET /sessions`, `POST /sessions`, `PATCH /sessions/:id` | `Authorization: Bearer <api-key>`                    |
-| `POST /users`                                            | Bearer if any users exist; open when table is empty  |
-| `PATCH /users/:id`, `DELETE /users/:id`                  | `Authorization: Bearer <api-key>`                    |
-| `POST /query`, `POST /remember`                          | `Authorization: Bearer <api-key>`                    |
+| Endpoint                                                 | Auth                                                |
+| -------------------------------------------------------- | --------------------------------------------------- |
+| `GET /health`                                            | none                                                |
+| `POST /admin/nuke`                                       | none (sandbox; wipe DB `public` schema)             |
+| `GET /users`, `GET /users/:id`                           | none (sandbox convenience)                          |
+| `GET /users/:id/data`                                    | `Authorization: Bearer <api-key>`                   |
+| `DELETE /users/:id/memories/:memoryId`                   | `Authorization: Bearer <api-key>`                   |
+| `GET /sessions`, `POST /sessions`, `PATCH /sessions/:id` | `Authorization: Bearer <api-key>`                   |
+| `POST /users`                                            | Bearer if any users exist; open when table is empty |
+| `PATCH /users/:id`, `DELETE /users/:id`                  | `Authorization: Bearer <api-key>`                   |
+| `POST /query`, `POST /remember`                          | `Authorization: Bearer <api-key>`                   |
 
 Seed users (after `bun run seed`; stored in `app_users`):
 
@@ -108,9 +108,9 @@ Bearer. Body `{ "content": "…" }` — inserts a personal memory note.
 
 ## Env
 
-| Variable           | Purpose                                      |
-| ------------------ | -------------------------------------------- |
-| `DATABASE_URL`     | Postgres URL (database name `neuxus`)        |
-| `MINIMAX_API_KEY`  | Ask synthesis                                |
-| `SYNTHESIS_MODEL`  | Optional model id (default MiniMax-M3)       |
-| `PORT`             | API port (default 3132)                      |
+| Variable          | Purpose                                |
+| ----------------- | -------------------------------------- |
+| `DATABASE_URL`    | Postgres URL (database name `neuxus`)  |
+| `MINIMAX_API_KEY` | Ask synthesis                          |
+| `SYNTHESIS_MODEL` | Optional model id (default MiniMax-M3) |
+| `PORT`            | API port (default 3001)                |

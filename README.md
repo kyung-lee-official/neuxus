@@ -5,8 +5,8 @@ Turborepo monorepo: Bun HTTP API (`apps/api`) with personal memory and chat sess
 ```text
 neuxus/
 ├── apps/
-│   ├── api/                 # Bun + Elysia API (@neuxus/api) :3132
-│   └── web/                 # Next.js UI (@neuxus/web) :3133
+│   ├── api/                 # Bun + Elysia API (@neuxus/api) :3001
+│   └── web/                 # Next.js UI (@neuxus/web) :3000
 ├── packages/
 │   └── typescript-config/
 └── docs/
@@ -14,12 +14,12 @@ neuxus/
 
 ## Stack
 
-| Piece | Role |
-| --- | --- |
+| Piece               | Role                                |
+| ------------------- | ----------------------------------- |
 | Postgres (`neuxus`) | Users, memories, sessions, messages |
-| Bun API | Auth (API keys), chat ask, CRUD |
-| MiniMax | Ask-mode LLM synthesis |
-| Next.js | Sign-in, chat UI, settings |
+| Bun API             | Auth (API keys), chat ask, CRUD     |
+| MiniMax             | Ask-mode LLM synthesis              |
+| Next.js             | Sign-in, chat UI, settings          |
 
 Ask mode uses **personal memories** + **recent session messages**, then synthesizes with MiniMax. There is no external knowledge base.
 
@@ -55,15 +55,15 @@ bun run seed
 bun run dev
 ```
 
-- API: http://localhost:3132  
-- Web: http://localhost:3133  
+- API: http://localhost:3001
+- Web: http://localhost:3000
 
 ## Seed users
 
-| User id | Role | Default API key |
-| --- | --- | --- |
-| `haewon` | admin | `demo-key-haewon` |
-| `lily`, `sullyoon`, `bae`, `jiwoo`, `kyujin` | member | `demo-key-<id>` |
+| User id                                      | Role   | Default API key   |
+| -------------------------------------------- | ------ | ----------------- |
+| `haewon`                                     | admin  | `demo-key-haewon` |
+| `lily`, `sullyoon`, `bae`, `jiwoo`, `kyujin` | member | `demo-key-<id>`   |
 
 Without seed, the **first** created account becomes `admin`; later accounts are `member`.
 
