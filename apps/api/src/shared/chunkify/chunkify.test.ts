@@ -1,17 +1,22 @@
 import { describe, expect, test } from "bun:test";
+import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { type ChunkifyOptions, chunkify } from "./index.ts";
+import {
+  CHUNKIFY_DEFAULTS,
+  type ChunkifyOptions,
+  type ChunkifyResult,
+  chunkify,
+  resolveChunkifyOptions,
+} from "./index.ts";
 
 const fixturesDir = join(import.meta.dir, "fixtures");
+const fixturesOutDir = join(import.meta.dir, "fixtures-out");
 
 async function loadFixture(name: string): Promise<string> {
   return await Bun.file(join(fixturesDir, name)).text();
 }
 
-function assertExactSlices(
-  body: string,
-  result: ReturnType<typeof chunkify>,
-): void {
+function assertExactSlices(body: string, result: ChunkifyResult): void {
   for (const p of result.parents) {
     expect(p.text).toBe(body.slice(p.start, p.end));
   }
@@ -20,27 +25,100 @@ function assertExactSlices(
   }
 }
 
-function runFixture(name: string, options?: ChunkifyOptions) {
-  return async () => {
-    const body = await loadFixture(name);
-    const result = chunkify(body, options);
-    assertExactSlices(body, result);
-    return { body, ...result };
+function renderReviewMarkdown(
+  fixtureName: string,
+  body: string,
+  result: ChunkifyResult,
+): string {
+  const lines: string[] = [
+    `# ${fixtureName}`,
+    "",
+    `parents: ${result.parents.length} · children: ${result.children.length} · bodyChars: ${body.length}`,
+    "",
+  ];
+
+  for (const parent of result.parents) {
+    lines.push(`## Parent ${parent.index} [${parent.start}:${parent.end}]`);
+    lines.push("");
+    lines.push("```markdown");
+    lines.push(parent.text.replace(/\n$/, "") || "(empty)");
+    lines.push("```");
+    lines.push("");
+
+    const kids = result.children.filter((c) => c.parentIndex === parent.index);
+    for (const child of kids) {
+      lines.push(
+        `### Child ${child.index} (parent ${child.parentIndex}) [${child.start}:${child.end}]`,
+      );
+      lines.push("");
+      lines.push("```markdown");
+      lines.push(child.text.replace(/\n$/, "") || "(empty)");
+      lines.push("```");
+      lines.push("");
+    }
+  }
+
+  if (result.parents.length === 0) {
+    lines.push("_(no parents / children)_");
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}
+
+async function writeReviewDump(
+  fixtureName: string,
+  body: string,
+  result: ChunkifyResult,
+  options?: ChunkifyOptions,
+): Promise<void> {
+  await mkdir(fixturesOutDir, { recursive: true });
+  const base = fixtureName.replace(/\.md$/i, "");
+  const resolved = resolveChunkifyOptions(options);
+
+  const payload = {
+    fixture: fixtureName,
+    options: resolved,
+    defaults: CHUNKIFY_DEFAULTS,
+    bodyChars: body.length,
+    parents: result.parents,
+    children: result.children,
   };
+
+  await Bun.write(
+    join(fixturesOutDir, `${base}.json`),
+    `${JSON.stringify(payload, null, 2)}\n`,
+  );
+  await Bun.write(
+    join(fixturesOutDir, `${base}.md`),
+    renderReviewMarkdown(fixtureName, body, result),
+  );
+}
+
+async function runFixture(name: string, options?: ChunkifyOptions) {
+  const body = await loadFixture(name);
+  const result = chunkify(body, options);
+  assertExactSlices(body, result);
+  await writeReviewDump(name, body, result, options);
+  return { body, ...result };
 }
 
 describe("chunkify fixtures", () => {
-  test("empty string → no chunks", () => {
-    expect(chunkify("")).toEqual({ parents: [], children: [] });
+  test("empty string → no chunks", async () => {
+    const result = chunkify("");
+    expect(result).toEqual({ parents: [], children: [] });
+    await writeReviewDump("empty-string.md", "", result);
   });
 
   test("whitespace-only.md → no chunks", async () => {
     const body = await loadFixture("whitespace-only.md");
-    expect(chunkify(body)).toEqual({ parents: [], children: [] });
+    const result = chunkify(body);
+    expect(result).toEqual({ parents: [], children: [] });
+    await writeReviewDump("whitespace-only.md", body, result);
   });
 
   test("short-note.md → one parent, one child", async () => {
-    const { parents, children } = await runFixture("short-note.md")();
+    const { parents, children } = await runFixture("short-note.md");
     expect(parents).toHaveLength(1);
     expect(children).toHaveLength(1);
     expect(children[0]!.parentIndex).toBe(0);
@@ -48,7 +126,7 @@ describe("chunkify fixtures", () => {
   });
 
   test("two-h2-sections.md → one parent per ##", async () => {
-    const { parents, children } = await runFixture("two-h2-sections.md")();
+    const { parents, children } = await runFixture("two-h2-sections.md");
     expect(parents).toHaveLength(2);
     expect(parents[0]!.text).toContain("## One");
     expect(parents[1]!.text).toContain("## Two");
@@ -58,7 +136,7 @@ describe("chunkify fixtures", () => {
   });
 
   test("preamble-before-h2.md → preamble is first parent", async () => {
-    const { parents } = await runFixture("preamble-before-h2.md")();
+    const { parents } = await runFixture("preamble-before-h2.md");
     expect(parents.length).toBeGreaterThanOrEqual(2);
     expect(parents[0]!.text).toContain("Intro before any section heading.");
     expect(parents[0]!.text).not.toContain("## First");
@@ -66,14 +144,14 @@ describe("chunkify fixtures", () => {
   });
 
   test("heading-only.md → one parent, one searchable child", async () => {
-    const { parents, children } = await runFixture("heading-only.md")();
+    const { parents, children } = await runFixture("heading-only.md");
     expect(parents).toHaveLength(1);
     expect(children).toHaveLength(1);
     expect(children[0]!.text).toContain("## Only heading");
   });
 
   test("empty-h2.md → empty section still gets a child", async () => {
-    const { parents, children } = await runFixture("empty-h2.md")();
+    const { parents, children } = await runFixture("empty-h2.md");
     expect(parents.length).toBe(2);
     const emptyParent = parents.find((p) => p.text.includes("## Empty"));
     expect(emptyParent).toBeDefined();
@@ -85,7 +163,7 @@ describe("chunkify fixtures", () => {
   });
 
   test("fence-intro-glue.md → intro stays with fence", async () => {
-    const { children } = await runFixture("fence-intro-glue.md")();
+    const { children } = await runFixture("fence-intro-glue.md");
     const withFence = children.find((c) => c.text.includes("```ts"));
     expect(withFence).toBeDefined();
     expect(withFence!.text).toContain("Here is the setup code:");
@@ -93,7 +171,7 @@ describe("chunkify fixtures", () => {
   });
 
   test("image-desc-glue.md → image and desc same child", async () => {
-    const { children } = await runFixture("image-desc-glue.md")();
+    const { children } = await runFixture("image-desc-glue.md");
     const hit = children.find((c) => c.text.includes("image-desc"));
     expect(hit).toBeDefined();
     expect(hit!.text).toContain("![Alt](./a.png)");
@@ -101,14 +179,14 @@ describe("chunkify fixtures", () => {
   });
 
   test("blank-lines-preserved.md → blank line kept in slice", async () => {
-    const { children } = await runFixture("blank-lines-preserved.md")();
+    const { children } = await runFixture("blank-lines-preserved.md");
     const child = children.find((c) => c.text.includes("Alpha"));
     expect(child).toBeDefined();
     expect(child!.text).toContain("Alpha paragraph.\n\nBeta paragraph.");
   });
 
   test("unclosed-fence.md → fence through EOF", async () => {
-    const { children } = await runFixture("unclosed-fence.md")();
+    const { children } = await runFixture("unclosed-fence.md");
     const fence = children.find((c) => c.text.includes("```js"));
     expect(fence).toBeDefined();
     expect(fence!.text).toContain("console.log(1);");
@@ -119,7 +197,7 @@ describe("chunkify fixtures", () => {
     const { children } = await runFixture("oversized-fence.md", {
       childTargetTokens: 50,
       childHardMaxTokens: 80,
-    })();
+    });
     const fenceChild = children.find((c) => c.text.includes("```ts"));
     expect(fenceChild).toBeDefined();
     expect(fenceChild!.text).toContain("const n0 = 0;");
