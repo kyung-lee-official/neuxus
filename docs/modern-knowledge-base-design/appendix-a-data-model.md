@@ -8,11 +8,11 @@ Postgres + pgvector on **`kb_children.embedding`**. Chunking: [01-chunkify.md](.
 Page ──* Parent ──* Child (embedding)
 ```
 
-| Entity | Role | `vector`? |
-| ------ | ---- | --------- |F
-| **Page** | Markdown file: slug, title, body, `content_hash` | No |
-| **Parent** | Generation slice of `body` | No |
-| **Child** | Retrieval unit | Yes |
+| Entity     | Role                                             | `vector`? |
+| ---------- | ------------------------------------------------ | --------- |
+| **Page**   | Markdown file: slug, title, body, `content_hash` | No        |
+| **Parent** | Generation slice of `body`                       | No        |
+| **Child**  | Retrieval unit                                   | Yes       |
 
 FKs: `Parent.pageId → Page`, `Child.parentId → Parent`. Optional denormalized `Child.pageId`; optional `startOffset` / `endOffset`. On page change: delete that page’s parents/children, insert the new tree ([incremental updates](./01-chunkify.md#incremental-updates-page-hash)).
 
@@ -73,10 +73,10 @@ CREATE INDEX kb_children_embedding_hnsw
   USING hnsw (embedding vector_cosine_ops);
 ```
 
-| Concern | Tooling |
-| ------- | ------- |
+| Concern                    | Tooling           |
+| -------------------------- | ----------------- |
 | Page / parent / child text | Prisma and/or SQL |
-| Embed + similarity | Raw SQL only |
+| Embed + similarity         | Raw SQL only      |
 
 ## Chunk knobs table
 
