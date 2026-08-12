@@ -1,8 +1,33 @@
 # Chunkify strategy (parent–child + structure-first)
 
-**Parents** = generation context. **Children** = retrieval units (embedded). Structure decides parents; size only refines children and oversized parents. Do not slice the whole file every N characters as the first step.
+**Parents** = generation context. **Children** = retrieval units. Structure decides parents; size only refines children and oversized parents. Do not slice the whole file every N characters as the first step.
 
 Related: [appendix-a-data-model.md](./appendix-a-data-model.md) (tables / Prisma), [appendix-b-vector-search.md](./appendix-b-vector-search.md) (query-time search).
+
+## Pure function scope
+
+The chunkifier is a **pure function**: markdown `body` in → parent/child spans out. No I/O.
+
+```ts
+chunkify(body: string, options?: ChunkifyOptions): {
+  parents: { index: number; text: string; start: number; end: number }[];
+  children: {
+    parentIndex: number;
+    index: number;
+    text: string;
+    start: number;
+    end: number;
+  }[];
+}
+```
+
+| In scope                                                   | Out of scope                                      |
+| ---------------------------------------------------------- | ------------------------------------------------- |
+| Newline normalize, lex, parent/child pack                  | Frontmatter strip (caller supplies `body` only)   |
+| Token counts for packing decisions                         | Page `content_hash` / skip gate                   |
+| Exact `text` slices + `start`/`end` into normalized `body` | Persisting rows; embedding; query / LLM synthesis |
+
+Callers merge **knobs** from DB (if present) over **app-level defaults**, then pass the resolved numbers into `options`.
 
 ## Why parent–child
 
@@ -11,10 +36,10 @@ Related: [appendix-a-data-model.md](./appendix-a-data-model.md) (tables / Prisma
 | Small chunks | Precise retrieval, thin LLM context |
 | Large chunks | Better context, blurry embeddings   |
 
-| Role                           | Purpose                       | Embedded? |
-| ------------------------------ | ----------------------------- | --------- |
-| **Child** (~300–450 tokens)    | Search / match                | Yes       |
-| **Parent** (~1000–1600 tokens) | LLM context when a child hits | No        |
+| Role                   | Purpose                       | Embedded? |
+| ---------------------- | ----------------------------- | --------- |
+| **Child** (see knobs)  | Search / match                | Yes       |
+| **Parent** (see knobs) | LLM context when a child hits | No        |
 
 Child size is limited mainly by **embedding precision**. Parent size is limited by **useful context** (+ remaining LLM budget). The model context window is secondary.
 
@@ -32,76 +57,116 @@ page (slug, title, body)
 
 **Identity and lookup**
 
-| Link             | Meaning                                                                                                                |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `child → parent` | Required foreign key (or stable parent key). A search hit resolves context by loading this parent’s text.              |
-| `parent → page`  | Parent belongs to one page (`slug` / page id) for citation and title.                                                  |
-| Offsets          | Optional `start` / `end` in `body` so parent/child text can be re-sliced or debugged without storing divergent copies. |
+| Link             | Meaning                                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------------------------- |
+| `child → parent` | Required FK (or parent index in the pure result). A search hit loads this parent’s text for generation. |
+| `parent → page`  | Parent belongs to one page (`slug` / page id) for citation and title.                                   |
+| Offsets          | `start` / `end` into normalized `body` so spans stay aligned with source text.                          |
 
 **Invariants**
 
 - Children are built **only inside** their parent’s span; no child crosses a parent boundary.
 - Sibling overlap (when used) stays within that parent.
-- On page edit: replace that page’s parents and children together, then re-embed children (no orphan vectors from an old layout).
+- On page change: replace that page’s parents and children together (no orphan vectors from an old layout).
 - At query time: rank **children** → collect unique **parents** → budget → send parent text (+ page title / slug) to the LLM.
+
+## Parser and token counting (decided)
+
+| Concern          | Decision                                                                                                                                    |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Markdown dialect | GitHub Flavored Markdown (GFM)                                                                                                              |
+| Parser           | Bun built-in **`Bun.markdown`** (GFM extensions on by default). Map parse/render events into the [block inventory](#block-inventory) below. |
+| Token counting   | **`ai-tokenizer`** (`tokenizer.count(text)`). One encoding for all packing decisions (encoding id is a knob; see open questions).           |
+
+`Bun.markdown` is a render-oriented API and may evolve (unstable). Chunkify still needs reliable **source offsets** into normalized `body` — see open questions if callbacks do not expose positions directly.
+
+## Knobs (DB-adjustable, app defaults)
+
+Size and packing knobs are **adjustable in the database** (see [appendix-a](./appendix-a-data-model.md)). Missing DB values fall back to **app-level defaults** (not SQL `DEFAULT`). Resolved knobs are passed into `chunkify` as `options`.
+
+| Knob                      | App default                         | Role                                                         |
+| ------------------------- | ----------------------------------- | ------------------------------------------------------------ |
+| `childTargetTokens`       | `400`                               | Soft pack target for children                                |
+| `childHardMaxTokens`      | `500`                               | Hard max for **splittable prose** packs only                 |
+| `childOverlapTokens`      | `60`                                | Overlap after a forced prose split                           |
+| `childCrumbMinTokens`     | `64`                                | Merge smaller crumbs into the previous child when allowed    |
+| `parentMaxTokens`         | `1400`                              | Max parent size before `###` / block re-pack                 |
+| `fenceIntroGlueMaxTokens` | `40`                                | Max size of a lead-in paragraph glued to the following fence |
+| `tokenizerEncoding`       | _(open — pick with `ai-tokenizer`)_ | Encoding module used for `count`                             |
+
+**Parent boundaries (fixed policy, not a numeric knob):** `##` → `###` → block packs. Atomic blocks (fences, glue groups, tables, lists, …) may exceed size knobs as one unit.
 
 ## How we build chunks
 
-**Input:** page `body` only (YAML/TOML frontmatter stripped before tokenization). Chunking never sees frontmatter.
+**Input:** page `body` only (YAML/TOML frontmatter already stripped by the caller). Chunking never sees frontmatter.
 
 **Pipeline (fixed order):**
 
 1. Normalize newlines (`\r\n` / `\r` → `\n`); do not alter fence interiors beyond this.
-2. Lex `body` into an ordered list of **blocks** (see [Atomic blocks](#atomic-blocks-and-edge-cases)).
+2. Lex `body` via **`Bun.markdown`** into an ordered list of **blocks** (see [Atomic blocks](#atomic-blocks-and-edge-cases)).
 3. Build **parents** from blocks using structure-first rules (below).
-4. Inside each parent, pack contiguous blocks into **children**.
+4. Inside each parent, pack contiguous blocks into **children** using **`ai-tokenizer`** counts and resolved knobs.
 
 Parent and child packing operate on **whole blocks only**. A block is never cut mid-content except where this doc explicitly allows a **forced prose split** (plain paragraphs only).
 
+### Output text = exact body slices
+
+Every parent/child `text` is `body.slice(start, end)` on the **newline-normalized** body (same string the offsets refer to). Keep intervening blank lines inside a span; do not compact or re-join blocks with a single `\n`.
+
+Example — `body` contains two paragraphs separated by a blank line. One child covering both is:
+
+```text
+Alpha paragraph.
+
+Beta paragraph.
+```
+
+not `Alpha paragraph.\nBeta paragraph.`.
+
 ### Parents (structure-first)
 
-1. Prefer one parent per `##` section: heading block + following blocks until the next `##` (or EOF). A leading `#` title (if present in `body`) belongs to the first parent with the following prose until the first `##`, or alone with the rest of the body when there is no `##`.
+1. Prefer one parent per `##` section: heading block + following blocks until the next `##` (or EOF). A leading `#` title (if present in `body`) belongs to the first parent with the following prose until the first `##`, or with the rest of the body when there is no `##`.
 2. No `##` → whole body is one parent (typical short notes).
-3. If a section still exceeds `parentMax` (~1000–1600 tokens): split on `###` boundaries first; if still over, pack consecutive blocks into sub-parents ≤ `parentMax` without breaking atomic blocks.
-4. Never start a new parent in the middle of an atomic block. Never orphan a **glue group** (see below) across a parent boundary.
+3. If a section still exceeds `parentMaxTokens`: split on `###` boundaries first; if still over, pack consecutive blocks into sub-parents ≤ `parentMaxTokens` without breaking atomic blocks.
+4. Never start a new parent in the middle of an atomic block. Never orphan a **glue group** across a parent boundary.
 
 ### Children (inside each parent only)
 
-1. Walk the parent’s blocks in order; pack into children targeting **~300–450 tokens** (soft).
-2. Hard max **~500 tokens** applies only to packs of **splittable prose**. Atomic blocks and glue groups may exceed the hard max as a single child (see [Oversized atomic blocks](#oversized-atomic-blocks)).
-3. Overlap **~40–80 tokens** only after a **forced prose split** (plain paragraph cut). Never overlap by duplicating fence or image-desc content.
-4. Merge crumbs under ~50–80 tokens into the previous child when that merge stays ≤ hard max (or the previous child is already an oversized atomic exception).
-5. Persist each child with `parent_id` (and page / offsets as needed). Offsets must cover the exact `body` span of the packed blocks.
+1. Walk the parent’s blocks in order; pack into children targeting `childTargetTokens` (soft).
+2. `childHardMaxTokens` applies only to packs of **splittable prose**. Atomic blocks and glue groups may exceed it as a single child (see [Oversized atomic blocks](#oversized-atomic-blocks)).
+3. Overlap `childOverlapTokens` only after a **forced prose split**. Never overlap by duplicating fence or image-desc content.
+4. Merge crumbs under `childCrumbMinTokens` into the previous child when that merge stays ≤ hard max (or the previous child is already an oversized atomic exception).
+5. Each child carries `parentIndex` and offsets covering the exact span of the packed blocks.
 
 ### Degenerate cases
 
-| Page                    | Parents                            | Children             |
-| ----------------------- | ---------------------------------- | -------------------- |
-| Short body ≤ parent max | 1 = full body                      | Often 1 (or a few)   |
-| Normal `##` doc         | 1 per `##`                         | Several per parent   |
-| Huge `##`               | Sub-parents via `###` / paragraphs | Children inside each |
+| Page                           | Parents                            | Children             |
+| ------------------------------ | ---------------------------------- | -------------------- |
+| Short body ≤ `parentMaxTokens` | 1 = full body                      | Often 1 (or a few)   |
+| Normal `##` doc                | 1 per `##`                         | Several per parent   |
+| Huge `##`                      | Sub-parents via `###` / paragraphs | Children inside each |
 
 ## Atomic blocks and edge cases
 
-The chunkifier is **deterministic**: same `body` bytes (after newline normalization) always yield the same parent/child spans. Edge cases are resolved by classifying every region of the body as exactly one block type before packing.
+The chunkifier is **deterministic**: same normalized `body` + same resolved knobs always yield the same parent/child spans. Edge cases are resolved by classifying every region of the body as exactly one block type before packing.
 
 ### Block inventory
 
-Lex top-level CommonMark-ish blocks in document order. Fenced regions and image-desc regions win over paragraph rules (a line inside a fence is not a heading or list).
+Lex top-level GFM blocks in document order (via `Bun.markdown`). Fenced regions and image-desc regions win over paragraph rules (a line inside a fence is not a heading or list).
 
-| Block type         | How it is recognized                                                               | Atomic?          | Notes                                                                                                                              |
-| ------------------ | ---------------------------------------------------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| ATX heading        | Line matching `#{1,6} ` at line start (optional trailing `#`)                      | Yes              | Stays with following content via parent rules; never merged into previous child’s prose mid-pack across a new `##` parent boundary |
-| Fenced code        | Opening fence through matching close (see [Code fences](#code-fences))             | Yes              | Language tag and info string stay on the opening line                                                                              |
-| Image + desc group | Image line(s) + optional alt/title + `<!-- image-desc -->` region (see below)      | Yes (glue group) | One retrieval/generation unit                                                                                                      |
-| Indented code      | Runs of lines with ≥4 leading spaces / 1 tab, CommonMark-style                     | Yes              | Prefer fences in authored docs; still atomic if present                                                                            |
-| List               | Contiguous list items (tight or loose) until a blank line that ends the list       | Yes              | Nested lists stay inside the same list block                                                                                       |
-| Table              | GFM table: header row + delimiter row + body rows                                  | Yes              |                                                                                                                                    |
-| Blockquote         | Contiguous `>` lines (may contain nested structure treated as opaque text in v1)   | Yes              |                                                                                                                                    |
-| Thematic break     | `---`, `***`, or `___` line alone                                                  | Yes              | Soft parent hint only; does not alone force a parent split                                                                         |
-| HTML block         | HTML block per CommonMark (excluding image-desc comments, which are handled above) | Yes              |                                                                                                                                    |
-| Paragraph          | One or more non-blank lines not classified above                                   | No (splittable)  | Only type that may be force-split when over hard max                                                                               |
-| Blank run          | One or more `\n` between blocks                                                    | —                | Separators only; not stored as their own child                                                                                     |
+| Block type         | How it is recognized                                                          | Atomic?          | Notes                                                   |
+| ------------------ | ----------------------------------------------------------------------------- | ---------------- | ------------------------------------------------------- |
+| ATX heading        | Line matching `#{1,6} ` at line start (optional trailing `#`)                 | Yes              | Stays with following content via parent rules           |
+| Fenced code        | Opening fence through matching close (see [Code fences](#code-fences))        | Yes              | Language tag and info string stay on the opening line   |
+| Image + desc group | Image line(s) + optional alt/title + `<!-- image-desc -->` region (see below) | Yes (glue group) | One retrieval/generation unit                           |
+| Indented code      | Runs of lines with ≥4 leading spaces / 1 tab, CommonMark-style                | Yes              | Prefer fences in authored docs; still atomic if present |
+| List               | Contiguous list items (tight or loose) until the list ends                    | Yes              | Nested lists stay inside the same list block            |
+| Table              | GFM table: header row + delimiter row + body rows                             | Yes              |                                                         |
+| Blockquote         | Contiguous `>` lines (nested structure opaque in v1)                          | Yes              |                                                         |
+| Thematic break     | `---`, `***`, or `___` line alone                                             | Yes              | Does not alone force a parent split                     |
+| HTML block         | HTML block per CommonMark (excluding image-desc markers, handled above)       | Yes              |                                                         |
+| Paragraph          | One or more non-blank lines not classified above                              | No (splittable)  | Only type that may be force-split when over hard max    |
+| Blank run          | One or more `\n` between blocks                                               | —                | Not its own child; preserved inside exact slices        |
 
 **Glue group:** two or more adjacent blocks that must stay in the same parent and the same child. Today that means **image + image-desc** (and the image’s immediate caption paragraph if it sits between them with no blank line). Treat the group as one atomic unit for packing.
 
@@ -115,23 +180,40 @@ Lex top-level CommonMark-ish blocks in document order. Fenced regions and image-
 
 **Rules**
 
-| Situation                                      | Behavior                                                                                                                                                                                                                  |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Normal paired fence                            | One atomic block. Never split inside; never attach half a fence to the previous/next child.                                                                                                                               |
-| Fence longer than `childHardMax` / `parentMax` | Still one atomic block. Becomes its own child (and its own parent if it alone exceeds `parentMax` after structure splits). Do **not** slice code to satisfy size knobs.                                                   |
-| Unclosed fence (EOF before close)              | From opener through EOF is one atomic fence block. Do not reinterpret interior lines as headings/lists.                                                                                                                   |
-| Fence inside a list item                       | In v1, if the lexer is top-level only: prefer authors use fences outside lists. If a fence is detected at top level, it still closes only on a valid closing fence line — list markers inside the fence are literal text. |
-| Apparent “nested” fences                       | CommonMark does not nest fences: the first matching closer ends the fence. An info string may contain fence characters; a closer must be a line of only the fence character (plus optional indent).                       |
-| Backtick vs tilde                              | Opener character chooses the fence family; a backtick line does not close a tilde fence and vice versa.                                                                                                                   |
+| Situation                                                  | Behavior                                                                                                                                                      |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Normal paired fence                                        | One atomic block. Never split inside; never attach half a fence to the previous/next child.                                                                   |
+| Fence longer than `childHardMaxTokens` / `parentMaxTokens` | Still one atomic block. Own child (and own parent if it alone exceeds `parentMaxTokens` after structure splits). Do **not** slice code to satisfy size knobs. |
+| Unclosed fence (EOF before close)                          | From opener through EOF is one atomic fence block. Do not reinterpret interior lines as headings/lists.                                                       |
+| Fence inside a list item                                   | Prefer fences outside lists in authored docs. List markers inside a fence are literal text.                                                                   |
+| Apparent “nested” fences                                   | First matching closer ends the fence. Closer = line of only the fence character (plus optional indent).                                                       |
+| Backtick vs tilde                                          | Opener character chooses the fence family.                                                                                                                    |
 
-**Packing with neighbors**
+### Fence intro glue
 
-- A short paragraph that only introduces the fence (“Example:”) **should** pack into the same child as the fence when the combined size ≤ soft target; if packing would exceed hard max, keep the intro paragraph in the previous child only when it is not part of a glue group — prefer packing intro + fence together and allowing soft-target overrun up to hard max; if intro + fence still exceed hard max, keep them together anyway when the intro is ≤ ~40 tokens (treat as glue-to-fence). Otherwise the fence stands alone as its own child and the intro stays with prior prose.
-- Never put the fence in child _N_ and its closing line in child _N+1_.
+A short paragraph that only introduces the following fence should stay in the **same child** as the fence when it is ≤ `fenceIntroGlueMaxTokens` (default `40`).
+
+````markdown
+## Examples
+
+Here is the setup code:
+
+```ts
+export const x = 1;
+```
+````
+
+“Here is the setup code:” is the fence intro. Glued child = intro paragraph + fence. Without glue, retrieval can hit the code without the sentence (or the reverse).
+
+**Packing rule (v1):**
+
+1. If the block immediately before a fence is a paragraph with token count ≤ `fenceIntroGlueMaxTokens`, treat **intro + fence** as a glue pair for child packing (same child; may exceed soft target; may exceed hard max only because the fence is atomic).
+2. If the intro is larger than `fenceIntroGlueMaxTokens`, do not glue: intro packs with prior prose; fence is its own child (or packs with following material under normal rules).
+3. Never put the fence in child _N_ and its closing line in child _N+1_.
 
 ### Image descriptions
 
-**Canonical form** (authors and ingest must normalize to this):
+**Canonical form** (authors should use this shape):
 
 ```markdown
 ![Alt text](path-or-url "optional title")
@@ -154,63 +236,63 @@ May span multiple lines.
 
 **Rules**
 
-| Situation                    | Behavior                                                                                                       |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Image + desc present         | One **glue group** (image paragraph + desc region). Same parent, same child.                                   |
-| Image without desc           | Image paragraph is a normal atomic HTML/paragraph-like block (treat as atomic media block); no desc required.  |
-| Desc without preceding image | Treat as an HTML/comment atomic block alone (do not invent an image). Prefer linting this away at author time. |
-| Desc larger than hard max    | Keep glue group intact; allow oversized child (same exception as fences).                                      |
-| Markers inside a code fence  | Literal text inside the fence; **not** an image-desc region.                                                   |
-| Extra HTML comments          | Ordinary HTML / ignored for glue unless they match the exact markers above.                                    |
+| Situation                    | Behavior                                                  |
+| ---------------------------- | --------------------------------------------------------- |
+| Image + desc present         | One **glue group**. Same parent, same child.              |
+| Image without desc           | Atomic media block; no desc required.                     |
+| Desc without preceding image | HTML/comment atomic block alone (do not invent an image). |
+| Desc larger than hard max    | Keep glue group intact; oversized child allowed.          |
+| Markers inside a code fence  | Literal text; **not** an image-desc region.               |
+| Extra HTML comments          | Ordinary HTML unless they match the exact markers above.  |
 
 **Parent split:** never place the image in one parent and its `image-desc` in the next. If a size-based parent pack would separate them, move the whole glue group into the next parent (or keep the group in the previous parent and start the new parent after the group).
 
 ### Lists, tables, quotes
 
-| Construct                              | Edge rule                                                                                                                                                                                                                                  |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Loose list (blank lines between items) | Still **one** list block until the list ends; blank lines inside do not create paragraph children mid-list.                                                                                                                                |
-| List item longer than hard max         | Keep whole list atomic in v1 (same oversized exception). Optional later: split between top-level items only if each item is a separate list block by blank-line separation **and** authors use separate lists — do not half-split an item. |
-| Table                                  | Atomic; oversized table → oversized child/parent exception.                                                                                                                                                                                |
-| Blockquote                             | Atomic in v1 (opaque).                                                                                                                                                                                                                     |
+| Construct                              | Edge rule                                             |
+| -------------------------------------- | ----------------------------------------------------- |
+| Loose list (blank lines between items) | Still **one** list block until the list ends.         |
+| List item longer than hard max         | Whole list atomic in v1 (oversized exception).        |
+| Table                                  | Atomic; oversized → oversized child/parent exception. |
+| Blockquote                             | Atomic in v1 (opaque).                                |
 
 ### Forced prose splits (paragraphs only)
 
-When packing children and a **single paragraph** block exceeds `childHardMax`:
+When packing children and a **single paragraph** block exceeds `childHardMaxTokens`:
 
-1. Split on sentence boundaries (`. `, `? `, `! `) preferring chunks in the soft target range.
+1. Split on sentence boundaries (`. `, `? `, `! `) preferring chunks near `childTargetTokens`.
 2. If a single sentence still exceeds hard max, split on whitespace nearest the target size.
-3. Apply overlap **only** between the two resulting prose pieces (~40–80 tokens from the end of the previous piece), still within the same parent.
+3. Apply overlap of `childOverlapTokens` only between the resulting prose pieces, still within the same parent.
 4. Never apply this procedure inside fences, tables, lists, image-desc bodies, or headings.
 
 ### Oversized atomic blocks
 
 Size knobs are **soft constraints** for prose packing. Atomic blocks and glue groups always win.
 
-| Case                               | Parent                          | Child                                      |
-| ---------------------------------- | ------------------------------- | ------------------------------------------ |
-| Atomic ≤ parentMax, > childHardMax | Stays in current section parent | Alone as one child (over hard max allowed) |
-| Atomic > parentMax                 | That block alone is one parent  | One child (= full parent text)             |
-| Glue group > parentMax             | Whole group is one parent       | One child                                  |
+| Case                                               | Parent                          | Child                          |
+| -------------------------------------------------- | ------------------------------- | ------------------------------ |
+| Atomic ≤ `parentMaxTokens`, > `childHardMaxTokens` | Stays in current section parent | Alone as one child             |
+| Atomic > `parentMaxTokens`                         | That block alone is one parent  | One child (= full parent text) |
+| Glue group > `parentMaxTokens`                     | Whole group is one parent       | One child                      |
 
-Record optional debug metadata later (e.g. `oversized: true`) if useful; v1 behavior does not drop or truncate these blocks.
+v1 does not drop or truncate these blocks.
 
 ### Heading and structure edge cases
 
-| Situation                                    | Behavior                                                                                                                                                            |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `#` only, no `##`                            | Single parent = full body                                                                                                                                           |
-| Text starts with prose before first `##`     | First parent = preamble through the line before first `##`                                                                                                          |
-| Empty `##` section (heading with no body)    | Parent may be heading-only; emit no children, or one child with just the heading text — prefer **one child** equal to the heading so the section remains searchable |
-| `####` and deeper                            | Do not start parents; they remain blocks inside the current `##` / `###` parent pack                                                                                |
-| Setext headings (`===` / `---` under a line) | v1: treat as paragraph + thematic break unless you explicitly lex Setext; prefer ATX in the corpus                                                                  |
+| Situation                                 | Behavior                                                                             |
+| ----------------------------------------- | ------------------------------------------------------------------------------------ |
+| `#` only, no `##`                         | Single parent = full body                                                            |
+| Body starts with prose before first `##`  | First parent = preamble through the line before first `##`                           |
+| Empty `##` section (heading with no body) | One child equal to the heading text (searchable)                                     |
+| `####` and deeper                         | Do not start parents; stay inside current `##` / `###` pack                          |
+| Setext headings                           | Prefer ATX in the corpus; follow whatever `Bun.markdown` emits for Setext if present |
 
 ### Empty and whitespace-only bodies
 
-| Input                          | Result                                                      |
-| ------------------------------ | ----------------------------------------------------------- |
-| Empty / whitespace-only `body` | No parents, no children; page row may still exist with hash |
-| Heading-only page              | One parent, one child (heading text)                        |
+| Input                          | Result                               |
+| ------------------------------ | ------------------------------------ |
+| Empty / whitespace-only `body` | No parents, no children              |
+| Heading-only page              | One parent, one child (heading text) |
 
 ## Query path
 
@@ -224,18 +306,6 @@ question → embed → search children only
 
 Do not send children to the LLM. Short pages: one small parent ≈ full body.
 
-## Defaults (tech markdown)
-
-| Knob                    | Value                                                         |
-| ----------------------- | ------------------------------------------------------------- |
-| Child target / hard max | 300–450 / ~500 tokens (prose packs only)                      |
-| Child overlap           | 40–80 tokens (forced **prose** splits only)                   |
-| Parent target / max     | 1000–1600 tokens                                              |
-| Parent boundaries       | `##` → `###` → block packs                                    |
-| Atomic override         | Fences, glue groups, tables, lists may exceed max as one unit |
-| Embed                   | Children only (optional `Title: …` prefix)                    |
-| LLM context             | Deduped parents under a character budget                      |
-
 ## Incremental updates (page hash)
 
 The skip gate is the **markdown page**, not each child. Store `pages.content_hash` over stable fields (normalize newlines first), for example:
@@ -246,13 +316,11 @@ The skip gate is the **markdown page**, not each child. Store `pages.content_has
 | ------------------------------------------- | ----------------------------------------------------------------- |
 | Hash matches stored page                    | Skip — no re-chunk, no re-embed                                   |
 | Hash differs                                | Replace that page’s parents and children, then embed new children |
-| Markdown unchanged, embedding model changed | Re-embed children whose `embedding_model` (or signature) is stale |
+| Markdown unchanged, embedding model changed | Re-embed children whose `embedding_model` is stale                |
 
-Do not rely on per-child file hashes as the primary gate: you would still parse every file to know what changed. Optional child/parent text hashes are fine later for debugging; v1 replace-on-page-change is enough.
+Do not rely on per-child file hashes as the primary gate. Shared path: hash check → optional replace tree → chunkify → embed children → update `content_hash` / `embedding_model`.
 
-Ingest should share one code path with any higher-layer rebuild tools: hash check → optional replace tree → embed children → update `content_hash` / `embedding_model`. Operator-facing APIs (compare hashes, force re-chunk, re-embed stale) live outside this doc.
-
-See also [appendix-a-data-model.md](./appendix-a-data-model.md) (tables / Prisma) and [appendix-b-vector-search.md](./appendix-b-vector-search.md) (query-time search).
+See also [appendix-a-data-model.md](./appendix-a-data-model.md) and [appendix-b-vector-search.md](./appendix-b-vector-search.md).
 
 ## One-line rule
 

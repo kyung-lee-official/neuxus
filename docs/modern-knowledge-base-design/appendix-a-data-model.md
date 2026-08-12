@@ -100,3 +100,27 @@ CREATE INDEX kb_children_embedding_hnsw
 | App chat users / sessions                      | Existing `app_*` models — keep separate from `kb_*` |
 
 Same database URL is fine; keep knowledge tables namespaced so they do not collide with `app_users`, memories, and sessions.
+
+## Chunk knobs (settings)
+
+Packing sizes are **adjustable in DB**; **app code** supplies defaults when a value is missing (not SQL `DEFAULT`). Resolved knobs are passed into `chunkify` — see [01-chunkify.md](./01-chunkify.md).
+
+Illustrative shape (single-row or key/value — final shape open):
+
+```prisma
+model KnowledgeChunkSettings {
+  id String @id @default("default")
+
+  childTargetTokens        Int?
+  childHardMaxTokens       Int?
+  childOverlapTokens       Int?
+  childCrumbMinTokens      Int?
+  parentMaxTokens          Int?
+  fenceIntroGlueMaxTokens  Int?
+  tokenizerEncoding        String? // e.g. ai-tokenizer encoding id
+
+  @@map("kb_chunk_settings")
+}
+```
+
+App defaults when null/absent: `childTargetTokens=400`, `childHardMaxTokens=500`, `childOverlapTokens=60`, `childCrumbMinTokens=64`, `parentMaxTokens=1400`, `fenceIntroGlueMaxTokens=40`; `tokenizerEncoding` still to be chosen with `ai-tokenizer`.
