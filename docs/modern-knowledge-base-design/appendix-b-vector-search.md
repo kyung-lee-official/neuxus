@@ -1,6 +1,6 @@
 # Appendix B — Vector search (question → parents)
 
-After children are embedded ([chunkify.md](./chunkify.md), [appendix-a-data-model.md](./appendix-a-data-model.md)), answer retrieval uses **pgvector in SQL** on `kb_children.embedding`. Prisma Client is not used for similarity.
+After children are embedded ([01-chunkify.md](./01-chunkify.md), [appendix-a-data-model.md](./appendix-a-data-model.md)), answer retrieval uses **pgvector in SQL** on `kb_children.embedding`. Prisma Client is not used for similarity.
 
 ## End-to-end flow
 
@@ -68,4 +68,4 @@ Never send only the tiny child window as the sole LLM context when a parent exis
 
 ## Stale vectors
 
-If `embedding` is null or `embedding_model` does not match the configured model, exclude from search (or repair first via the re-embed API in [chunkify.md](./chunkify.md)).
+If `embedding` is null or `embedding_model` does not match the configured model, exclude from search (or repair first via a higher-layer re-embed path; see incremental updates in [01-chunkify.md](./01-chunkify.md)).

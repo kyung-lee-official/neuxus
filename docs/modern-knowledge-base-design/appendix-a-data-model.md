@@ -1,6 +1,6 @@
 # Appendix A — Knowledge data model (pages, parents, children)
 
-Relational store in Postgres. Embeddings live as a **`vector` column on `children`** (pgvector extension) — still a normal table, not a separate vector product. Chunking rules: [chunkify.md](./chunkify.md). Search: [appendix-b-vector-search.md](./appendix-b-vector-search.md).
+Relational store in Postgres. Embeddings live as a **`vector` column on `children`** (pgvector extension) — still a normal table, not a separate vector product. Chunking rules: [01-chunkify.md](./01-chunkify.md). Search: [appendix-b-vector-search.md](./appendix-b-vector-search.md).
 
 ## Entity links
 
@@ -18,7 +18,7 @@ Page 1 ──* Parent 1 ──* Child
 
 Required FKs: `Parent.pageId → Page`, `Child.parentId → Parent`. Optional denormalized `Child.pageId` for cheaper filters. Optional `startOffset` / `endOffset` into page `body` for debug and re-slice.
 
-On page change: delete that page’s parents and children (vectors go with child rows), then insert the new tree. See incremental updates in [chunkify.md](./chunkify.md).
+On page change: delete that page’s parents and children (vectors go with child rows), then insert the new tree. See incremental updates in [01-chunkify.md](./01-chunkify.md).
 
 ## Prisma schema shape
 
