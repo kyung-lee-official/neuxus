@@ -158,11 +158,19 @@ describe("chunkify fixtures", () => {
     expect(child!.text).toContain("Alpha paragraph.\n\nBeta paragraph.");
   });
 
-  test("unclosed-fence.md → fence through EOF", async () => {
-    const { children } = await runFixture("unclosed-fence.md");
+  test("unclosed-fence.md → fence through EOF; interior not re-lexed", async () => {
+    const { parents, children } = await runFixture("unclosed-fence.md");
+    expect(parents).toHaveLength(1);
+    expect(parents[0]!.text).toContain("## C");
+    expect(parents.some((p) => p.text.trimStart().startsWith("## XXX"))).toBe(
+      false,
+    );
+
     const fence = children.find((c) => c.text.includes("```js"));
     expect(fence).toBeDefined();
     expect(fence!.text).toContain("console.log(1);");
+    expect(fence!.text).toContain("## XXX");
+    expect(fence!.text).toContain("- not a list either");
     expect(fence!.text.trimEnd().endsWith("```")).toBe(false);
   });
 
