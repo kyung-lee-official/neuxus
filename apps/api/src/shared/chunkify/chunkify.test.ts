@@ -8,6 +8,7 @@ import {
   chunkify,
   resolveChunkifyOptions,
 } from "./index.ts";
+import { normalizeNewlines } from "./lex.ts";
 
 const fixturesDir = join(import.meta.dir, "fixtures");
 const fixturesOutDir = join(import.meta.dir, "fixtures-out");
@@ -25,45 +26,15 @@ function assertExactSlices(body: string, result: ChunkifyResult): void {
   }
 }
 
-function renderReviewMarkdown(
-  fixtureName: string,
-  body: string,
+/** Contiguous source span covering all parents — pure markdown, no review chrome. */
+function pureChunkedMarkdown(
+  normalizedBody: string,
   result: ChunkifyResult,
 ): string {
-  const lines: string[] = [
-    `# ${fixtureName}`,
-    "",
-    `parents: ${result.parents.length} · children: ${result.children.length} · bodyChars: ${body.length}`,
-    "",
-  ];
-
-  for (const parent of result.parents) {
-    lines.push(`## Parent ${parent.index} [${parent.start}:${parent.end}]`);
-    lines.push("");
-    lines.push("```markdown");
-    lines.push(parent.text.replace(/\n$/, "") || "(empty)");
-    lines.push("```");
-    lines.push("");
-
-    const kids = result.children.filter((c) => c.parentIndex === parent.index);
-    for (const child of kids) {
-      lines.push(
-        `### Child ${child.index} (parent ${child.parentIndex}) [${child.start}:${child.end}]`,
-      );
-      lines.push("");
-      lines.push("```markdown");
-      lines.push(child.text.replace(/\n$/, "") || "(empty)");
-      lines.push("```");
-      lines.push("");
-    }
-  }
-
-  if (result.parents.length === 0) {
-    lines.push("_(no parents / children)_");
-    lines.push("");
-  }
-
-  return lines.join("\n");
+  if (result.parents.length === 0) return "";
+  const start = result.parents[0]!.start;
+  const end = result.parents[result.parents.length - 1]!.end;
+  return normalizedBody.slice(start, end);
 }
 
 async function writeReviewDump(
@@ -74,13 +45,14 @@ async function writeReviewDump(
 ): Promise<void> {
   await mkdir(fixturesOutDir, { recursive: true });
   const base = fixtureName.replace(/\.md$/i, "");
+  const normalizedBody = normalizeNewlines(body);
   const resolved = resolveChunkifyOptions(options);
 
   const payload = {
     fixture: fixtureName,
     options: resolved,
     defaults: CHUNKIFY_DEFAULTS,
-    bodyChars: body.length,
+    bodyChars: normalizedBody.length,
     parents: result.parents,
     children: result.children,
   };
@@ -91,16 +63,17 @@ async function writeReviewDump(
   );
   await Bun.write(
     join(fixturesOutDir, `${base}.md`),
-    renderReviewMarkdown(fixtureName, body, result),
+    pureChunkedMarkdown(normalizedBody, result),
   );
 }
 
 async function runFixture(name: string, options?: ChunkifyOptions) {
   const body = await loadFixture(name);
+  const normalizedBody = normalizeNewlines(body);
   const result = chunkify(body, options);
-  assertExactSlices(body, result);
+  assertExactSlices(normalizedBody, result);
   await writeReviewDump(name, body, result, options);
-  return { body, ...result };
+  return { body: normalizedBody, ...result };
 }
 
 describe("chunkify fixtures", () => {
