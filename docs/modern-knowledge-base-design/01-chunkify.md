@@ -43,25 +43,25 @@ Child size tracks **embedding precision**; parent size tracks **useful context**
 
 ## Parser and tokens
 
-| Concern | Decision                                                                     |
-| ------- | ---------------------------------------------------------------------------- |
-| Dialect | GFM                                                                          |
-| Lex     | Source lexer for exact offsets (`Bun.markdown` lacks positions — open issue) |
-| Count   | `ai-tokenizer`                                                               |
+| Concern | Decision                                                                  |
+| ------- | ------------------------------------------------------------------------- |
+| Dialect | GFM                                                                       |
+| Lex     | Source lexer that yields blocks with exact offsets into normalized `body` |
+| Count   | A stable tokenizer API (`count(text)`); encoding id is a knob             |
 
 ## Knobs
 
-DB may store overrides ([appendix-a](./appendix-a-data-model.md)); missing values use these **app defaults**:
+DB may store overrides ([appendix-a](./appendix-a-data-model.md)); missing values use these **application defaults**:
 
-| Knob                      | Default      | Role                                                  |
-| ------------------------- | ------------ | ----------------------------------------------------- |
-| `childTargetTokens`       | `400`        | Soft child pack target                                |
-| `childHardMaxTokens`      | `500`        | Hard max for **splittable prose** only                |
-| `childOverlapTokens`      | `60`         | After forced prose split                              |
-| `childCrumbMinTokens`     | `64`         | Merge smaller crumbs into previous child when allowed |
-| `parentMaxTokens`         | `1400`       | Max parent before `###` / block re-pack               |
-| `fenceIntroGlueMaxTokens` | `40`         | Max lead-in paragraph glued to following fence        |
-| `tokenizerEncoding`       | `o200k_base` | `ai-tokenizer` encoding id                            |
+| Knob                      | Default                    | Role                                                  |
+| ------------------------- | -------------------------- | ----------------------------------------------------- |
+| `childTargetTokens`       | `400`                      | Soft child pack target                                |
+| `childHardMaxTokens`      | `500`                      | Hard max for **splittable prose** only                |
+| `childOverlapTokens`      | `60`                       | After forced prose split                              |
+| `childCrumbMinTokens`     | `64`                       | Merge smaller crumbs into previous child when allowed |
+| `parentMaxTokens`         | `1400`                     | Max parent before `###` / block re-pack               |
+| `fenceIntroGlueMaxTokens` | `40`                       | Max lead-in paragraph glued to following fence        |
+| `tokenizerEncoding`       | _(implementation-defined)_ | Tokenizer encoding / model id used for `count`        |
 
 Fixed policy (not a knob): parent cuts `##` → `###` → block packs. Atomic blocks may exceed size knobs as one unit ([Oversized](#oversized-atomic-blocks)).
 

@@ -1,6 +1,6 @@
 # Appendix A — Knowledge data model (pages, parents, children)
 
-Postgres + pgvector on **`kb_children.embedding`**. Chunking: [01-chunkify.md](./01-chunkify.md). Search: [appendix-b-vector-search.md](./appendix-b-vector-search.md).
+Relational store in **PostgreSQL**, with **pgvector** on `kb_children.embedding`. Chunking: [01-chunkify.md](./01-chunkify.md). Search: [appendix-b-vector-search.md](./appendix-b-vector-search.md).
 
 ## Entities
 
@@ -14,70 +14,73 @@ Page ──* Parent ──* Child (embedding)
 | **Parent** | Generation slice of `body`                       | No        |
 | **Child**  | Retrieval unit                                   | Yes       |
 
-FKs: `Parent.pageId → Page`, `Child.parentId → Parent`. Optional denormalized `Child.pageId`; optional `startOffset` / `endOffset`. On page change: delete that page’s parents/children, insert the new tree ([incremental updates](./01-chunkify.md#incremental-updates-page-hash)).
+FKs: `kb_parents.page_id → kb_pages`, `kb_children.parent_id → kb_parents`. Optional denormalized `kb_children.page_id`; optional `start_offset` / `end_offset` into page `body`. On page change: delete that page’s parents/children, insert the new tree ([incremental updates](./01-chunkify.md#incremental-updates-page-hash)).
 
-Keep `kb_*` separate from `app_*` (same `DATABASE_URL` is fine).
+Keep `kb_*` namespaced apart from application tables (same database is fine).
 
-## Prisma shape
+## Tables (PostgreSQL)
 
-Prisma has no first-class pgvector: use `Unsupported("vector(N)")` and **raw SQL** for embed/search. Client CRUD omits `embedding`.
-
-```prisma
-model KnowledgePage {
-  id          String   @id @default(cuid())
-  slug        String   @unique
-  title       String
-  type        String?
-  tags        String[] @default([])
-  body        String
-  sourcePath  String?  @map("source_path")
-  contentHash String   @map("content_hash")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  parents     KnowledgeParent[]
-  @@map("kb_pages")
-}
-
-model KnowledgeParent {
-  id          String @id @default(cuid())
-  pageId      String @map("page_id")
-  parentIndex Int    @map("parent_index")
-  text        String
-  page        KnowledgePage    @relation(fields: [pageId], references: [id], onDelete: Cascade)
-  children    KnowledgeChild[]
-  @@unique([pageId, parentIndex])
-  @@map("kb_parents")
-}
-
-model KnowledgeChild {
-  id             String                      @id @default(cuid())
-  parentId       String                      @map("parent_id")
-  pageId         String                      @map("page_id")
-  childIndex     Int                         @map("child_index")
-  text           String
-  embedding      Unsupported("vector(768)")?
-  embeddingModel String?                     @map("embedding_model")
-  embeddedAt     DateTime?                   @map("embedded_at")
-  parent         KnowledgeParent @relation(fields: [parentId], references: [id], onDelete: Cascade)
-  @@unique([parentId, childIndex])
-  @@map("kb_children")
-}
-```
-
-Match `vector(N)` to the embedding model. Migration SQL (manual — agents must not migrate / db push):
+Match `vector(N)` to the embedding model dimensions. Apply schema changes with your usual migration process.
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE kb_pages (
+  id           TEXT PRIMARY KEY,
+  slug         TEXT NOT NULL UNIQUE,
+  title        TEXT NOT NULL,
+  type         TEXT,
+  tags         TEXT[] NOT NULL DEFAULT '{}',
+  body         TEXT NOT NULL,
+  source_path  TEXT,
+  content_hash TEXT NOT NULL,
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE kb_parents (
+  id           TEXT PRIMARY KEY,
+  page_id      TEXT NOT NULL REFERENCES kb_pages (id) ON DELETE CASCADE,
+  parent_index INT NOT NULL,
+  text         TEXT NOT NULL,
+  -- optional: start_offset INT, end_offset INT
+  UNIQUE (page_id, parent_index)
+);
+
+CREATE TABLE kb_children (
+  id              TEXT PRIMARY KEY,
+  parent_id       TEXT NOT NULL REFERENCES kb_parents (id) ON DELETE CASCADE,
+  page_id         TEXT NOT NULL,  -- optional denorm; add FK to kb_pages if desired
+  child_index     INT NOT NULL,
+  text            TEXT NOT NULL,
+  embedding       vector(768),    -- adjust N to the embedding model
+  embedding_model TEXT,
+  embedded_at     TIMESTAMPTZ,
+  UNIQUE (parent_id, child_index)
+);
 
 CREATE INDEX kb_children_embedding_hnsw
   ON kb_children
   USING hnsw (embedding vector_cosine_ops);
 ```
 
-| Concern                    | Tooling           |
-| -------------------------- | ----------------- |
-| Page / parent / child text | Prisma and/or SQL |
-| Embed + similarity         | Raw SQL only      |
+| Concern                                        | Access                                                |
+| ---------------------------------------------- | ----------------------------------------------------- |
+| Page / parent / child text and metadata        | Ordinary SQL (or any ORM)                             |
+| Insert / update `embedding`, similarity search | SQL against pgvector (ORM vector support is optional) |
 
 ## Chunk knobs table
 
-Nullable columns; **defaults live in app code** ([01-chunkify.md](./01-chunkify.md#knobs)), not SQL `DEFAULT`. Shape: single row `id = "default"` (see `KnowledgeChunkSettings` in `apps/api/prisma/schema.prisma`). No app load/save code yet — schema only until ingest wires it.
+Nullable columns; **defaults live in application code** ([01-chunkify.md](./01-chunkify.md#knobs)), not SQL `DEFAULT`. Shape: single row `id = 'default'`.
+
+```sql
+CREATE TABLE kb_chunk_settings (
+  id                          TEXT PRIMARY KEY DEFAULT 'default',
+  child_target_tokens         INT,
+  child_hard_max_tokens       INT,
+  child_overlap_tokens        INT,
+  child_crumb_min_tokens      INT,
+  parent_max_tokens           INT,
+  fence_intro_glue_max_tokens INT,
+  tokenizer_encoding          TEXT
+);
+```

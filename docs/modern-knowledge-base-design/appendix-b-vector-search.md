@@ -1,6 +1,6 @@
 # Appendix B — Vector search (question → parents)
 
-Similarity on `kb_children.embedding` via **pgvector SQL** (not Prisma Client). Schema/index: [appendix-a-data-model.md](./appendix-a-data-model.md). Chunk roles: [01-chunkify.md](./01-chunkify.md).
+Similarity on `kb_children.embedding` via **pgvector** SQL. Schema/index: [appendix-a-data-model.md](./appendix-a-data-model.md). Chunk roles: [01-chunkify.md](./01-chunkify.md).
 
 ## Flow
 

@@ -4,80 +4,80 @@
 // Do not run migrate / db push from the agent.
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+    provider = "prisma-client"
+    output   = "../src/generated/prisma"
 }
 
 datasource db {
-  provider = "postgresql"
+    provider = "postgresql"
 }
 
 model User {
-  id        String   @id
-  apiKey    String   @unique @map("api_key")
-  /// `admin` | `member` — haewon (seed) or first created account is admin.
-  role      String   @default("member")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+    id        String   @id
+    apiKey    String   @unique @map("api_key")
+    /// `admin` | `member` — haewon (seed) or first created account is admin.
+    role      String   @default("member")
+    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  memories Memory[]
-  sessions Session[]
+    memories Memory[]
+    sessions Session[]
 
-  @@map("app_users")
+    @@map("app_users")
 }
 
 model Memory {
-  id        BigInt   @id @default(autoincrement())
-  userId    String   @map("user_id")
-  slug      String
-  content   String
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+    id        BigInt   @id @default(autoincrement())
+    userId    String   @map("user_id")
+    slug      String
+    content   String
+    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, slug])
-  @@index([userId, createdAt(sort: Desc)], map: "app_memories_user_id_idx")
-  @@map("app_memories")
+    @@unique([userId, slug])
+    @@index([userId, createdAt(sort: Desc)], map: "app_memories_user_id_idx")
+    @@map("app_memories")
 }
 
 model Session {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @map("user_id")
-  title     String?
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+    id        String   @id @default(uuid()) @db.Uuid
+    userId    String   @map("user_id")
+    title     String?
+    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages Message[]
+    user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+    messages Message[]
 
-  @@map("app_sessions")
+    @@map("app_sessions")
 }
 
 /// Stored as TEXT with CHECK (role IN ('user', 'assistant')) — matches existing schema.
 model Message {
-  id        BigInt   @id @default(autoincrement())
-  sessionId String   @map("session_id") @db.Uuid
-  role      String
-  content   String
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+    id        BigInt   @id @default(autoincrement())
+    sessionId String   @map("session_id") @db.Uuid
+    role      String
+    content   String
+    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+    session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
-  @@index([sessionId, createdAt], map: "app_messages_session_id_idx")
-  @@map("app_messages")
+    @@index([sessionId, createdAt], map: "app_messages_session_id_idx")
+    @@map("app_messages")
 }
 
 /// Chunkify knobs (`kb_chunk_settings`). Nullable columns — app defaults live in code
 /// (`CHUNKIFY_DEFAULTS`), not SQL DEFAULT. Single row: id = `"default"`.
 model KnowledgeChunkSettings {
-  id String @id @default("default")
+    id String @id @default("default")
 
-  childTargetTokens       Int?    @map("child_target_tokens")
-  childHardMaxTokens      Int?    @map("child_hard_max_tokens")
-  childOverlapTokens      Int?    @map("child_overlap_tokens")
-  childCrumbMinTokens     Int?    @map("child_crumb_min_tokens")
-  parentMaxTokens         Int?    @map("parent_max_tokens")
-  fenceIntroGlueMaxTokens Int?    @map("fence_intro_glue_max_tokens")
-  tokenizerEncoding       String? @map("tokenizer_encoding")
+    childTargetTokens       Int?    @map("child_target_tokens")
+    childHardMaxTokens      Int?    @map("child_hard_max_tokens")
+    childOverlapTokens      Int?    @map("child_overlap_tokens")
+    childCrumbMinTokens     Int?    @map("child_crumb_min_tokens")
+    parentMaxTokens         Int?    @map("parent_max_tokens")
+    fenceIntroGlueMaxTokens Int?    @map("fence_intro_glue_max_tokens")
+    tokenizerEncoding       String? @map("tokenizer_encoding")
 
-  @@map("kb_chunk_settings")
+    @@map("kb_chunk_settings")
 }
