@@ -1,6 +1,6 @@
-# Appendix B — Vector search (question → parents)
+# Query (question → parents)
 
-Similarity on `kb_children.embedding` via **pgvector** SQL. Schema/index: [appendix-a-data-model.md](./appendix-a-data-model.md). Chunk roles: [02-chunkify.md](./02-chunkify.md). Embed: [03-embed.md](./03-embed.md).
+Read-path: embed the question, similarity-search `kb_children.embedding`, expand to parents for the LLM. Schema/index: [appendix-a-data-model.md](./appendix-a-data-model.md). Chunk roles: [02-chunkify.md](./02-chunkify.md). Embed: [03-embed.md](./03-embed.md).
 
 ## Flow
 

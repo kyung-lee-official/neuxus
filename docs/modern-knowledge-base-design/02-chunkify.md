@@ -4,7 +4,7 @@
 
 **`body`** is ingest-normalized page markdown ([01-ingest.md](./01-ingest.md)), stored as `kb_pages.body`, **before** `chunkify`. Parents and children are slices of this string, not a second copy of the file.
 
-Related: [01-ingest.md](./01-ingest.md), [appendix-a-data-model.md](./appendix-a-data-model.md), [appendix-b-vector-search.md](./appendix-b-vector-search.md), [03-embed.md](./03-embed.md).
+Related: [01-ingest.md](./01-ingest.md), [03-embed.md](./03-embed.md), [04-query.md](./04-query.md), [appendix-a-data-model.md](./appendix-a-data-model.md).
 
 ## Pure function
 
@@ -41,7 +41,7 @@ No I/O. Caller supplies `body` (frontmatter already stripped, ingest-normalized)
 
 Child size tracks **embedding precision**; parent size tracks **useful context** (+ remaining LLM budget).
 
-**Tree:** page →\* parent →\* child. Children never cross a parent boundary; overlap (if any) stays inside one parent. Persistence FKs and page replace-on-edit: [appendix-a](./appendix-a-data-model.md). Query expand: [appendix-b](./appendix-b-vector-search.md).
+**Tree:** page →\* parent →\* child. Children never cross a parent boundary; overlap (if any) stays inside one parent. Persistence FKs and page replace-on-edit: [appendix-a](./appendix-a-data-model.md). Query expand: [04-query.md](./04-query.md).
 
 ## Lex
 

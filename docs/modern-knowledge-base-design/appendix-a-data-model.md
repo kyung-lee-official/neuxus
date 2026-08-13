@@ -1,6 +1,6 @@
 # Appendix A — Knowledge data model (pages, parents, children)
 
-Relational store in **PostgreSQL**, with **pgvector** on `kb_children.embedding`. Ingest: [01-ingest.md](./01-ingest.md). Chunking: [02-chunkify.md](./02-chunkify.md). Embed: [03-embed.md](./03-embed.md). Search: [appendix-b-vector-search.md](./appendix-b-vector-search.md).
+Relational store in **PostgreSQL**, with **pgvector** on `kb_children.embedding`. Ingest: [01-ingest.md](./01-ingest.md). Chunking: [02-chunkify.md](./02-chunkify.md). Embed: [03-embed.md](./03-embed.md). Query: [04-query.md](./04-query.md).
 
 ## Entities
 
