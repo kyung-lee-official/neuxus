@@ -31,7 +31,7 @@ CREATE TABLE kb_pages (
   title        TEXT NOT NULL,
   type         TEXT,
   tags         TEXT[] NOT NULL DEFAULT '{}',
-  body         TEXT NOT NULL,  -- newline-normalized (\r\n / \r → \n) at ingest
+  body         TEXT NOT NULL,  -- ingest: newlines, strip trailing spaces, final \n
   source_path  TEXT,
   content_hash TEXT NOT NULL,
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()

@@ -6,11 +6,13 @@ Related: [appendix-a-data-model.md](./appendix-a-data-model.md), [appendix-b-vec
 
 ## Body
 
-**`body`** is the page’s markdown **after ingest**, stored as `kb_pages.body`, **before** `chunkify`. Frontmatter is already stripped (title/tags are columns). Newlines are already `\n` ([Body ownership](#body-ownership)). Parents and children are slices of this string, not a second copy of the file.
+**`body`** is the page’s markdown **after ingest**, stored as `kb_pages.body`, **before** `chunkify`. YAML frontmatter is stripped (title/tags are columns). Newlines, trailing spaces, and a final `\n` are already applied ([Body ownership](#body-ownership)). Parents and children are slices of this string, not a second copy of the file.
 
 ```text
-file.md → strip frontmatter → \r\n → \n → kb_pages.body → chunkify(body)
+file.md → strip YAML frontmatter → normalize → kb_pages.body → chunkify(body)
 ```
+
+Frontmatter (`---` YAML) is ingest-only: `title` / `tags` go to columns; `chunkify` never sees the `---` block.
 
 ## Pure function
 
@@ -27,7 +29,7 @@ chunkify(body: string, options?: ChunkifyOptions): {
 }
 ```
 
-No I/O. Caller supplies `body` (frontmatter already stripped, **newline-normalized at ingest** — see [Body ownership](#body-ownership)) and resolved knobs. Each `text` is `body.slice(start, end)` — keep blank lines inside the span; do not compact.
+No I/O. Caller supplies `body` (frontmatter already stripped, ingest-normalized — see [Body ownership](#body-ownership)) and resolved knobs. Each `text` is `body.slice(start, end)` — keep blank lines inside the span; do not compact.
 
 | In scope                          | Out of scope                                |
 | --------------------------------- | ------------------------------------------- |
@@ -83,41 +85,51 @@ Rules for how parents and children are packed: [Pipeline](#pipeline).
 
 ## Parser and tokens
 
-| Concern | Decision                                                      |
-| ------- | ------------------------------------------------------------- |
-| Dialect | GFM                                                           |
-| Count   | A stable tokenizer API (`count(text)`); encoding id is a knob |
+| Concern   | Decision                                                |
+| --------- | ------------------------------------------------------- |
+| Dialect   | GFM                                                     |
+| Lex       | Custom `lex.ts` — no third-party markdown parser        |
+| Tokenizer | `ai-tokenizer` encoding **`o200k_base`** (fixed for v1) |
 
 ## Knobs
 
 DB may store overrides ([appendix-a](./appendix-a-data-model.md)); missing values use these **application defaults**:
 
-| Knob                      | Default                    | Role                                                       |
-| ------------------------- | -------------------------- | ---------------------------------------------------------- |
-| `childTargetTokens`       | `400`                      | Soft child pack target                                     |
-| `childHardMaxTokens`      | `500`                      | Hard max for **splittable prose** only                     |
-| `childOverlapTokens`      | `60`                       | Token **budget** after sentence snap ([overlap](#overlap)) |
-| `childCrumbMinTokens`     | `64`                       | Merge smaller crumbs into previous child when allowed      |
-| `parentMaxTokens`         | `1400`                     | Max parent before `###` / block re-pack                    |
-| `fenceIntroGlueMaxTokens` | `40`                       | Max lead-in paragraph glued to following fence             |
-| `tokenizerEncoding`       | _(implementation-defined)_ | Tokenizer encoding / model id used for `count`             |
+| Knob                      | Default      | Role                                                      |
+| ------------------------- | ------------ | --------------------------------------------------------- |
+| `childTargetTokens`       | `400`        | Soft child pack target                                    |
+| `childHardMaxTokens`      | `500`        | Hard max for **splittable prose** only                    |
+| `childOverlapTokens`      | `60`         | Token **budget** after a legal snap ([overlap](#overlap)) |
+| `childCrumbMinTokens`     | `64`         | Merge smaller crumbs into previous child when allowed     |
+| `parentMaxTokens`         | `1400`       | Max parent before `###` / block re-pack                   |
+| `fenceIntroGlueMaxTokens` | `40`         | Max lead-in paragraph glued to following fence            |
+| `tokenizerEncoding`       | `o200k_base` | Fixed encoding for `count` (v1)                           |
 
 Fixed policy (not a knob): parent cuts `##` → `###` → block packs. Atomic blocks may exceed size knobs as one unit ([Oversized](#oversized-atomic-blocks)).
 
 ## Pipeline
 
-1. Treat `body` as already newline-normalized ([Body ownership](#body-ownership)); a second `\r\n` → `\n` pass is idempotent.
+1. Treat `body` as already ingest-normalized ([Body ownership](#body-ownership)); a second pass is idempotent.
 2. Lex into [blocks](#block-inventory).
 3. Build [parents](#parents).
 4. Pack [children](#children) inside each parent (whole blocks only; only paragraphs may [force-split](#forced-prose-splits)).
 
 ### Body ownership
 
-Ingest persists **newline-normalized** `kb_pages.body` (`\r\n` / `\r` → `\n`). Hashes, `chunkify` offsets, and stored slices all use that string — not original file bytes. A second normalize pass in `chunkify` is idempotent. CRLF round-trip is out of scope.
+Ingest writes canonical `kb_pages.body`:
+
+- `\r\n` / `\r` → `\n`
+- strip trailing spaces on each line
+- ensure a single final `\n`
+- no Unicode NFC (not required)
+
+Hashes, offsets, and slices use that string — not original file bytes. `chunkify` may re-apply the same map (idempotent). CRLF round-trip is out of scope.
 
 ### Overlap
 
-`childOverlapTokens` is a **budget**, used only after a [forced prose split](#forced-prose-splits). Measure it on the previous piece’s **tail after the sentence (or whitespace) snap**, not as a raw N-token suffix of the unsplit paragraph. Prefer whole sentences (size may be under 60); never start mid-word when a boundary exists.
+`childOverlapTokens` is a **budget**, used only after a [forced prose split](#forced-prose-splits). Measure it on the previous piece’s **tail after the snap**, not as a raw N-token suffix of the unsplit paragraph. Size may be under 60.
+
+**Legal snap points** (never mid-word / mid-sentence): sentence, paragraph, heading, list item.
 
 ### Parents
 
@@ -195,7 +207,7 @@ Markers: lines exactly `<!-- image-desc -->` / `<!-- /image-desc -->` (trim that
 
 ### Forced prose splits
 
-Only when a **single paragraph** exceeds `childHardMaxTokens`: snap the cut to a **sentence** boundary near `childTargetTokens` (else whitespace / word — never mid-word). Then apply [overlap](#overlap). Never inside fences, tables, lists, image-desc, or headings.
+Only when a **single paragraph** exceeds `childHardMaxTokens`: snap at a [legal cut point](#overlap) near `childTargetTokens`. Then apply [overlap](#overlap). Never inside fences, tables, image-desc, or headings.
 
 ### Oversized atomic blocks
 
@@ -212,7 +224,7 @@ Whitespace-only → no parents, no children.
 
 ## Incremental updates (page hash)
 
-Skip gate is the **page**, not each child. Example: `sha256(title + type + tags + body)` on the stored (newline-normalized) `body`.
+Skip gate is the **page**, not each child. Example: `sha256(title + type + tags + body)` on the stored ingest-normalized `body`.
 
 | Situation                          | Action                                                     |
 | ---------------------------------- | ---------------------------------------------------------- |
