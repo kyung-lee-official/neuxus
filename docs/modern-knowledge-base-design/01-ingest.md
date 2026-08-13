@@ -39,10 +39,10 @@ sha256(
 
 Do not concatenate raw strings (`title + type + tags + body`) — `ab`+`c` and `a`+`bc` collide.
 
-| Situation                          | Action                                                     |
-| ---------------------------------- | ---------------------------------------------------------- |
-| Hash match                         | Skip                                                       |
-| Hash differs                       | Replace that page’s parent/child tree, then embed children |
-| Same markdown, new embedding model | Re-embed stale children                                    |
+| Situation                                                | Action                                                     |
+| -------------------------------------------------------- | ---------------------------------------------------------- |
+| Hash match                                               | Skip                                                       |
+| Hash differs                                             | Replace that page’s parent/child tree, then embed children |
+| Same markdown, new embedding model (`kb_embed_settings`) | Re-embed stale children ([03-embed.md](./03-embed.md))     |
 
 Shared path: hash check → optional replace → `chunkify` → embed → update `content_hash` / `embedding_model`.

@@ -10,19 +10,26 @@ Parents are not embedded. The LLM sees parent text at query time, not at embed t
 
 ## Provider
 
-Talk to **Ollama** through an **embedder** interface (`embed(texts) → vectors`). The Ollama client is one implementation. Callers (page embed, later question embed) must not import Ollama HTTP details.
+Talk to the provider through an **embedder** interface (`embed(texts) → vectors`). The first implementation is **Ollama**. Callers (page embed, later question embed) must not import HTTP details.
 
-Default model id: **`nomic-embed-text:latest`**. Match `vector(N)` to that model’s dimensions (`nomic-embed-text` is 768). Cosine distance (`<=>`) for search.
+**All embed runtime config lives in Postgres** (`kb_embed_settings`), not in env: current model, provider, host, port, API key (when used). `DATABASE_URL` remains process env so the app can reach the database.
 
-## Model in the database
+Default model id when the settings row is missing or `embedding_model` is null: **`nomic-embed-text:latest`**. Match `vector(N)` to that model’s dimensions (`nomic-embed-text` is 768). Cosine distance (`<=>`) for search. Changing width is a **schema migration**, not a settings-row flip.
 
-**Current model** (what new embeds use) lives in the DB, same idea as chunk knobs: nullable column, **app default in code** when missing.
+## Settings in the database
 
-Shape: single row `id = 'default'` (own table, or a column next to chunk settings). Store at least `embedding_model` (text). Example default when the column is null: `nomic-embed-text:latest`.
+Dedicated table `kb_embed_settings`, same idea as chunk knobs: single row `id = 'default'`, **nullable columns**, **app defaults in code** when missing. Schema: [appendix-a-data-model.md](./appendix-a-data-model.md#embed-settings-table).
 
-**Each child** also stores what produced its vector: `kb_children.embedding_model` and `embedded_at`. Search and re-embed compare the child to the **current** DB model, not a hardcoded string.
+Two kinds of fields:
 
-Changing the current model does not rewrite vectors until a re-embed pass. Children with a different `embedding_model` (or null `embedding`) are stale.
+| Kind                         | Columns                               | Changing it                                                                                                                         |
+| ---------------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **Vector identity**          | `embedding_model`                     | Children with a different `embedding_model` (or null `embedding`) are stale; re-embed pass. Search compares children to this value. |
+| **How we call the provider** | `provider`, `host`, `port`, `api_key` | Next embed/query call only. Do **not** rewrite or exclude vectors. Do **not** snapshot host/key onto each child.                    |
+
+**Each child** stores only `kb_children.embedding_model` and `embedded_at` (what produced that vector). Compare the child to the **current** `kb_embed_settings.embedding_model` (after applying the app default), not a hardcoded string.
+
+Changing the current model does not rewrite vectors until a re-embed pass.
 
 ## Input
 

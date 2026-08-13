@@ -17,7 +17,7 @@ Vector-only for now. Optional later: hybrid FTS + RRF.
 
 ## Question embed
 
-Same provider/model as the current DB embedding model and `vector(N)` ([03-embed.md](./03-embed.md)). Default model: `nomic-embed-text:latest` (Ollama).
+Read **`kb_embed_settings`** (same row as the write path): provider, host, port, API key, and current `embedding_model`, then apply app defaults for nulls ([03-embed.md](./03-embed.md#settings-in-the-database)). Embed the question with that client/model and `vector(N)`. Default model when unset: `nomic-embed-text:latest`.
 
 ### Embed input prefix
 
@@ -69,4 +69,4 @@ WHERE p.id = ANY($1::text[]);
 
 ## Stale vectors
 
-Null `embedding` or mismatched `embedding_model` → exclude from search (or repair via re-embed; [03-embed.md](./03-embed.md)).
+Null `embedding` or `embedding_model` ≠ current `kb_embed_settings.embedding_model` (after app default) → exclude from search (or repair via re-embed; [03-embed.md](./03-embed.md)). Host / port / API key changes do not make vectors stale.

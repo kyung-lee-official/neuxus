@@ -87,11 +87,19 @@ CREATE TABLE kb_chunk_settings (
 
 ## Embed settings table
 
-Current embedding model for new vectors ([03-embed.md](./03-embed.md)). Nullable; app default `nomic-embed-text:latest`. Single row `id = 'default'`. Each child still stores `embedding_model` of the vector it holds.
+Runtime embed config ([03-embed.md](./03-embed.md#settings-in-the-database)): model **and** how to reach the provider (host, port, API key). Not env. Nullable columns; **defaults live in application code**, not SQL `DEFAULT`. Single row `id = 'default'`. Empty/missing row must still embed using those defaults.
+
+`embedding_model` is vector identity (compare to `kb_children.embedding_model`). `provider` / `host` / `port` / `api_key` are connection only — changing them does not stale children. Do not log `api_key`.
+
+App defaults (when null / no row): `embedding_model` = `nomic-embed-text:latest`, `provider` = `ollama`, `host` = `127.0.0.1`, `port` = `11434`, `api_key` unused for typical Ollama. `vector(N)` stays a schema fact (768 for that default model).
 
 ```sql
 CREATE TABLE kb_embed_settings (
   id               TEXT PRIMARY KEY DEFAULT 'default',
-  embedding_model  TEXT
+  embedding_model  TEXT,
+  provider         TEXT,
+  host             TEXT,
+  port             INT,
+  api_key          TEXT
 );
 ```
