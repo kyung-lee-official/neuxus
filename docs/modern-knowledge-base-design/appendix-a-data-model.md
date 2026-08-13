@@ -1,6 +1,6 @@
 # Appendix A — Knowledge data model (pages, parents, children)
 
-Relational store in **PostgreSQL**, with **pgvector** on `kb_children.embedding`. Chunking: [01-chunkify.md](./01-chunkify.md). Search: [appendix-b-vector-search.md](./appendix-b-vector-search.md).
+Relational store in **PostgreSQL**, with **pgvector** on `kb_children.embedding`. Ingest: [01-ingest.md](./01-ingest.md). Chunking: [02-chunkify.md](./02-chunkify.md). Search: [appendix-b-vector-search.md](./appendix-b-vector-search.md).
 
 ## Entities
 
@@ -10,11 +10,11 @@ Page ──* Parent ──* Child (embedding)
 
 | Entity     | Role                                                                                          | `vector`? |
 | ---------- | --------------------------------------------------------------------------------------------- | --------- |
-| **Page**   | Markdown file: slug, title, ingest-normalized [`body`](./01-chunkify.md#body), `content_hash` | No        |
+| **Page**   | Markdown file: slug, title, ingest-normalized [`body`](./01-ingest.md#body), `content_hash` | No        |
 | **Parent** | Generation slice of `body`                                                                    | No        |
 | **Child**  | Retrieval unit                                                                                | Yes       |
 
-FKs: `kb_parents.page_id → kb_pages`, `kb_children.parent_id → kb_parents`. Optional denormalized `kb_children.page_id`; optional `start_offset` / `end_offset` into page `body` ([normalized at ingest](./01-chunkify.md#body-ownership)). On page change: delete that page’s parents/children, insert the new tree ([incremental updates](./01-chunkify.md#incremental-updates-page-hash)).
+FKs: `kb_parents.page_id → kb_pages`, `kb_children.parent_id → kb_parents`. Optional denormalized `kb_children.page_id`; optional `start_offset` / `end_offset` into page `body` ([normalized at ingest](./01-ingest.md#body)). On page change: delete that page’s parents/children, insert the new tree ([incremental updates](./01-ingest.md#incremental-updates-page-hash)).
 
 Keep `kb_*` namespaced apart from application tables (same database is fine).
 
@@ -70,7 +70,7 @@ CREATE INDEX kb_children_embedding_hnsw
 
 ## Chunk knobs table
 
-Nullable columns; **defaults live in application code** ([01-chunkify.md](./01-chunkify.md#knobs)), not SQL `DEFAULT`. Shape: single row `id = 'default'`.
+Nullable columns; **defaults live in application code** ([02-chunkify.md](./02-chunkify.md#knobs)), not SQL `DEFAULT`. Shape: single row `id = 'default'`.
 
 ```sql
 CREATE TABLE kb_chunk_settings (

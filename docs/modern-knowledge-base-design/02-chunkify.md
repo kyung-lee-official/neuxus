@@ -2,17 +2,9 @@
 
 **Parents** = generation context. **Children** = retrieval units. Structure decides parents; size only refines children and oversized parents. Do not slice the whole file every N characters as the first step.
 
-Related: [appendix-a-data-model.md](./appendix-a-data-model.md), [appendix-b-vector-search.md](./appendix-b-vector-search.md).
+**`body`** is ingest-normalized page markdown ([01-ingest.md](./01-ingest.md)), stored as `kb_pages.body`, **before** `chunkify`. Parents and children are slices of this string, not a second copy of the file.
 
-## Body
-
-**`body`** is the page’s markdown **after ingest**, stored as `kb_pages.body`, **before** `chunkify`. YAML frontmatter is stripped (title/tags are columns). Newlines, trailing spaces, and a final `\n` are already applied ([Body ownership](#body-ownership)). Parents and children are slices of this string, not a second copy of the file.
-
-```text
-file.md → strip YAML frontmatter → normalize → kb_pages.body → chunkify(body)
-```
-
-Frontmatter is ingest-only and **leading only**: strip only if the file begins with `---\n` … closing `---\n` (optional newline after the closer). `title` / `tags` go to columns. A later `---` in the body is a thematic break or content. `chunkify` never strips frontmatter.
+Related: [01-ingest.md](./01-ingest.md), [appendix-a-data-model.md](./appendix-a-data-model.md), [appendix-b-vector-search.md](./appendix-b-vector-search.md).
 
 ## Pure function
 
@@ -29,11 +21,11 @@ chunkify(body: string, options?: ChunkifyOptions): {
 }
 ```
 
-No I/O. Caller supplies `body` (frontmatter already stripped, ingest-normalized — see [Body ownership](#body-ownership)) and resolved knobs. Each `text` is `body.slice(start, end)` — keep blank lines inside the span; do not compact.
+No I/O. Caller supplies `body` (frontmatter already stripped, ingest-normalized) and resolved knobs. Each `text` is `body.slice(start, end)` — keep blank lines inside the span; do not compact.
 
-| In scope                          | Out of scope                                |
-| --------------------------------- | ------------------------------------------- |
-| Normalize, lex, parent/child pack | Hash skip gate, persist, embed, query / LLM |
+| In scope                                      | Out of scope                                |
+| --------------------------------------------- | ------------------------------------------- |
+| Idempotent body normalize, lex, parent/child pack | Hash skip gate, persist, embed, query / LLM |
 
 ## Why parent–child
 
@@ -109,21 +101,10 @@ Fixed policy (not a knob): parent cuts `##` → `###` → block packs. Atomic bl
 
 ## Pipeline
 
-1. Treat `body` as already ingest-normalized ([Body ownership](#body-ownership)); a second pass is idempotent.
+1. Treat `body` as already ingest-normalized ([01-ingest.md](./01-ingest.md#body)); a second `normalizeBody` pass is idempotent.
 2. Lex into [blocks](#block-inventory).
 3. Build [parents](#parents).
 4. Pack [children](#children) inside each parent (whole blocks only; only paragraphs may [force-split](#forced-prose-splits)).
-
-### Body ownership
-
-Ingest writes canonical `kb_pages.body`:
-
-- `\r\n` / `\r` → `\n`
-- strip trailing spaces on each line
-- ensure a single final `\n`
-- no Unicode NFC (not required)
-
-Hashes, offsets, and slices use that string — not original file bytes. `chunkify` may re-apply the same map (idempotent). CRLF round-trip is out of scope.
 
 ### Overlap
 
@@ -247,23 +228,3 @@ Atomics, [glue groups](#glue-groups), and [fence-intro](#fence-intro-glue) pairs
 ### Empty body
 
 Whitespace-only → no parents, no children.
-
-## Incremental updates (page hash)
-
-Skip gate is the **page**, not each child. Hash a stable encoding of the stored ingest-normalized fields, for example:
-
-```ts
-sha256(
-  JSON.stringify({ title, type: type ?? null, tags: [...tags].sort(), body }),
-);
-```
-
-Do not concatenate raw strings (`title + type + tags + body`) — `ab`+`c` and `a`+`bc` collide.
-
-| Situation                          | Action                                                     |
-| ---------------------------------- | ---------------------------------------------------------- |
-| Hash match                         | Skip                                                       |
-| Hash differs                       | Replace that page’s parent/child tree, then embed children |
-| Same markdown, new embedding model | Re-embed stale children                                    |
-
-Shared path: hash check → optional replace → `chunkify` → embed → update `content_hash` / `embedding_model`.

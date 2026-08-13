@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { normalizeBody } from "../ingest/normalize.ts";
 import { legalSnapIndices, pickCutEnd, pickOverlapStart } from "./children.ts";
 import {
   CHUNKIFY_DEFAULTS,
@@ -9,7 +10,7 @@ import {
   chunkify,
   resolveChunkifyOptions,
 } from "./index.ts";
-import { lexBlocks, normalizeNewlines } from "./lex.ts";
+import { lexBlocks } from "./lex.ts";
 import { countTokens } from "./tokenize.ts";
 
 const fixturesDir = join(import.meta.dir, "fixtures");
@@ -47,7 +48,7 @@ async function writeReviewDump(
 ): Promise<void> {
   await mkdir(fixturesOutDir, { recursive: true });
   const base = fixtureName.replace(/\.md$/i, "");
-  const normalizedBody = normalizeNewlines(body);
+  const normalizedBody = normalizeBody(body);
   const resolved = resolveChunkifyOptions(options);
 
   const payload = {
@@ -71,7 +72,7 @@ async function writeReviewDump(
 
 async function runFixture(name: string, options?: ChunkifyOptions) {
   const body = await loadFixture(name);
-  const normalizedBody = normalizeNewlines(body);
+  const normalizedBody = normalizeBody(body);
   const result = chunkify(body, options);
   assertExactSlices(normalizedBody, result);
   await writeReviewDump(name, body, result, options);

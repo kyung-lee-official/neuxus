@@ -1,6 +1,6 @@
 # Appendix B — Vector search (question → parents)
 
-Similarity on `kb_children.embedding` via **pgvector** SQL. Schema/index: [appendix-a-data-model.md](./appendix-a-data-model.md). Chunk roles: [01-chunkify.md](./01-chunkify.md).
+Similarity on `kb_children.embedding` via **pgvector** SQL. Schema/index: [appendix-a-data-model.md](./appendix-a-data-model.md). Chunk roles: [02-chunkify.md](./02-chunkify.md).
 
 ## Flow
 
@@ -69,4 +69,4 @@ WHERE p.id = ANY($1::text[]);
 
 ## Stale vectors
 
-Null `embedding` or mismatched `embedding_model` → exclude from search (or repair via re-embed; [01-chunkify incremental updates](./01-chunkify.md#incremental-updates-page-hash)).
+Null `embedding` or mismatched `embedding_model` → exclude from search (or repair via re-embed; [01-ingest incremental updates](./01-ingest.md#incremental-updates-page-hash)).

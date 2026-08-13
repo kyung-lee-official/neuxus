@@ -1,8 +1,5 @@
 import type { LexBlock } from "./types.ts";
 
-export function normalizeNewlines(body: string): string {
-  return body.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-}
 
 type Line = {
   /** Inclusive start offset in body */
