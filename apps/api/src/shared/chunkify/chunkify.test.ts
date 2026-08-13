@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { legalSnapIndices, pickCutEnd, pickOverlapStart } from "./children.ts";
 import {
   CHUNKIFY_DEFAULTS,
   type ChunkifyOptions,
@@ -9,6 +10,7 @@ import {
   resolveChunkifyOptions,
 } from "./index.ts";
 import { normalizeNewlines } from "./lex.ts";
+import { countTokens } from "./tokenize.ts";
 
 const fixturesDir = join(import.meta.dir, "fixtures");
 const fixturesOutDir = join(import.meta.dir, "fixtures-out");
@@ -185,3 +187,81 @@ describe("chunkify fixtures", () => {
     expect(fenceChild!.text).toContain("const n79 = 79;");
   });
 });
+
+describe("force-split snap indices", () => {
+  test("legal snaps: sentence + newline; not 3.14 or e.g.", () => {
+    const text = "See e.g. the 3.14 value.\nNext line.";
+    const idx = legalSnapIndices(text);
+    expect(idx[0]).toBe(0);
+    expect(idx[idx.length - 1]).toBe(text.length);
+    const afterValue = text.indexOf("value.") + "value.".length;
+    expect(idx).toContain(afterValue);
+    expect(idx).toContain(text.indexOf("\n") + 1);
+    expect(idx).not.toContain(text.indexOf("3.14") + 1);
+    expect(idx).not.toContain(text.indexOf("e.g.") + 2);
+  });
+
+  test("previous piece owns spaces after terminator", () => {
+    const text = "Hello.  World";
+    const idx = legalSnapIndices(text);
+    expect(idx).toContain("Hello.  ".length);
+    expect("Hello.  World".slice("Hello.  ".length)).toBe("World");
+  });
+
+  test("cut end prefers last legal snap at or before target", () => {
+    const encoding = CHUNKIFY_DEFAULTS.tokenizerEncoding;
+    const a = "One sentence here. ";
+    const b = "Two sentence here. ";
+    const c = "Three sentence here.";
+    const text = a + b + c;
+    const target = countTokens(a, encoding);
+    const hard = countTokens(a + b + c, encoding);
+    expect(pickCutEnd(text, target, hard, encoding)).toBe(a.length);
+  });
+
+  test("overlap start is a legal index with largest tail under budget", () => {
+    const encoding = CHUNKIFY_DEFAULTS.tokenizerEncoding;
+    const piece = "Alpha words here. Beta words here. Gamma.";
+    const cutLegal = legalSnapIndices(piece).filter((i) => i > 0);
+    expect(cutLegal.length).toBeGreaterThan(1);
+    const S = pickOverlapStart(piece, 20, encoding);
+    expect(legalSnapIndices(piece)).toContain(S);
+    expect(S).toBeGreaterThan(0);
+    expect(S).toBeLessThanOrEqual(piece.length);
+    expect(countTokens(piece.slice(S), encoding)).toBeLessThanOrEqual(20);
+  });
+
+  test("chunkify force-split: ends and overlap starts are legal", () => {
+    const sentences = Array.from(
+      { length: 40 },
+      (_, i) => `Sentence number ${i} sits here.`,
+    );
+    const body = sentences.join(" ");
+    const options: ChunkifyOptions = {
+      childTargetTokens: 40,
+      childHardMaxTokens: 55,
+      childOverlapTokens: 15,
+    };
+    const result = chunkify(body, options);
+    expect(result.children.length).toBeGreaterThan(1);
+
+    const paraStart = result.parents[0]!.start;
+    const paraText = result.parents[0]!.text;
+
+    for (let i = 0; i < result.children.length; i++) {
+      const child = result.children[i]!;
+      if (i < result.children.length - 1) {
+        const remaining = paraText.slice(child.start - paraStart);
+        expect(legalSnapIndices(remaining)).toContain(child.end - child.start);
+      }
+      if (i > 0) {
+        const prev = result.children[i - 1]!;
+        expect(child.start).toBeGreaterThan(prev.start);
+        expect(child.start).toBeLessThanOrEqual(prev.end);
+        const piece = body.slice(prev.start, prev.end);
+        expect(legalSnapIndices(piece)).toContain(child.start - prev.start);
+      }
+    }
+  });
+});
+

@@ -42,6 +42,106 @@ function takeGlueRun(
   return { group, next: i + 1 };
 }
 
+/** Exclusive ends / next starts: 0, text end, after sentence terminators, after each `\n`. */
+export function legalSnapIndices(text: string): number[] {
+  const set = new Set<number>([0, text.length]);
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]!;
+    if (ch === "." || ch === "?" || ch === "!") {
+      const next = i + 1 < text.length ? text[i + 1]! : "";
+      if (next === "" || next === " " || next === "\n") {
+        let end = i + 1;
+        while (end < text.length && (text[end] === " " || text[end] === "\t")) {
+          end++;
+        }
+        set.add(end);
+      }
+    }
+    if (ch === "\n") {
+      set.add(i + 1);
+    }
+  }
+  return [...set].sort((a, b) => a - b);
+}
+
+function maxIndexWithTokensAtMost(
+  text: string,
+  maxTokens: number,
+  encoding: string,
+): number {
+  let lo = 0;
+  let hi = text.length;
+  let best = 0;
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (countTokens(text.slice(0, mid), encoding) <= maxTokens) {
+      best = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return best;
+}
+
+export function pickCutEnd(
+  text: string,
+  targetTokens: number,
+  hardMaxTokens: number,
+  encoding: string,
+): number {
+  if (text.length === 0) return 0;
+  const legal = legalSnapIndices(text);
+  const T = maxIndexWithTokensAtMost(text, targetTokens, encoding);
+  const H = maxIndexWithTokensAtMost(text, hardMaxTokens, encoding);
+
+  let cut = 0;
+  for (const idx of legal) {
+    if (idx > 0 && idx <= T) cut = idx;
+  }
+  if (cut > 0) return cut;
+
+  for (const idx of legal) {
+    if (idx > T && idx <= H) return idx;
+  }
+
+  let whitespace = 0;
+  const hi = Math.min(H, text.length);
+  for (let i = 1; i <= hi; i++) {
+    const c = text[i - 1]!;
+    if (c === " " || c === "\t" || c === "\n") whitespace = i;
+  }
+  if (whitespace > 0) return whitespace;
+
+  return Math.max(1, Math.min(H || text.length, text.length));
+}
+
+/** Next-child start into `piece` (exclusive-end `piece.length` is the cut). */
+export function pickOverlapStart(
+  piece: string,
+  overlapTokens: number,
+  encoding: string,
+): number {
+  const cut = piece.length;
+  if (cut === 0 || overlapTokens <= 0) return cut;
+
+  let bestS = cut;
+  let bestTailTokens = 0;
+  for (const S of legalSnapIndices(piece)) {
+    if (S <= 0 || S >= cut) continue;
+    const tailTokens = countTokens(piece.slice(S), encoding);
+    if (tailTokens > overlapTokens) continue;
+    if (
+      tailTokens > bestTailTokens ||
+      (tailTokens === bestTailTokens && S < bestS)
+    ) {
+      bestTailTokens = tailTokens;
+      bestS = S;
+    }
+  }
+  return bestS;
+}
+
 function forceSplitParagraph(
   body: string,
   block: LexBlock,
@@ -55,9 +155,8 @@ function forceSplitParagraph(
   const hard = options.childHardMaxTokens;
   const overlap = options.childOverlapTokens;
 
-  // Work on content without forcing inclusion issues — offsets must map to body
   const children: ChunkChild[] = [];
-  let offset = 0; // into `full`
+  let offset = 0;
   let childIndex = childIndexStart;
 
   while (offset < full.length) {
@@ -75,20 +174,13 @@ function forceSplitParagraph(
       break;
     }
 
-    // Prefer sentence boundary near target
-    let cut = pickCutIndex(remaining, target, hard, encoding);
-    if (cut <= 0)
-      cut = Math.min(
-        remaining.length,
-        Math.max(1, Math.floor(remaining.length / 2)),
-      );
-
+    const cut = Math.min(
+      remaining.length,
+      Math.max(1, pickCutEnd(remaining, target, hard, encoding)),
+    );
     const piece = remaining.slice(0, cut);
-    // Grow with overlap into next iteration via absolute offsets
     const start = block.start + offset;
     const end = start + cut;
-    // Trim cut to not split mid-line awkwardly — already on char index
-
     children.push({
       index: childIndex++,
       parentIndex,
@@ -97,89 +189,11 @@ function forceSplitParagraph(
       text: body.slice(start, end),
     });
 
-    // Next offset retreats by overlap tokens
-    const overlapChars = charsForOverlap(piece, overlap, encoding);
-    offset = Math.max(offset + cut - overlapChars, offset + 1);
+    const S = pickOverlapStart(piece, overlap, encoding);
+    offset += Math.max(S, 1);
   }
 
   return children;
-}
-
-function pickCutIndex(
-  text: string,
-  target: number,
-  hard: number,
-  encoding: string,
-): number {
-  // Binary search character end so tokens ~= target, then snap to sentence
-  let lo = 1;
-  let hi = text.length;
-  let best = Math.min(text.length, 1);
-  while (lo <= hi) {
-    const mid = Math.floor((lo + hi) / 2);
-    const n = countTokens(text.slice(0, mid), encoding);
-    if (n < target) {
-      best = mid;
-      lo = mid + 1;
-    } else {
-      hi = mid - 1;
-    }
-  }
-  // Snap forward/back to sentence end within hard max
-  const window = text.slice(0, Math.min(text.length, Math.max(best, 1)));
-  const sentenceEnds: number[] = [];
-  for (const re of [/\. /g, /\? /g, /! /g]) {
-    let m = re.exec(window);
-    while (m !== null) {
-      sentenceEnds.push(m.index + m[0].length);
-      m = re.exec(window);
-    }
-  }
-  sentenceEnds.sort((a, b) => a - b);
-  let snapped = best;
-  for (const end of sentenceEnds) {
-    if (countTokens(text.slice(0, end), encoding) <= hard) {
-      snapped = end;
-    }
-    if (countTokens(text.slice(0, end), encoding) >= target) break;
-  }
-  if (countTokens(text.slice(0, snapped), encoding) > hard) {
-    // Whitespace fallback
-    let w = snapped;
-    while (w > 0 && countTokens(text.slice(0, w), encoding) > hard) {
-      const prev = text.lastIndexOf(" ", w - 1);
-      if (prev <= 0) {
-        w = Math.max(1, Math.floor(w / 2));
-        break;
-      }
-      w = prev;
-    }
-    return Math.max(1, w);
-  }
-  return Math.max(1, snapped);
-}
-
-function charsForOverlap(
-  piece: string,
-  overlapTokens: number,
-  encoding: string,
-): number {
-  if (overlapTokens <= 0 || piece.length === 0) return 0;
-  let lo = 0;
-  let hi = piece.length;
-  let best = 0;
-  while (lo <= hi) {
-    const mid = Math.floor((lo + hi) / 2);
-    const slice = piece.slice(piece.length - mid);
-    const n = countTokens(slice, encoding);
-    if (n <= overlapTokens) {
-      best = mid;
-      lo = mid + 1;
-    } else {
-      hi = mid - 1;
-    }
-  }
-  return best;
 }
 
 export function packChildren(
