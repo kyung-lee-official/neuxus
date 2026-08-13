@@ -273,11 +273,11 @@ export function packChildren(
         continue;
       }
 
-      // Atomic / glue oversized → own child
+      // Atomic / glue already over target → own child
       const unitAtomic = unit.every(
         (b) => b.atomic || b.glueGroupId != null || b.kind === "fence",
       );
-      if (unitTokens > options.childHardMaxTokens && unitAtomic) {
+      if (unitTokens > options.childTargetTokens && unitAtomic) {
         flushCurrent();
         const { start, end } = spanOf(unit);
         out.push({
@@ -303,21 +303,6 @@ export function packChildren(
 
       if (trialTokens <= options.childTargetTokens) {
         current = trial;
-        continue;
-      }
-
-      if (trialTokens <= options.childHardMaxTokens) {
-        // Prefer staying under hard max; if already past target, flush before adding if current is non-empty and reasonably full
-        const currentTokens = countTokens(
-          body.slice(spanOf(current).start, spanOf(current).end),
-          options.tokenizerEncoding,
-        );
-        if (currentTokens >= options.childTargetTokens) {
-          flushCurrent();
-          current = [...unit];
-        } else {
-          current = trial;
-        }
         continue;
       }
 

@@ -186,6 +186,25 @@ describe("chunkify fixtures", () => {
     expect(fenceChild!.text).toContain("const n0 = 0;");
     expect(fenceChild!.text).toContain("const n79 = 79;");
   });
+
+  test("mixed pack stops at target, not hard max", () => {
+    const encoding = CHUNKIFY_DEFAULTS.tokenizerEncoding;
+    const words: string[] = [];
+    while (countTokens(words.join(" "), encoding) < 80) {
+      words.push(`word${words.length}`);
+    }
+    const body = `# Title\n\n${words.join(" ")}`;
+    const { children } = chunkify(body, {
+      childTargetTokens: 20,
+      childHardMaxTokens: 400,
+    });
+    const heading = children.find((c) => c.text.includes("# Title"));
+    const prose = children.find((c) => c.text.includes("word0"));
+    expect(heading).toBeDefined();
+    expect(prose).toBeDefined();
+    expect(heading!.text).not.toContain("word0");
+    expect(prose!.text).not.toContain("# Title");
+  });
 });
 
 describe("force-split snap indices", () => {
