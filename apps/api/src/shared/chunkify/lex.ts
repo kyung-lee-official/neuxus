@@ -321,6 +321,12 @@ export function lexBlocks(body: string): LexBlock[] {
     }
   }
 
+  for (const block of blocks) {
+    if (block.kind === "image_desc" && block.glueGroupId == null) {
+      block.kind = "html";
+    }
+  }
+
   return blocks;
 }
 

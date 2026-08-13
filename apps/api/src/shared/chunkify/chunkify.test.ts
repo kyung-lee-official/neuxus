@@ -9,7 +9,7 @@ import {
   chunkify,
   resolveChunkifyOptions,
 } from "./index.ts";
-import { normalizeNewlines } from "./lex.ts";
+import { lexBlocks, normalizeNewlines } from "./lex.ts";
 import { countTokens } from "./tokenize.ts";
 
 const fixturesDir = join(import.meta.dir, "fixtures");
@@ -162,6 +162,22 @@ describe("chunkify fixtures", () => {
     expect(hit).toBeDefined();
     expect(hit!.text).toContain("![Alt](./a.png)");
     expect(hit!.text).toContain("A diagram of the flow.");
+  });
+
+  test("image-desc without image is an HTML block", () => {
+    const body = [
+      "## Fig",
+      "",
+      "<!-- image-desc -->",
+      "Orphan description.",
+      "<!-- /image-desc -->",
+      "",
+    ].join("\n");
+    const kinds = lexBlocks(body)
+      .filter((b) => b.kind !== "blank")
+      .map((b) => b.kind);
+    expect(kinds).toEqual(["heading", "html"]);
+    expect(kinds).not.toContain("image_desc");
   });
 
   test("blank-lines-preserved.md → blank line kept in slice", async () => {
