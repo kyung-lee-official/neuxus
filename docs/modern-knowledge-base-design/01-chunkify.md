@@ -12,7 +12,7 @@ Related: [appendix-a-data-model.md](./appendix-a-data-model.md), [appendix-b-vec
 file.md → strip YAML frontmatter → normalize → kb_pages.body → chunkify(body)
 ```
 
-Frontmatter (`---` YAML) is ingest-only: `title` / `tags` go to columns; `chunkify` never sees the `---` block.
+Frontmatter is ingest-only and **leading only**: strip only if the file begins with `---\n` … closing `---\n` (optional newline after the closer). `title` / `tags` go to columns. A later `---` in the body is a thematic break or content. `chunkify` never strips frontmatter.
 
 ## Pure function
 
@@ -73,7 +73,7 @@ Without packing you would have to pick a blunt default:
 | One child = whole parent | Blurry embeddings     |
 | Slice every N characters | Cuts fences / lists   |
 
-Packing is the middle path: concatenate neighboring blocks toward `childTargetTokens` / `parentMaxTokens`, stop before overflow, keep glue groups together.
+Packing is the middle path: concatenate neighboring blocks toward `childTargetTokens` / `parentMaxTokens`, stop before the next unit would exceed the target (mixed packs), keep glue groups together.
 
 ```text
 Lex:     [## Tips] [para] [fence] [para] [fence]
@@ -95,15 +95,15 @@ Rules for how parents and children are packed: [Pipeline](#pipeline).
 
 DB may store overrides ([appendix-a](./appendix-a-data-model.md)); missing values use these **application defaults**:
 
-| Knob                      | Default      | Role                                                      |
-| ------------------------- | ------------ | --------------------------------------------------------- |
-| `childTargetTokens`       | `400`        | Soft child pack target                                    |
-| `childHardMaxTokens`      | `500`        | Hard max for **splittable prose** only                    |
-| `childOverlapTokens`      | `60`         | Token **budget** after a legal snap ([overlap](#overlap)) |
-| `childCrumbMinTokens`     | `64`         | Merge crumbs into previous child ([children](#children))  |
-| `parentMaxTokens`         | `1400`       | Max parent before `###` / block re-pack                   |
-| `fenceIntroGlueMaxTokens` | `40`         | Max lead-in paragraph glued to following fence            |
-| `tokenizerEncoding`       | `o200k_base` | App default encoding for `count`; DB may override         |
+| Knob                      | Default      | Role                                                              |
+| ------------------------- | ------------ | ----------------------------------------------------------------- |
+| `childTargetTokens`       | `400`        | Soft child pack target                                            |
+| `childHardMaxTokens`      | `500`        | Hard max when [force-splitting](#forced-prose-splits) a paragraph |
+| `childOverlapTokens`      | `60`         | Token **budget** after a legal snap ([overlap](#overlap))         |
+| `childCrumbMinTokens`     | `64`         | Merge crumbs into previous child ([children](#children))          |
+| `parentMaxTokens`         | `1400`       | Max parent before `###` / block re-pack                           |
+| `fenceIntroGlueMaxTokens` | `40`         | Max lead-in paragraph glued to following fence                    |
+| `tokenizerEncoding`       | `o200k_base` | App default encoding for `count`; DB may override                 |
 
 Fixed policy (not a knob): parent cuts `##` → `###` → block packs. Atomic blocks may exceed size knobs as one unit ([Oversized](#oversized-atomic-blocks)).
 
@@ -135,7 +135,7 @@ The **end** of the previous child and the **start** of the next child must both 
 
 **Legal indices** (exclusive ends / next starts): `0`, paragraph end, and every position **after** a terminator:
 
-- ASCII `.` / `?` / `!` only if the next character is space, `\n`, or end of the piece (`3.14`, `e.g.` do not snap)
+- ASCII `.` / `?` / `!` only if the next character is space, `\n`, or end of the piece (`3.14`, `e.g.` do not snap; `Mr. Smith` may snap after `Mr.` — no abbreviation list)
 - each `\n`
 
 The previous piece **owns** the terminator and any following spaces on that line (and the `\n` when that is the snap). The next piece starts at the following character.
@@ -151,14 +151,14 @@ The previous piece **owns** the terminator and any following spaces on that line
 
 ### Parents
 
-1. One parent per `##` (heading through next `##` / EOF). Preamble before the first `##` is its own first parent. No `##` → one parent for the whole body.
+1. One parent per `##` (heading through next `##` / EOF). Preamble before the first `##` is its own first parent. No `##` → one parent for the whole body. Trailing blank runs attach to the **previous** parent (and its last child): parent 0 ends at the last `\n` before the next `##`.
 2. If over `parentMaxTokens`: split on `###`, then pack blocks ≤ max without breaking atomics or [glue groups](#glue-groups).
-3. Empty `##`: one child = heading text. `####`+ do not start parents. Prefer ATX headings.
+3. Empty `##`: one child = heading text. `####`+ do not start parents. Only [ATX headings](#headings) (`#{1,6} `). Setext underlines are not headings.
 
 ### Children
 
-1. Pack toward `childTargetTokens`; `childHardMaxTokens` applies to prose packs only.
-2. [Fence intro](#fence-intro-glue) and [image-desc glue](#image-descriptions) stay in one child.
+1. Pack toward `childTargetTokens`. Mixed packs (any atomic + prose) **stop at target**: if adding the next unit would exceed target, flush first. `childHardMaxTokens` applies only when [force-splitting](#forced-prose-splits) a single paragraph. An atomic already over target stays alone ([Oversized](#oversized-atomic-blocks)).
+2. [Fence intro](#fence-intro-glue) and [image-desc glue](#image-descriptions) stay in one child (glue wins over knobs).
 3. [Overlap](#overlap) only after [forced prose split](#forced-prose-splits).
 4. Merge crumbs under `childCrumbMinTokens` into the previous child if combined tokens ≤ `childHardMaxTokens`, **or** if that previous child is already over `childHardMaxTokens`.
 
@@ -168,20 +168,24 @@ Same normalized `body` + knobs ⇒ same spans. Every region is exactly one block
 
 ### Block inventory
 
-| Block          | Recognition                                      | Atomic?                |
-| -------------- | ------------------------------------------------ | ---------------------- |
-| ATX heading    | `#{1,6} ` at line start                          | Yes                    |
-| Fenced code    | [Code fences](#code-fences)                      | Yes                    |
-| Image          | Sole `![…](…)` or `<img>` paragraph              | Yes                    |
-| Image-desc     | [Image descriptions](#image-descriptions)        | Yes (glue with image)  |
-| Indented code  | ≥4 spaces / tab run                              | Yes                    |
-| List           | Items until list ends (loose blanks stay inside) | Yes                    |
-| Table          | GFM header + delimiter + rows                    | Yes                    |
-| Blockquote     | Contiguous `>` (opaque nested structure)         | Yes                    |
-| Thematic break | `---` / `***` / `___` alone                      | Yes                    |
-| HTML block     | CommonMark HTML (except image-desc markers)      | Yes                    |
-| Paragraph      | Otherwise                                        | No (splittable)        |
-| Blank run      | `\n+` between blocks                             | — (kept inside slices) |
+| Block          | Recognition                                      | Atomic?                                      |
+| -------------- | ------------------------------------------------ | -------------------------------------------- |
+| ATX heading    | [Headings](#headings)                            | Yes                                          |
+| Fenced code    | [Code fences](#code-fences)                      | Yes                                          |
+| Image          | Sole `![…](…)` or `<img>` paragraph              | Yes                                          |
+| Image-desc     | [Image descriptions](#image-descriptions)        | Yes (glue with image)                        |
+| Indented code  | ≥4 spaces / tab run                              | Yes                                          |
+| List           | Items until list ends (loose blanks stay inside) | Yes                                          |
+| Table          | GFM header + delimiter + rows                    | Yes                                          |
+| Blockquote     | Contiguous `>` (opaque nested structure)         | Yes                                          |
+| Thematic break | `---` / `***` / `___` alone                      | Yes                                          |
+| HTML block     | [HTML blocks](#html-blocks)                      | Yes                                          |
+| Paragraph      | Otherwise                                        | No (splittable)                              |
+| Blank run      | `\n+` between blocks                             | — (trailing blanks attach to previous slice) |
+
+### Headings
+
+Only ATX: `#{1,6} ` at line start. Setext (`Setup` / `=====`) is not a heading: the title line is a paragraph; an underline that matches a thematic break is an `hr`.
 
 ### Glue groups
 
@@ -207,7 +211,7 @@ export const x = 1;
 ```
 ````
 
-If the paragraph immediately before a fence has ≤ `fenceIntroGlueMaxTokens`, pack **intro + fence** as one child. Otherwise pack the intro with prior prose and the fence alone (or with what follows under normal rules).
+If the paragraph immediately before a fence (blanks between allowed) has ≤ `fenceIntroGlueMaxTokens`, pack **intro + fence** as one child. Glue wins over size knobs: if the pair exceeds `childTargetTokens` / `childHardMaxTokens`, it is still one child and follows [Oversized](#oversized-atomic-blocks). Otherwise pack the intro with prior prose and the fence alone (or with what follows under normal rules).
 
 ### Image descriptions
 
@@ -221,7 +225,11 @@ Description lines…
 <!-- /image-desc -->
 ```
 
-Markers: lines exactly `<!-- image-desc -->` / `<!-- /image-desc -->` (trim that line only). Missing closer → through next heading, fence opener, or EOF; still glue to the image. Markers inside a fence are literal. Desc without an image = lone HTML block. Never split image and desc across parents.
+Markers: lines exactly `<!-- image-desc -->` / `<!-- /image-desc -->` (trim that line only). Missing closer → through next heading, fence opener, or EOF; still glue to the image. Markers inside a fence are literal. Desc without an image = lone [HTML block](#html-blocks). Never split image and desc across parents.
+
+### HTML blocks
+
+A line that starts with indent ≤3 and `<`, except image (`<img>`) and [image-desc](#image-descriptions) markers. Span through the next blank line or EOF. Interior lines are not re-lexed as headings, lists, or fences.
 
 ### Forced prose splits
 
@@ -229,7 +237,7 @@ Only when a **single paragraph** exceeds `childHardMaxTokens`. Choose the cut en
 
 ### Oversized atomic blocks
 
-Atomics and glue groups are never sliced to satisfy knobs.
+Atomics, [glue groups](#glue-groups), and [fence-intro](#fence-intro-glue) pairs are never sliced to satisfy knobs.
 
 | Case                                        | Parent                      | Child     |
 | ------------------------------------------- | --------------------------- | --------- |
@@ -242,7 +250,15 @@ Whitespace-only → no parents, no children.
 
 ## Incremental updates (page hash)
 
-Skip gate is the **page**, not each child. Example: `sha256(title + type + tags + body)` on the stored ingest-normalized `body`.
+Skip gate is the **page**, not each child. Hash a stable encoding of the stored ingest-normalized fields, for example:
+
+```ts
+sha256(
+  JSON.stringify({ title, type: type ?? null, tags: [...tags].sort(), body }),
+);
+```
+
+Do not concatenate raw strings (`title + type + tags + body`) — `ab`+`c` and `a`+`bc` collide.
 
 | Situation                          | Action                                                     |
 | ---------------------------------- | ---------------------------------------------------------- |
