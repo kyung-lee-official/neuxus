@@ -17,7 +17,23 @@ Vector-only for now. Optional later: hybrid FTS + RRF.
 
 ## Question embed
 
-Same provider/model as `children.embedding_model` and `vector(N)`. If ingest prefixes child text (e.g. `Title: …`), use the same policy on the query side.
+Same provider/model as `children.embedding_model` and `vector(N)`.
+
+### Embed input prefix
+
+Stored `kb_children.text` is the chunk body from `chunkify` — no extra header. Optionally, **at embed time only**, prepend page context so similar children on different pages separate in vector space, for example:
+
+```text
+Title: Setup
+
+Here is the setup code:
+```
+
+(`Setup` is the page title or slug; the rest is `child.text`.)
+
+If children are embedded with a prefix, embed the **question** with the same policy (same fields, same order). Mixing prefixed documents and a bare question mismatches the space.
+
+This does not change parent/child spans. Skip the prefix until ingest needs it.
 
 ## Similarity SQL (cosine)
 
