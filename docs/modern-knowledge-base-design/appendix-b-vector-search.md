@@ -39,6 +39,8 @@ This does not change parent/child spans. Skip the prefix until ingest needs it (
 
 `<=>` = cosine distance (lower is closer). Display score: `1 - distance`. Prefer HNSW with `vector_cosine_ops` ([appendix-a](./appendix-a-data-model.md)).
 
+`$current_model` is `kb_embed_settings.embedding_model` after app default ([03-embed.md](./03-embed.md#settings-in-the-database)).
+
 ```sql
 SELECT
   c.id AS child_id,
@@ -48,6 +50,7 @@ SELECT
   1 - (c.embedding <=> $1::vector) AS score
 FROM kb_children c
 WHERE c.embedding IS NOT NULL
+  AND c.embedding_model IS NOT DISTINCT FROM $current_model
 ORDER BY c.embedding <=> $1::vector
 LIMIT $2;
 ```

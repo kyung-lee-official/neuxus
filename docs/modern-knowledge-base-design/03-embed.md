@@ -8,6 +8,8 @@ hash check → optional replace → chunkify → persist (embeddings null) → e
 
 Parents are not embedded. The LLM sees parent text at query time, not at embed time.
 
+This doc is the **embed contract**: read `kb_embed_settings`, call the provider (first: Ollama) with `child.text`, store the vector. Retry, timeouts, jobs, and admin APIs are application layer.
+
 ## Provider
 
 Talk to the provider through an **embedder** interface (`embed(texts) → vectors`). The first implementation is **Ollama**. Callers (page embed, later question embed) must not import HTTP details.
@@ -61,8 +63,8 @@ SET
 WHERE id = $3;
 ```
 
-Upsert per child or small batches. A failed batch must not erase vectors already written; retry remaining stale/null rows. Do not wrap a whole page’s embeds in one transaction.
+Write per child. A failed call must not erase vectors already stored. Do not wrap a whole page’s embeds in one transaction. Retry and batch size are application layer.
 
 ## Stale at query time
 
-Null `embedding` or `embedding_model` ≠ current model → exclude from similarity search (or repair via this embed pass).
+Null `embedding` or `embedding_model` ≠ current `kb_embed_settings.embedding_model` (after app default) → exclude from similarity search (or repair via this embed pass). Host / port / API key do not affect this check.
