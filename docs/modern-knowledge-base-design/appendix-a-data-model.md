@@ -8,11 +8,11 @@ Relational store in **PostgreSQL**, with **pgvector** on `kb_children.embedding`
 Page ──* Parent ──* Child (embedding)
 ```
 
-| Entity     | Role                                                                                           | `vector`? |
-| ---------- | ---------------------------------------------------------------------------------------------- | --------- |
-| **Page**   | Markdown file: slug, title, newline-normalized [`body`](./01-chunkify.md#body), `content_hash` | No        |
-| **Parent** | Generation slice of `body`                                                                     | No        |
-| **Child**  | Retrieval unit                                                                                 | Yes       |
+| Entity     | Role                                                                                          | `vector`? |
+| ---------- | --------------------------------------------------------------------------------------------- | --------- |
+| **Page**   | Markdown file: slug, title, ingest-normalized [`body`](./01-chunkify.md#body), `content_hash` | No        |
+| **Parent** | Generation slice of `body`                                                                    | No        |
+| **Child**  | Retrieval unit                                                                                | Yes       |
 
 FKs: `kb_parents.page_id → kb_pages`, `kb_children.parent_id → kb_parents`. Optional denormalized `kb_children.page_id`; optional `start_offset` / `end_offset` into page `body` ([normalized at ingest](./01-chunkify.md#body-ownership)). On page change: delete that page’s parents/children, insert the new tree ([incremental updates](./01-chunkify.md#incremental-updates-page-hash)).
 

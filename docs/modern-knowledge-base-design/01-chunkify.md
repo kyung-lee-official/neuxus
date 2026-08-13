@@ -85,11 +85,11 @@ Rules for how parents and children are packed: [Pipeline](#pipeline).
 
 ## Parser and tokens
 
-| Concern   | Decision                                                |
-| --------- | ------------------------------------------------------- |
-| Dialect   | GFM                                                     |
-| Lex       | Custom `lex.ts` — no third-party markdown parser        |
-| Tokenizer | `ai-tokenizer` encoding **`o200k_base`** (fixed for v1) |
+| Concern   | Decision                                                                |
+| --------- | ----------------------------------------------------------------------- |
+| Dialect   | GFM                                                                     |
+| Lex       | Custom `lex.ts` — no third-party markdown parser                        |
+| Tokenizer | `ai-tokenizer`; app default encoding **`o200k_base`** (DB may override) |
 
 ## Knobs
 
@@ -100,10 +100,10 @@ DB may store overrides ([appendix-a](./appendix-a-data-model.md)); missing value
 | `childTargetTokens`       | `400`        | Soft child pack target                                    |
 | `childHardMaxTokens`      | `500`        | Hard max for **splittable prose** only                    |
 | `childOverlapTokens`      | `60`         | Token **budget** after a legal snap ([overlap](#overlap)) |
-| `childCrumbMinTokens`     | `64`         | Merge smaller crumbs into previous child when allowed     |
+| `childCrumbMinTokens`     | `64`         | Merge crumbs into previous child ([children](#children))  |
 | `parentMaxTokens`         | `1400`       | Max parent before `###` / block re-pack                   |
 | `fenceIntroGlueMaxTokens` | `40`         | Max lead-in paragraph glued to following fence            |
-| `tokenizerEncoding`       | `o200k_base` | Fixed encoding for `count` (v1)                           |
+| `tokenizerEncoding`       | `o200k_base` | App default encoding for `count`; DB may override         |
 
 Fixed policy (not a knob): parent cuts `##` → `###` → block packs. Atomic blocks may exceed size knobs as one unit ([Oversized](#oversized-atomic-blocks)).
 
@@ -129,7 +129,11 @@ Hashes, offsets, and slices use that string — not original file bytes. `chunki
 
 `childOverlapTokens` is a **budget**, used only after a [forced prose split](#forced-prose-splits). Measure it on the previous piece’s **tail after the snap**, not as a raw N-token suffix of the unsplit paragraph. Size may be under 60.
 
-**Legal snap points** (never mid-word / mid-sentence): sentence, paragraph, heading, list item.
+The **end** of the previous child and the **start** of the next child (overlap) must both land on a legal snap point. Never mid-word / mid-sentence.
+
+**Legal snap points:** sentence, paragraph, heading. Lists stay atomic (no cut between items).
+
+**Sentence:** ASCII `.` / `?` / `!` / `\n` (not Unicode sentence breaking).
 
 ### Parents
 
@@ -142,7 +146,7 @@ Hashes, offsets, and slices use that string — not original file bytes. `chunki
 1. Pack toward `childTargetTokens`; `childHardMaxTokens` applies to prose packs only.
 2. [Fence intro](#fence-intro-glue) and [image-desc glue](#image-descriptions) stay in one child.
 3. [Overlap](#overlap) only after [forced prose split](#forced-prose-splits).
-4. Merge crumbs under `childCrumbMinTokens` into the previous child when allowed.
+4. Merge crumbs under `childCrumbMinTokens` into the previous child if combined tokens ≤ `childHardMaxTokens`, **or** if that previous child is already over `childHardMaxTokens`.
 
 ## Atomic blocks and edge cases
 
@@ -207,7 +211,7 @@ Markers: lines exactly `<!-- image-desc -->` / `<!-- /image-desc -->` (trim that
 
 ### Forced prose splits
 
-Only when a **single paragraph** exceeds `childHardMaxTokens`: snap at a [legal cut point](#overlap) near `childTargetTokens`. Then apply [overlap](#overlap). Never inside fences, tables, image-desc, or headings.
+Only when a **single paragraph** exceeds `childHardMaxTokens`: snap at a [legal snap point](#overlap) near `childTargetTokens`. Then apply [overlap](#overlap) so the next piece also starts on a legal snap point. Never inside fences, tables, image-desc, or headings.
 
 ### Oversized atomic blocks
 
