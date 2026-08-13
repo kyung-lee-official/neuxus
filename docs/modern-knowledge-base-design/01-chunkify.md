@@ -129,11 +129,25 @@ Hashes, offsets, and slices use that string — not original file bytes. `chunki
 
 `childOverlapTokens` is a **budget**, used only after a [forced prose split](#forced-prose-splits). Measure it on the previous piece’s **tail after the snap**, not as a raw N-token suffix of the unsplit paragraph. Size may be under 60.
 
-The **end** of the previous child and the **start** of the next child (overlap) must both land on a legal snap point. Never mid-word / mid-sentence.
+The **end** of the previous child and the **start** of the next child must both land on a legal index. Never mid-word / mid-sentence.
 
-**Legal snap points:** sentence, paragraph, heading. Lists stay atomic (no cut between items).
+**Packing** already cuts at heading and paragraph boundaries. Lists stay atomic (no cut between items). [Force-split](#forced-prose-splits) and overlap run **inside one paragraph**, so the live snaps are sentence and `\n` only.
 
-**Sentence:** ASCII `.` / `?` / `!` / `\n` (not Unicode sentence breaking).
+**Legal indices** (exclusive ends / next starts): `0`, paragraph end, and every position **after** a terminator:
+
+- ASCII `.` / `?` / `!` only if the next character is space, `\n`, or end of the piece (`3.14`, `e.g.` do not snap)
+- each `\n`
+
+The previous piece **owns** the terminator and any following spaces on that line (and the `\n` when that is the snap). The next piece starts at the following character.
+
+**Cut end** (first piece of an oversized paragraph). Let `T` = largest index with tokens ≤ `childTargetTokens`, `H` = largest index with tokens ≤ `childHardMaxTokens`:
+
+1. Last legal index ≤ `T` and `> 0`
+2. Else first legal index in (`T`, `H`]
+3. Else last whitespace in `(0, H]`
+4. Else `H` — only if the paragraph has no space/`\n` (sole mid-word escape)
+
+**Overlap start** (next child): among legal indices `S` in the previous piece with `count(piece[S : cut]) ≤ childOverlapTokens`, pick the `S` with the **largest tail** (most overlap without exceeding the budget). `S = cut` is always legal (zero overlap). Require `S` greater than the previous start so the loop advances. If no other legal `S` fits the budget, skip overlap — do not start mid-sentence.
 
 ### Parents
 
@@ -211,7 +225,7 @@ Markers: lines exactly `<!-- image-desc -->` / `<!-- /image-desc -->` (trim that
 
 ### Forced prose splits
 
-Only when a **single paragraph** exceeds `childHardMaxTokens`: snap at a [legal snap point](#overlap) near `childTargetTokens`. Then apply [overlap](#overlap) so the next piece also starts on a legal snap point. Never inside fences, tables, image-desc, or headings.
+Only when a **single paragraph** exceeds `childHardMaxTokens`. Choose the cut end, then the next start, with the [overlap](#overlap) rules. Never inside fences, tables, image-desc, or headings.
 
 ### Oversized atomic blocks
 
