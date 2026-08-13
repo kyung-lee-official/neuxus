@@ -180,6 +180,18 @@ describe("chunkify fixtures", () => {
     expect(kinds).not.toContain("image_desc");
   });
 
+  test("image-desc markers match only after trim, not inner spaces", () => {
+    const exact = lexBlocks(
+      "![Alt](./a.png)\n\n  <!-- image-desc -->  \nDesc.\n<!-- /image-desc -->\n",
+    );
+    expect(exact.some((b) => b.kind === "image_desc")).toBe(true);
+
+    const loose = lexBlocks(
+      "![Alt](./a.png)\n\n<!--  image-desc  -->\nDesc.\n<!-- /image-desc -->\n",
+    );
+    expect(loose.some((b) => b.kind === "image_desc")).toBe(false);
+  });
+
   test("blank-lines-preserved.md → blank line kept in slice", async () => {
     const { children } = await runFixture("blank-lines-preserved.md");
     const child = children.find((c) => c.text.includes("Alpha"));

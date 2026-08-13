@@ -41,8 +41,16 @@ const TABLE_ROW = /^\s*\|.*\|\s*$/;
 const TABLE_DELIM = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/;
 const IMAGE_MD = /^![ \t]*\[.*?\]\(.*\)\s*$/;
 const IMAGE_HTML = /^<img\b[^>]*>\s*$/i;
-const IMAGE_DESC_OPEN = /^<!--\s*image-desc\s*-->\s*$/;
-const IMAGE_DESC_CLOSE = /^<!--\s*\/image-desc\s*-->\s*$/;
+const IMAGE_DESC_OPEN_LINE = "<!-- image-desc -->";
+const IMAGE_DESC_CLOSE_LINE = "<!-- /image-desc -->";
+
+function isImageDescOpen(lineText: string): boolean {
+  return lineText.trim() === IMAGE_DESC_OPEN_LINE;
+}
+
+function isImageDescClose(lineText: string): boolean {
+  return lineText.trim() === IMAGE_DESC_CLOSE_LINE;
+}
 
 function isBlankLine(text: string): boolean {
   return text.trim() === "";
@@ -127,24 +135,24 @@ export function lexBlocks(body: string): LexBlock[] {
       continue;
     }
 
-    if (IMAGE_DESC_OPEN.test(line.text)) {
+    if (isImageDescOpen(line.text)) {
       const start = line.start;
       let end = line.end;
       i++;
-      while (i < lines.length && !IMAGE_DESC_CLOSE.test(lines[i]!.text)) {
+      while (i < lines.length && !isImageDescClose(lines[i]!.text)) {
         // Stop at next structural boundary if closer missing
         const t = lines[i]!.text;
         if (
           ATX_HEADING.test(t) ||
           FENCE_OPEN.test(t) ||
-          IMAGE_DESC_OPEN.test(t)
+          isImageDescOpen(t)
         ) {
           break;
         }
         end = lines[i]!.end;
         i++;
       }
-      if (i < lines.length && IMAGE_DESC_CLOSE.test(lines[i]!.text)) {
+      if (i < lines.length && isImageDescClose(lines[i]!.text)) {
         end = lines[i]!.end;
         i++;
       }
@@ -201,7 +209,7 @@ export function lexBlocks(body: string): LexBlock[] {
           ATX_HEADING.test(t) ||
           FENCE_OPEN.test(t) ||
           HR.test(t) ||
-          IMAGE_DESC_OPEN.test(t)
+          isImageDescOpen(t)
         ) {
           break;
         }
@@ -279,7 +287,7 @@ export function lexBlocks(body: string): LexBlock[] {
         HR.test(t) ||
         LIST_ITEM.test(t) ||
         BLOCKQUOTE.test(t) ||
-        IMAGE_DESC_OPEN.test(t) ||
+        isImageDescOpen(t) ||
         (TABLE_ROW.test(t) &&
           i + 1 < lines.length &&
           TABLE_DELIM.test(lines[i + 1]!.text))
