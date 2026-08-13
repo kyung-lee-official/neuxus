@@ -1,12 +1,11 @@
 export {
   hashesMatch,
-  pageContentHash,
   type PageHashFields,
+  pageContentHash,
 } from "./hash.ts";
 export {
   findPageContentHash,
-  persistKnowledgePage,
   type PersistKnowledgePageInput,
   type PersistKnowledgePageResult,
+  persistKnowledgePage,
 } from "./persist.ts";
-
