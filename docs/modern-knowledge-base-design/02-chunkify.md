@@ -4,7 +4,7 @@
 
 **`body`** is ingest-normalized page markdown ([01-ingest.md](./01-ingest.md)), stored as `kb_pages.body`, **before** `chunkify`. Parents and children are slices of this string, not a second copy of the file.
 
-Related: [01-ingest.md](./01-ingest.md), [appendix-a-data-model.md](./appendix-a-data-model.md), [appendix-b-vector-search.md](./appendix-b-vector-search.md).
+Related: [01-ingest.md](./01-ingest.md), [appendix-a-data-model.md](./appendix-a-data-model.md), [appendix-b-vector-search.md](./appendix-b-vector-search.md), [03-embed.md](./03-embed.md).
 
 ## Pure function
 
@@ -23,8 +23,8 @@ chunkify(body: string, options?: ChunkifyOptions): {
 
 No I/O. Caller supplies `body` (frontmatter already stripped, ingest-normalized) and resolved knobs. Each `text` is `body.slice(start, end)` — keep blank lines inside the span; do not compact.
 
-| In scope                                      | Out of scope                                |
-| --------------------------------------------- | ------------------------------------------- |
+| In scope                                          | Out of scope                                |
+| ------------------------------------------------- | ------------------------------------------- |
 | Idempotent body normalize, lex, parent/child pack | Hash skip gate, persist, embed, query / LLM |
 
 ## Why parent–child

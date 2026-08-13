@@ -1,6 +1,6 @@
 # Appendix A — Knowledge data model (pages, parents, children)
 
-Relational store in **PostgreSQL**, with **pgvector** on `kb_children.embedding`. Ingest: [01-ingest.md](./01-ingest.md). Chunking: [02-chunkify.md](./02-chunkify.md). Search: [appendix-b-vector-search.md](./appendix-b-vector-search.md).
+Relational store in **PostgreSQL**, with **pgvector** on `kb_children.embedding`. Ingest: [01-ingest.md](./01-ingest.md). Chunking: [02-chunkify.md](./02-chunkify.md). Embed: [03-embed.md](./03-embed.md). Search: [appendix-b-vector-search.md](./appendix-b-vector-search.md).
 
 ## Entities
 
@@ -8,11 +8,11 @@ Relational store in **PostgreSQL**, with **pgvector** on `kb_children.embedding`
 Page ──* Parent ──* Child (embedding)
 ```
 
-| Entity     | Role                                                                                          | `vector`? |
-| ---------- | --------------------------------------------------------------------------------------------- | --------- |
+| Entity     | Role                                                                                        | `vector`? |
+| ---------- | ------------------------------------------------------------------------------------------- | --------- |
 | **Page**   | Markdown file: slug, title, ingest-normalized [`body`](./01-ingest.md#body), `content_hash` | No        |
-| **Parent** | Generation slice of `body`                                                                    | No        |
-| **Child**  | Retrieval unit                                                                                | Yes       |
+| **Parent** | Generation slice of `body`                                                                  | No        |
+| **Child**  | Retrieval unit                                                                              | Yes       |
 
 FKs: `kb_parents.page_id → kb_pages`, `kb_children.parent_id → kb_parents`. Optional denormalized `kb_children.page_id`; optional `start_offset` / `end_offset` into page `body` ([normalized at ingest](./01-ingest.md#body)). On page change: delete that page’s parents/children, insert the new tree ([incremental updates](./01-ingest.md#incremental-updates-page-hash)).
 
@@ -82,5 +82,16 @@ CREATE TABLE kb_chunk_settings (
   parent_max_tokens           INT,
   fence_intro_glue_max_tokens INT,
   tokenizer_encoding          TEXT
+);
+```
+
+## Embed settings table
+
+Current embedding model for new vectors ([03-embed.md](./03-embed.md)). Nullable; app default `nomic-embed-text:latest`. Single row `id = 'default'`. Each child still stores `embedding_model` of the vector it holds.
+
+```sql
+CREATE TABLE kb_embed_settings (
+  id               TEXT PRIMARY KEY DEFAULT 'default',
+  embedding_model  TEXT
 );
 ```

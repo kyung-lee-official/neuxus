@@ -1,6 +1,6 @@
 # Appendix B — Vector search (question → parents)
 
-Similarity on `kb_children.embedding` via **pgvector** SQL. Schema/index: [appendix-a-data-model.md](./appendix-a-data-model.md). Chunk roles: [02-chunkify.md](./02-chunkify.md).
+Similarity on `kb_children.embedding` via **pgvector** SQL. Schema/index: [appendix-a-data-model.md](./appendix-a-data-model.md). Chunk roles: [02-chunkify.md](./02-chunkify.md). Embed: [03-embed.md](./03-embed.md).
 
 ## Flow
 
@@ -17,7 +17,7 @@ Vector-only for now. Optional later: hybrid FTS + RRF.
 
 ## Question embed
 
-Same provider/model as `children.embedding_model` and `vector(N)`.
+Same provider/model as the current DB embedding model and `vector(N)` ([03-embed.md](./03-embed.md)). Default model: `nomic-embed-text:latest` (Ollama).
 
 ### Embed input prefix
 
@@ -33,7 +33,7 @@ Here is the setup code:
 
 If children are embedded with a prefix, embed the **question** with the same policy (same fields, same order). Mixing prefixed documents and a bare question mismatches the space.
 
-This does not change parent/child spans. Skip the prefix until ingest needs it.
+This does not change parent/child spans. Skip the prefix until ingest needs it ([03-embed.md](./03-embed.md#input)).
 
 ## Similarity SQL (cosine)
 
@@ -69,4 +69,4 @@ WHERE p.id = ANY($1::text[]);
 
 ## Stale vectors
 
-Null `embedding` or mismatched `embedding_model` → exclude from search (or repair via re-embed; [01-ingest incremental updates](./01-ingest.md#incremental-updates-page-hash)).
+Null `embedding` or mismatched `embedding_model` → exclude from search (or repair via re-embed; [03-embed.md](./03-embed.md)).
