@@ -101,21 +101,32 @@ describe("chunkify fixtures", () => {
   });
 
   test("two-h2-sections.md → one parent per ##", async () => {
-    const { parents, children } = await runFixture("two-h2-sections.md");
+    const { body, parents, children } = await runFixture("two-h2-sections.md");
     expect(parents).toHaveLength(2);
     expect(parents[0]!.text).toContain("## One");
     expect(parents[1]!.text).toContain("## Two");
     expect(
       children.every((c) => c.parentIndex === 0 || c.parentIndex === 1),
     ).toBe(true);
+    expect(parents[0]!.start).toBe(0);
+    expect(parents[0]!.end).toBe(parents[1]!.start);
+    expect(parents[1]!.end).toBe(body.length);
+    expect(parents[0]!.text.endsWith("\n")).toBe(true);
+    expect(parents[0]!.text).not.toContain("## Two");
+    const lastOfOne = children.filter((c) => c.parentIndex === 0).at(-1);
+    expect(lastOfOne?.end).toBe(parents[0]!.end);
+    expect(lastOfOne?.text.endsWith("\n")).toBe(true);
   });
 
   test("preamble-before-h2.md → preamble is first parent", async () => {
-    const { parents } = await runFixture("preamble-before-h2.md");
+    const { body, parents } = await runFixture("preamble-before-h2.md");
     expect(parents.length).toBeGreaterThanOrEqual(2);
     expect(parents[0]!.text).toContain("Intro before any section heading.");
     expect(parents[0]!.text).not.toContain("## First");
     expect(parents[1]!.text).toContain("## First");
+    expect(parents[0]!.end).toBe(parents[1]!.start);
+    expect(parents[0]!.text.endsWith("\n")).toBe(true);
+    expect(parents[parents.length - 1]!.end).toBe(body.length);
   });
 
   test("heading-only.md → one parent, one searchable child", async () => {

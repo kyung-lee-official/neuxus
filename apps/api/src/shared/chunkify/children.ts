@@ -342,7 +342,21 @@ export function packChildren(
 
     for (let idx = 0; idx < merged.length; idx++) {
       merged[idx]!.index = idx;
-      out.push(merged[idx]!);
+    }
+
+    if (merged.length > 0) {
+      const first = merged[0]!;
+      const last = merged[merged.length - 1]!;
+      first.start = parent.start;
+      last.end = parent.end;
+      first.text = body.slice(first.start, first.end);
+      if (last !== first) {
+        last.text = body.slice(last.start, last.end);
+      }
+    }
+
+    for (const child of merged) {
+      out.push(child);
     }
   }
 

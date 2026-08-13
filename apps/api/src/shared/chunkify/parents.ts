@@ -153,5 +153,16 @@ export function buildParents(
     }
   }
 
+  coverBodyGaps(body, parents);
   return parents;
+}
+
+/** Trailing blanks attach to the previous parent; first parent starts at 0. */
+function coverBodyGaps(body: string, parents: ParentSlice[]): void {
+  if (parents.length === 0) return;
+  parents[0]!.start = 0;
+  for (let i = 0; i < parents.length - 1; i++) {
+    parents[i]!.end = parents[i + 1]!.start;
+  }
+  parents[parents.length - 1]!.end = body.length;
 }
