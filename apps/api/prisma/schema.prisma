@@ -82,6 +82,20 @@ model KnowledgeChunkSettings {
     @@map("kb_chunk_settings")
 }
 
+/// Embed runtime config (`kb_embed_settings`). Nullable columns — app defaults
+/// live in code (`EMBED_DEFAULTS`), not SQL DEFAULT. Single row: id = `"default"`.
+model KnowledgeEmbedSettings {
+    id String @id @default("default")
+
+    embeddingModel String? @map("embedding_model")
+    provider       String?
+    host           String?
+    port           Int?
+    apiKey         String? @map("api_key")
+
+    @@map("kb_embed_settings")
+}
+
 /// Knowledge page (`kb_pages`). `body` is ingest-normalized. Apply via your own migrate.
 model KnowledgePage {
     id          String   @id
