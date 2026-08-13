@@ -13,21 +13,43 @@ export type PersistKnowledgePageInput = {
   chunks: ChunkifyResult;
 };
 
+export type PersistKnowledgePageResult = {
+  contentHash: string;
+  skipped: boolean;
+};
+
+/** Stored `kb_pages.content_hash`, or null if the page is missing. */
+export async function findPageContentHash(
+  pageId: string,
+): Promise<string | null> {
+  const rows = await db()`
+    SELECT content_hash FROM kb_pages WHERE id = ${pageId} LIMIT 1
+  `;
+  const hash = rows[0]?.content_hash;
+  return typeof hash === "string" ? hash : null;
+}
+
 /**
- * Upsert `kb_pages`, then replace that page’s parent/child tree.
- * Embeddings stay null until a later embed pass. Does not skip on hash match.
+ * Upsert `kb_pages` and replace that page’s parent/child tree, unless
+ * `content_hash` already matches (skip gate — no rewrite, no re-chunk needed).
+ * Embeddings stay null until a later embed pass.
  * @see docs/modern-knowledge-base-design/01-ingest.md
  * @see docs/modern-knowledge-base-design/appendix-a-data-model.md
  */
 export async function persistKnowledgePage(
   input: PersistKnowledgePageInput,
-): Promise<{ contentHash: string }> {
+): Promise<PersistKnowledgePageResult> {
   const contentHash = pageContentHash({
     title: input.title,
     type: input.type,
     tags: input.tags,
     body: input.body,
   });
+
+  const stored = await findPageContentHash(input.id);
+  if (stored === contentHash) {
+    return { contentHash, skipped: true };
+  }
 
   const sql = db();
   await sql.begin(async (tx) => {
@@ -96,5 +118,5 @@ export async function persistKnowledgePage(
     }
   });
 
-  return { contentHash };
+  return { contentHash, skipped: false };
 }

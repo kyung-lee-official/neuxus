@@ -17,3 +17,11 @@ export function pageContentHash(fields: PageHashFields): string {
   });
   return createHash("sha256").update(payload).digest("hex");
 }
+
+/** True when a stored page hash matches ingest fields (skip gate). */
+export function hashesMatch(
+  storedHash: string | null,
+  fields: PageHashFields,
+): boolean {
+  return storedHash !== null && storedHash === pageContentHash(fields);
+}

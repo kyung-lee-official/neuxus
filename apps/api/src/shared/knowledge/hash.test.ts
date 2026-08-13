@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { pageContentHash } from "./hash.ts";
+import { hashesMatch, pageContentHash } from "./hash.ts";
 
 describe("pageContentHash", () => {
   test("same fields same hash; tag order does not matter", () => {
@@ -33,5 +33,28 @@ describe("pageContentHash", () => {
       body: "",
     });
     expect(left).not.toBe(right);
+  });
+});
+
+describe("hashesMatch", () => {
+  const fields = {
+    title: "T",
+    type: null as string | null,
+    tags: [] as string[],
+    body: "Hi\n",
+  };
+
+  test("false when nothing is stored", () => {
+    expect(hashesMatch(null, fields)).toBe(false);
+  });
+
+  test("true when stored hash equals current fields", () => {
+    expect(hashesMatch(pageContentHash(fields), fields)).toBe(true);
+  });
+
+  test("false when body changed", () => {
+    expect(hashesMatch(pageContentHash(fields), { ...fields, body: "Bye\n" })).toBe(
+      false,
+    );
   });
 });
