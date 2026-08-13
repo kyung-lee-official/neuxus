@@ -93,6 +93,17 @@ describe("chunkify fixtures", () => {
     await writeReviewDump("whitespace-only.md", body, result);
   });
 
+  test("re-applies ingest body normalize (CRLF, trailing spaces, final \\n)", () => {
+    const raw = "Hello  \r\nworld\t";
+    const body = normalizeBody(raw);
+    expect(body).toBe("Hello\nworld\n");
+    const result = chunkify(raw);
+    expect(result.parents).toHaveLength(1);
+    expect(result.parents[0]!.text).toBe(body);
+    expect(result.children[0]!.text).toBe(body);
+    assertExactSlices(body, result);
+  });
+
   test("short-note.md → one parent, one child", async () => {
     const { parents, children } = await runFixture("short-note.md");
     expect(parents).toHaveLength(1);
