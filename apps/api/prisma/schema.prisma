@@ -81,3 +81,56 @@ model KnowledgeChunkSettings {
 
     @@map("kb_chunk_settings")
 }
+
+/// Knowledge page (`kb_pages`). `body` is ingest-normalized. Apply via your own migrate.
+model KnowledgePage {
+    id          String   @id
+    slug        String   @unique
+    title       String
+    type        String?
+    tags        String[] @default([])
+    body        String
+    sourcePath  String?  @map("source_path")
+    contentHash String   @map("content_hash")
+    updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+    parents  KnowledgeParent[]
+    children KnowledgeChild[]
+
+    @@map("kb_pages")
+}
+
+model KnowledgeParent {
+    id          String @id
+    pageId      String @map("page_id")
+    parentIndex Int    @map("parent_index")
+    text        String
+    startOffset Int?   @map("start_offset")
+    endOffset   Int?   @map("end_offset")
+
+    page     KnowledgePage    @relation(fields: [pageId], references: [id], onDelete: Cascade)
+    children KnowledgeChild[]
+
+    @@unique([pageId, parentIndex])
+    @@map("kb_parents")
+}
+
+/// `embedding` is pgvector; set dimensions (e.g. vector(768)) in the migration. HNSW is not in this schema.
+model KnowledgeChild {
+    id             String                      @id
+    parentId       String                      @map("parent_id")
+    pageId         String                      @map("page_id")
+    childIndex     Int                         @map("child_index")
+    text           String
+    startOffset    Int?                        @map("start_offset")
+    endOffset      Int?                        @map("end_offset")
+    embedding      Unsupported("vector")?
+    embeddingModel String?                     @map("embedding_model")
+    embeddedAt     DateTime?                   @map("embedded_at") @db.Timestamptz(6)
+
+    parent KnowledgeParent @relation(fields: [parentId], references: [id], onDelete: Cascade)
+    page   KnowledgePage   @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+    @@unique([parentId, childIndex])
+    @@map("kb_children")
+}
