@@ -77,7 +77,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <div className="flex h-dvh overflow-hidden">
         <AdminNavPanel user={user} />
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-5 pt-8 pb-16">
-          {children}
+          <div className="mx-auto w-full max-w-4xl">{children}</div>
         </div>
       </div>
     </AdminUserContext.Provider>
