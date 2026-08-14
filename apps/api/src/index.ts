@@ -1,11 +1,11 @@
 import { cors } from "@elysiajs/cors";
 import { Elysia, status } from "elysia";
-import { serverPort } from "./shared/config.ts";
-import { admin } from "./modules/admin/index.ts";
 import { health } from "./modules/health/index.ts";
 import { query } from "./modules/query/index.ts";
+import { serverSetting } from "./modules/server-setting/index.ts";
 import { sessions } from "./modules/sessions/index.ts";
 import { users } from "./modules/users/index.ts";
+import { serverPort } from "./shared/config.ts";
 
 const app = new Elysia()
   .use(
@@ -29,7 +29,7 @@ const app = new Elysia()
     }
   })
   .use(health)
-  .use(admin)
+  .use(serverSetting)
   .use(query)
   .use(sessions)
   .use(users)
@@ -42,7 +42,9 @@ console.log(
 console.log(
   "Sessions: GET/POST /sessions, PATCH /sessions/:id; POST /query accepts body.sessionId",
 );
-console.log("Admin: POST /admin/nuke { target: app }");
+console.log(
+  "Server setting: GET/PUT /server-setting/embed; POST /server-setting/nuke { target: app }",
+);
 
 export type App = typeof app;
 export default app;

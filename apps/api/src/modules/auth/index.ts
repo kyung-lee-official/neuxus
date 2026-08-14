@@ -10,4 +10,12 @@ export const auth = new Elysia({ name: "Auth.Service" }).macro({
       return { user };
     },
   },
+  requireAdmin: {
+    async resolve({ headers }) {
+      const user = await Auth.resolveUserFromHeaders(headers);
+      if (!user) return Auth.unauthorized();
+      if (user.role !== "admin") return Auth.forbidden();
+      return { user };
+    },
+  },
 });

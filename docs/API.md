@@ -9,7 +9,6 @@ All responses are JSON (`Content-Type: application/json`).
 | Endpoint                                                 | Auth                                                |
 | -------------------------------------------------------- | --------------------------------------------------- |
 | `GET /health`                                            | none                                                |
-| `POST /admin/nuke`                                       | none (sandbox; wipe DB `public` schema)             |
 | `GET /users`, `GET /users/:id`                           | none (sandbox convenience)                          |
 | `GET /users/:id/data`                                    | `Authorization: Bearer <api-key>`                   |
 | `DELETE /users/:id/memories/:memoryId`                   | `Authorization: Bearer <api-key>`                   |
@@ -17,6 +16,8 @@ All responses are JSON (`Content-Type: application/json`).
 | `POST /users`                                            | Bearer if any users exist; open when table is empty |
 | `PATCH /users/:id`, `DELETE /users/:id`                  | `Authorization: Bearer <api-key>`                   |
 | `POST /query`, `POST /remember`                          | `Authorization: Bearer <api-key>`                   |
+| `GET /server-setting/embed`, `PUT /server-setting/embed` | Bearer **admin**                                    |
+| `POST /server-setting/nuke`                              | Bearer **admin**                                    |
 
 Seed users (after `bun run seed`; stored in `app_users`):
 
@@ -47,9 +48,9 @@ Liveness check. No auth.
 { "ok": true }
 ```
 
-### `POST /admin/nuke`
+### `POST /server-setting/nuke`
 
-Sandbox only: hard-wipe `public` on **`DATABASE_URL`** (including extensions). No auth. Does **not** remigrate or seed.
+Admin Bearer. Hard-wipe `public` on **`DATABASE_URL`** (including extensions). Does **not** remigrate or seed.
 
 **Request**
 
@@ -63,7 +64,7 @@ Sandbox only: hard-wipe `public` on **`DATABASE_URL`** (including extensions). N
 { "ok": true, "nuked": true, "target": "app" }
 ```
 
-**400** — missing/invalid `target` (only `"app"` is accepted).
+**400** — missing/invalid `target` (only `"app"` is accepted). Non-admin → `403`.
 
 ### Users
 
@@ -105,6 +106,24 @@ Bearer. Body:
 ### `POST /remember`
 
 Bearer. Body `{ "content": "…" }` — inserts a personal memory note.
+
+### Embed settings (admin)
+
+`GET /server-setting/embed` — resolved `kb_embed_settings` (app defaults filled in). Bearer admin.
+
+`PUT /server-setting/embed` body:
+
+```json
+{
+  "embeddingModel": "nomic-embed-text:latest",
+  "provider": "ollama",
+  "host": "127.0.0.1",
+  "port": 11434,
+  "apiKey": null
+}
+```
+
+Empty / `null` fields store as null (app defaults on read). Non-admin → `403`.
 
 ## Env
 

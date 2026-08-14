@@ -91,6 +91,7 @@ export const UserQueryKey = {
   Data: (id: string, messagePage: number) =>
     ["users", id, "data", messagePage] as const,
   Sessions: (userId: string) => ["sessions", userId] as const,
+  EmbedSettings: ["server-setting", "embed"] as const,
 } as const;
 
 export async function getHealth(): Promise<{ ok: boolean }> {
@@ -99,13 +100,16 @@ export async function getHealth(): Promise<{ ok: boolean }> {
 
 export type NukeTarget = "app";
 
-export async function nukeDatabase(
-  target: NukeTarget = "app",
-): Promise<{ ok: boolean; nuked: boolean; target: NukeTarget }> {
+export async function nukeDatabase(input: {
+  apiKey: string;
+  target?: NukeTarget;
+}): Promise<{ ok: boolean; nuked: boolean; target: NukeTarget }> {
+  const target = input.target ?? "app";
   return apiFetch<{ ok: boolean; nuked: boolean; target: NukeTarget }>(
-    "/admin/nuke",
+    "/server-setting/nuke",
     {
       method: "POST",
+      apiKey: input.apiKey,
       body: JSON.stringify({ target }),
     },
   );
@@ -246,5 +250,34 @@ export async function postRemember(input: {
     method: "POST",
     apiKey: input.apiKey,
     body: JSON.stringify({ content: input.content }),
+  });
+}
+
+export type EmbedSettings = {
+  embeddingModel: string;
+  provider: string;
+  host: string;
+  port: number;
+  apiKey: string | null;
+};
+
+export async function getEmbedSettings(apiKey: string): Promise<EmbedSettings> {
+  return apiFetch<EmbedSettings>("/server-setting/embed", { apiKey });
+}
+
+export async function putEmbedSettings(input: {
+  apiKey: string;
+  settings: {
+    embeddingModel: string | null;
+    provider: string | null;
+    host: string | null;
+    port: number | null;
+    apiKey: string | null;
+  };
+}): Promise<EmbedSettings> {
+  return apiFetch<EmbedSettings>("/server-setting/embed", {
+    method: "PUT",
+    apiKey: input.apiKey,
+    body: JSON.stringify(input.settings),
   });
 }

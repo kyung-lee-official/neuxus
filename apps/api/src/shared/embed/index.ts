@@ -15,5 +15,5 @@ export {
 } from "./defaults.ts";
 export { createOllamaEmbedder } from "./ollama.ts";
 export { createEmbedder } from "./provider.ts";
-export { loadEmbedSettings } from "./settings.ts";
+export { loadEmbedSettings, saveEmbedSettings } from "./settings.ts";
 export type { Embedder } from "./types.ts";

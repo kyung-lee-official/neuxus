@@ -17,4 +17,8 @@ export abstract class Auth {
       error: "Unauthorized. Use Authorization: Bearer <api-key>.",
     });
   }
+
+  static forbidden() {
+    return status(403, { error: "Admin only." });
+  }
 }

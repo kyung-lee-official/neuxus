@@ -12,13 +12,11 @@ import {
   createUser,
   deleteUser,
   listUsers,
-  nukeDatabase,
   regenerateUserKey,
   UserQueryKey,
 } from "@/lib/api";
 import { displayName } from "@/lib/display-name";
 import { AdminBadge } from "./admin-badge";
-import { Modal } from "./modal";
 
 const createUserSchema = z.object({
   id: z
@@ -46,7 +44,6 @@ export function AuthPanel() {
   const setActiveUserId = useActiveUserStore((s) => s.setActiveUserId);
   const [storeReady, setStoreReady] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [nukeConfirmOpen, setNukeConfirmOpen] = useState(false);
 
   useEffect(() => {
     setStoreReady(useActiveUserStore.persist.hasHydrated());
@@ -116,23 +113,11 @@ export function AuthPanel() {
     },
   });
 
-  const nukeMutation = useMutation({
-    mutationFn: () => nukeDatabase("app"),
-    onSuccess: async () => {
-      setNukeConfirmOpen(false);
-      setActiveUserId(null);
-      setSelectedId(null);
-      queryClient.clear();
-      await queryClient.invalidateQueries({ queryKey: UserQueryKey.List });
-    },
-  });
-
   const busy =
     usersQuery.isFetching ||
     createMutation.isPending ||
     regenerateMutation.isPending ||
     deleteMutation.isPending ||
-    nukeMutation.isPending ||
     createForm.formState.isSubmitting;
 
   const actionError =
@@ -141,7 +126,6 @@ export function AuthPanel() {
       ? errorMessage(regenerateMutation.error)
       : null) ||
     (deleteMutation.isError ? errorMessage(deleteMutation.error) : null) ||
-    (nukeMutation.isError ? errorMessage(nukeMutation.error) : null) ||
     (usersQuery.isError ? errorMessage(usersQuery.error) : null);
 
   function signIn() {
@@ -300,52 +284,7 @@ export function AuthPanel() {
             Create user
           </button>
         </form>
-
-        <div className="mt-6 border-line border-t pt-4">
-          <p className="mt-0 mb-2 text-muted text-xs">
-            Hard-wipe the neuxus database. Re-run Prisma migrate and seed
-            afterward.
-          </p>
-          <button
-            type="button"
-            className="w-full rounded border border-danger bg-transparent px-3.5 py-2 text-danger hover:bg-danger/10 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={busy}
-            onClick={() => setNukeConfirmOpen(true)}
-          >
-            Nuke DB
-          </button>
-        </div>
       </div>
-
-      <Modal
-        open={nukeConfirmOpen}
-        title="Nuke DB?"
-        titleId="nuke-dialog-title"
-        onClose={() => setNukeConfirmOpen(false)}
-        closeDisabled={nukeMutation.isPending}
-      >
-        <p className="m-0 text-muted text-sm">
-          Drops the entire <code className="font-mono text-xs">public</code>{" "}
-          schema on <code className="font-mono text-xs">DATABASE_URL</code>{" "}
-          (tables and extensions). Cannot be undone. Afterward run Prisma
-          migrate and <code className="font-mono text-xs">bun run seed</code>.
-        </p>
-        {nukeMutation.isError ? (
-          <p className="mt-3 mb-0 text-danger text-sm">
-            {errorMessage(nukeMutation.error)}
-          </p>
-        ) : null}
-        <div className="mt-4 flex justify-end">
-          <button
-            type="button"
-            className="rounded border border-danger bg-danger px-3.5 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={nukeMutation.isPending}
-            onClick={() => nukeMutation.mutate()}
-          >
-            {nukeMutation.isPending ? "Nuking…" : "Nuke DB"}
-          </button>
-        </div>
-      </Modal>
     </section>
   );
 }
