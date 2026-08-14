@@ -19,6 +19,13 @@ export const serverSetting = new Elysia({ prefix: "/server-setting" })
     requireAdmin: true,
     body: ServerSettingModel.synthesisBody,
   })
+  .get("/corpus", () => ServerSetting.getCorpus(), {
+    requireAdmin: true,
+  })
+  .put("/corpus", ({ body }) => ServerSetting.putCorpus(body), {
+    requireAdmin: true,
+    body: ServerSettingModel.corpusBody,
+  })
   .post("/nuke", ({ body }) => ServerSetting.nuke(body), {
     requireAdmin: true,
     body: ServerSettingModel.nukeBody,

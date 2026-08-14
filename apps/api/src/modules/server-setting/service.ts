@@ -1,4 +1,9 @@
 import { status } from "elysia";
+import {
+  type CorpusSettingsRow,
+  loadCorpusSettings,
+  saveCorpusSettings,
+} from "../../shared/corpus/index.ts";
 import { nukeDatabases } from "../../shared/db.ts";
 import {
   type EmbedSettingsRow,
@@ -42,6 +47,19 @@ export abstract class ServerSetting {
       contextWindowTokens: body.contextWindowTokens,
     };
     return saveSynthesisSettings(row);
+  }
+
+  static async getCorpus() {
+    return loadCorpusSettings();
+  }
+
+  static async putCorpus(body: ServerSettingModel["corpusBody"]) {
+    const row: CorpusSettingsRow = {
+      repoUrl: body.repoUrl,
+      branch: body.branch,
+      docsRoot: body.docsRoot,
+    };
+    return saveCorpusSettings(row);
   }
 
   static async nuke(body: ServerSettingModel["nukeBody"]) {

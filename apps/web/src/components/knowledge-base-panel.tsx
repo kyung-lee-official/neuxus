@@ -1,4 +1,11 @@
+"use client";
+
+import { useAdminUser } from "./admin-shell";
+import { CorpusSettingsBlock } from "./corpus-settings-block";
+
 export function KnowledgeBasePanel() {
+  const user = useAdminUser();
+
   return (
     <div className="flex w-full flex-col gap-4">
       <section className="flex flex-col gap-2 rounded-md border border-line bg-surface p-6 shadow-sm">
@@ -8,6 +15,7 @@ export function KnowledgeBasePanel() {
           content hashes. Upload and re-embed come later.
         </p>
       </section>
+      <CorpusSettingsBlock actorApiKey={user.apiKey} />
       <section className="flex flex-col gap-2 rounded-md border border-line bg-surface p-6">
         <h2 className="m-0 font-display text-ink text-lg">Pages</h2>
         <p className="m-0 text-muted text-sm">

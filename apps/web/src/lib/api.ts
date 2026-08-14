@@ -93,6 +93,7 @@ export const UserQueryKey = {
   Sessions: (userId: string) => ["sessions", userId] as const,
   EmbedSettings: ["server-setting", "embed"] as const,
   SynthesisSettings: ["server-setting", "synthesis"] as const,
+  CorpusSettings: ["server-setting", "corpus"] as const,
 } as const;
 
 export async function getHealth(): Promise<{ ok: boolean }> {
@@ -310,6 +311,34 @@ export async function putSynthesisSettings(input: {
   };
 }): Promise<SynthesisSettings> {
   return apiFetch<SynthesisSettings>("/server-setting/synthesis", {
+    method: "PUT",
+    apiKey: input.apiKey,
+    body: JSON.stringify(input.settings),
+  });
+}
+
+export type CorpusSettings = {
+  repoUrl: string | null;
+  branch: string | null;
+  docsRoot: string | null;
+  lastSyncedSha: string | null;
+};
+
+export async function getCorpusSettings(
+  apiKey: string,
+): Promise<CorpusSettings> {
+  return apiFetch<CorpusSettings>("/server-setting/corpus", { apiKey });
+}
+
+export async function putCorpusSettings(input: {
+  apiKey: string;
+  settings: {
+    repoUrl: string | null;
+    branch: string | null;
+    docsRoot: string | null;
+  };
+}): Promise<CorpusSettings> {
+  return apiFetch<CorpusSettings>("/server-setting/corpus", {
     method: "PUT",
     apiKey: input.apiKey,
     body: JSON.stringify(input.settings),

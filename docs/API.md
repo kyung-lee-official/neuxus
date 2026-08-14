@@ -18,6 +18,7 @@ All responses are JSON (`Content-Type: application/json`).
 | `POST /query`, `POST /remember`                          | `Authorization: Bearer <api-key>`                   |
 | `GET /server-setting/embed`, `PUT /server-setting/embed` | Bearer **admin**                                    |
 | `GET /server-setting/synthesis`, `PUT /server-setting/synthesis` | Bearer **admin**                                    |
+| `GET /server-setting/corpus`, `PUT /server-setting/corpus` | Bearer **admin**                                    |
 | `POST /server-setting/nuke`                              | Bearer **admin**                                    |
 
 Seed users (after `bun run seed`; stored in `app_users`):
@@ -145,6 +146,22 @@ Empty / `null` fields store as null (app defaults on read). Non-admin → `403`.
 
 Empty / `null` fields store as null (app defaults on read). Unknown model with no `contextWindowTokens` resolves to `0` and Ask will refuse to synthesize. Non-admin → `403`. Do not log `apiKey`.
 
+### Corpus settings (admin)
+
+`GET /server-setting/corpus` — stored `kb_corpus_settings` (`null` stays `null`). Bearer admin.
+
+`PUT /server-setting/corpus` body:
+
+```json
+{
+  "repoUrl": "https://github.com/org/kb.git",
+  "branch": "main",
+  "docsRoot": "docs"
+}
+```
+
+Empty / `null` fields store as null. Null `repoUrl` means do not clone. `lastSyncedSha` is read-only (sync writes it). Non-admin → `403`.
+
 ## Env
 
 | Variable       | Purpose                               |
@@ -152,4 +169,4 @@ Empty / `null` fields store as null (app defaults on read). Unknown model with n
 | `DATABASE_URL` | Postgres URL (database name `neuxus`) |
 | `PORT`         | API port (default 3001)               |
 
-Ask synthesis (MiniMax key, model, base URL, window) is `app_synthesis_settings`, not env.
+Ask synthesis (MiniMax key, model, base URL, window) is `app_synthesis_settings`, not env. Corpus git remote is `kb_corpus_settings`, not env.

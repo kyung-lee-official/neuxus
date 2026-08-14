@@ -19,6 +19,11 @@ export const ServerSettingModel = {
     maxTokens: t.Union([t.Integer({ minimum: 1 }), t.Null()]),
     contextWindowTokens: t.Union([t.Integer({ minimum: 1 }), t.Null()]),
   }),
+  corpusBody: t.Object({
+    repoUrl: t.Union([t.String(), t.Null()]),
+    branch: t.Union([t.String(), t.Null()]),
+    docsRoot: t.Union([t.String(), t.Null()]),
+  }),
 } as const;
 
 export type ServerSettingModel = {
