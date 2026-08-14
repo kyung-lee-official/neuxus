@@ -10,7 +10,7 @@ export type { ChunkifyOptions, ChunkifyResult };
 
 /**
  * Pure parent–child chunkifier for GFM markdown `body`.
- * @see docs/modern-knowledge-base-design/02-chunkify.md
+ * @see docs/modern-knowledge-base-design/03-chunkify.md
  */
 export function chunkify(
   body: string,

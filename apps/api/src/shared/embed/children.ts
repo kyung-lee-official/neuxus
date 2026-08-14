@@ -32,7 +32,7 @@ export function pgvectorLiteral(values: number[]): string {
 
 /**
  * Embed each row; skip empty text or a failed provider call (leave DB unchanged).
- * @see docs/modern-knowledge-base-design/03-embed.md
+ * @see docs/modern-knowledge-base-design/04-embed.md
  */
 export async function embedChildRows(
   rows: EmbedChildRow[],

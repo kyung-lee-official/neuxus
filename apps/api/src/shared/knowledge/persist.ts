@@ -33,7 +33,7 @@ export async function findPageContentHash(
  * Upsert `kb_pages` and replace that page’s parent/child tree, unless
  * `content_hash` already matches (skip gate — no rewrite, no re-chunk needed).
  * Embeddings stay null until a later embed pass.
- * @see docs/modern-knowledge-base-design/01-ingest.md
+ * @see docs/modern-knowledge-base-design/02-ingest.md
  * @see docs/modern-knowledge-base-design/appendix-a-data-model.md
  */
 export async function persistKnowledgePage(

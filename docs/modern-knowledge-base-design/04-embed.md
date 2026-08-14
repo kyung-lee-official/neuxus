@@ -1,6 +1,6 @@
 # Embed (children → vectors)
 
-Write-path only: turn `kb_children.text` into `embedding` and store it. Query is [04-query.md](./04-query.md). Synthesis: [05-synthesis.md](./05-synthesis.md). Chunk roles: [02-chunkify.md](./02-chunkify.md). Schema: [appendix-a-data-model.md](./appendix-a-data-model.md). Ingest skip/replace: [01-ingest.md](./01-ingest.md).
+Write-path only: turn `kb_children.text` into `embedding` and store it. Query is [05-query.md](./05-query.md). Synthesis: [06-synthesis.md](./06-synthesis.md). Chunk roles: [03-chunkify.md](./03-chunkify.md). Schema: [appendix-a-data-model.md](./appendix-a-data-model.md). Ingest skip/replace: [02-ingest.md](./02-ingest.md). Corpus: [01-corpus.md](./01-corpus.md).
 
 ```text
 hash check → optional replace → chunkify → persist (embeddings null) → embed children
@@ -50,7 +50,7 @@ OR embedding_model IS DISTINCT FROM $current_model
 
 After a page replace, scope with `page_id`. When only the stored current model changed, run the same predicate across all pages (no content-hash skip for vectors).
 
-Page hash skip ([01-ingest.md](./01-ingest.md#incremental-updates-page-hash)) means do not re-chunk or re-embed that page.
+Page hash skip ([02-ingest.md](./02-ingest.md#incremental-updates-page-hash)) means do not re-chunk or re-embed that page.
 
 ## Write
 

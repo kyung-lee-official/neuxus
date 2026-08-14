@@ -10,7 +10,7 @@ export type IngestMarkdownResult = {
 /**
  * Ingest a markdown file: strip leading YAML frontmatter, then normalize `body`.
  * `chunkify` never strips frontmatter; it may re-apply {@link normalizeBody}.
- * @see docs/modern-knowledge-base-design/01-ingest.md
+ * @see docs/modern-knowledge-base-design/02-ingest.md
  */
 export function ingestMarkdown(source: string): IngestMarkdownResult {
   const withNewlines = normalizeNewlines(source);

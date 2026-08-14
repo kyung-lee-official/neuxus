@@ -7,7 +7,7 @@ export type PageHashFields = {
   body: string;
 };
 
-/** Stable page skip-gate hash. @see docs/modern-knowledge-base-design/01-ingest.md */
+/** Stable page skip-gate hash. @see docs/modern-knowledge-base-design/02-ingest.md */
 export function pageContentHash(fields: PageHashFields): string {
   const payload = JSON.stringify({
     title: fields.title,

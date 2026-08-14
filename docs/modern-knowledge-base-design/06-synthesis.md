@@ -1,6 +1,6 @@
 # Synthesis (prompt → answer)
 
-Turn a built prompt into an answer string. Retrieve (question → parents) is [04-query.md](./04-query.md). Schema: [appendix-a-data-model.md](./appendix-a-data-model.md). Embed: [03-embed.md](./03-embed.md).
+Turn a built prompt into an answer string. Retrieve (question → parents) is [05-query.md](./05-query.md). Schema: [appendix-a-data-model.md](./appendix-a-data-model.md). Embed: [04-embed.md](./04-embed.md).
 
 ```text
 retrieve parents → build prompt (parents + personal memory + chat) → synthesize → answer
@@ -28,7 +28,7 @@ Unlike embed, nothing here is vector identity. Changing model or URL only affect
 
 The prompt is already assembled by the caller. It includes:
 
-- Knowledge **parent** texts (+ page title / slug) from [04-query.md](./04-query.md) — not child windows alone
+- Knowledge **parent** texts (+ page title / slug) from [05-query.md](./05-query.md) — not child windows alone
 - Personal memory and recent chat when the Ask path has them
 
 Empty parent list is allowed (memory/chat-only). If the prompt context does not contain the answer, the model should say so. Exact prompt wording is application layer.

@@ -35,7 +35,7 @@ function numberFromSql(value: unknown): number {
 /**
  * Embed the question and return ranked unique parents for the LLM.
  * Empty question → no parents. Does not call the synthesizer.
- * @see docs/modern-knowledge-base-design/04-query.md
+ * @see docs/modern-knowledge-base-design/05-query.md
  */
 export async function retrieveParentsByQuestion(
   question: string,

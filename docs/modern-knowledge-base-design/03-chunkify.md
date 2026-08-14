@@ -2,9 +2,9 @@
 
 **Parents** = generation context. **Children** = retrieval units. Structure decides parents; size only refines children and oversized parents. Do not slice the whole file every N characters as the first step.
 
-**`body`** is ingest-normalized page markdown ([01-ingest.md](./01-ingest.md)), stored as `kb_pages.body`, **before** `chunkify`. Parents and children are slices of this string, not a second copy of the file.
+**`body`** is ingest-normalized page markdown ([02-ingest.md](./02-ingest.md)), stored as `kb_pages.body`, **before** `chunkify`. Parents and children are slices of this string, not a second copy of the file.
 
-Related: [01-ingest.md](./01-ingest.md), [03-embed.md](./03-embed.md), [04-query.md](./04-query.md), [05-synthesis.md](./05-synthesis.md), [appendix-a-data-model.md](./appendix-a-data-model.md).
+Related: [01-corpus.md](./01-corpus.md), [02-ingest.md](./02-ingest.md), [04-embed.md](./04-embed.md), [05-query.md](./05-query.md), [06-synthesis.md](./06-synthesis.md), [appendix-a-data-model.md](./appendix-a-data-model.md).
 
 ## Pure function
 
@@ -41,7 +41,7 @@ No I/O. Caller supplies `body` (frontmatter already stripped, ingest-normalized)
 
 Child size tracks **embedding precision**; parent size tracks **useful context** (+ remaining LLM budget).
 
-**Tree:** page →\* parent →\* child. Children never cross a parent boundary; overlap (if any) stays inside one parent. Persistence FKs and page replace-on-edit: [appendix-a](./appendix-a-data-model.md). Query expand: [04-query.md](./04-query.md).
+**Tree:** page →\* parent →\* child. Children never cross a parent boundary; overlap (if any) stays inside one parent. Persistence FKs and page replace-on-edit: [appendix-a](./appendix-a-data-model.md). Query expand: [05-query.md](./05-query.md).
 
 ## Lex
 
@@ -101,7 +101,7 @@ Fixed policy (not a knob): parent cuts `##` → `###` → block packs. Atomic bl
 
 ## Pipeline
 
-1. Treat `body` as already ingest-normalized ([01-ingest.md](./01-ingest.md#body)); a second `normalizeBody` pass is idempotent.
+1. Treat `body` as already ingest-normalized ([02-ingest.md](./02-ingest.md#body)); a second `normalizeBody` pass is idempotent.
 2. Lex into [blocks](#block-inventory).
 3. Build [parents](#parents).
 4. Pack [children](#children) inside each parent (whole blocks only; only paragraphs may [force-split](#forced-prose-splits)).

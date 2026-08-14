@@ -70,4 +70,4 @@ Without seed, the **first** created account becomes `admin`; later accounts are 
 ## Docs
 
 - [`docs/API.md`](docs/API.md) — HTTP API
-- [`docs/modern-knowledge-base-design/`](docs/modern-knowledge-base-design/) — design notes (future KB)
+- [`docs/modern-knowledge-base-design/`](docs/modern-knowledge-base-design/) — KB pipeline (corpus → ingest → chunkify → embed; query → synthesis)

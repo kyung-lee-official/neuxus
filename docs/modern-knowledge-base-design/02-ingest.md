@@ -1,6 +1,6 @@
 # Ingest (file → page `body`)
 
-Ingest turns a markdown **file** into page columns. Chunking starts after that: [02-chunkify.md](./02-chunkify.md). Embed: [03-embed.md](./03-embed.md). Query: [04-query.md](./04-query.md). Synthesis: [05-synthesis.md](./05-synthesis.md). Schema: [appendix-a-data-model.md](./appendix-a-data-model.md).
+Which files exist is [01-corpus.md](./01-corpus.md). Ingest turns one markdown **file** into page columns. Chunking starts after that: [03-chunkify.md](./03-chunkify.md). Embed: [04-embed.md](./04-embed.md). Query: [05-query.md](./05-query.md). Synthesis: [06-synthesis.md](./06-synthesis.md). Schema: [appendix-a-data-model.md](./appendix-a-data-model.md).
 
 ```text
 file.md → strip leading YAML frontmatter → normalize → kb_pages.body → chunkify(body)
@@ -43,6 +43,6 @@ Do not concatenate raw strings (`title + type + tags + body`) — `ab`+`c` and `
 | -------------------------------------------------------- | ---------------------------------------------------------- |
 | Hash match                                               | Skip                                                       |
 | Hash differs                                             | Replace that page’s parent/child tree, then embed children |
-| Same markdown, new embedding model (`kb_embed_settings`) | Re-embed stale children ([03-embed.md](./03-embed.md))     |
+| Same markdown, new embedding model (`kb_embed_settings`) | Re-embed stale children ([04-embed.md](./04-embed.md))     |
 
 Shared path: hash check → optional replace → `chunkify` → embed → update `content_hash` / `embedding_model`.

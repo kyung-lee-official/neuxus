@@ -1,6 +1,6 @@
 # Appendix A — Knowledge data model (pages, parents, children)
 
-Relational store in **PostgreSQL**, with **pgvector** on `kb_children.embedding`. Ingest: [01-ingest.md](./01-ingest.md). Chunking: [02-chunkify.md](./02-chunkify.md). Embed: [03-embed.md](./03-embed.md). Query: [04-query.md](./04-query.md). Synthesis: [05-synthesis.md](./05-synthesis.md).
+Relational store in **PostgreSQL**, with **pgvector** on `kb_children.embedding`. Corpus: [01-corpus.md](./01-corpus.md). Ingest: [02-ingest.md](./02-ingest.md). Chunking: [03-chunkify.md](./03-chunkify.md). Embed: [04-embed.md](./04-embed.md). Query: [05-query.md](./05-query.md). Synthesis: [06-synthesis.md](./06-synthesis.md).
 
 ## Entities
 
@@ -10,11 +10,11 @@ Page ──* Parent ──* Child (embedding)
 
 | Entity     | Role                                                                                        | `vector`? |
 | ---------- | ------------------------------------------------------------------------------------------- | --------- |
-| **Page**   | Markdown file: slug, title, ingest-normalized [`body`](./01-ingest.md#body), `content_hash` | No        |
+| **Page**   | Markdown file: slug, title, ingest-normalized [`body`](./02-ingest.md#body), `content_hash` | No        |
 | **Parent** | Generation slice of `body`                                                                  | No        |
 | **Child**  | Retrieval unit                                                                              | Yes       |
 
-FKs: `kb_parents.page_id → kb_pages`, `kb_children.parent_id → kb_parents`. Optional denormalized `kb_children.page_id`; optional `start_offset` / `end_offset` into page `body` ([normalized at ingest](./01-ingest.md#body)). On page change: delete that page’s parents/children, insert the new tree ([incremental updates](./01-ingest.md#incremental-updates-page-hash)).
+FKs: `kb_parents.page_id → kb_pages`, `kb_children.parent_id → kb_parents`. Optional denormalized `kb_children.page_id`; optional `start_offset` / `end_offset` into page `body` ([normalized at ingest](./02-ingest.md#body)). On page change: delete that page’s parents/children, insert the new tree ([incremental updates](./02-ingest.md#incremental-updates-page-hash)).
 
 Keep `kb_*` namespaced apart from application tables (same database is fine).
 
@@ -70,7 +70,7 @@ CREATE INDEX kb_children_embedding_hnsw
 
 ## Chunk knobs table
 
-Nullable columns; **defaults live in application code** ([02-chunkify.md](./02-chunkify.md#knobs)), not SQL `DEFAULT`. Shape: single row `id = 'default'`.
+Nullable columns; **defaults live in application code** ([03-chunkify.md](./03-chunkify.md#knobs)), not SQL `DEFAULT`. Shape: single row `id = 'default'`.
 
 ```sql
 CREATE TABLE kb_chunk_settings (
@@ -87,7 +87,7 @@ CREATE TABLE kb_chunk_settings (
 
 ## Embed settings table
 
-Runtime embed config ([03-embed.md](./03-embed.md#settings-in-the-database)): model **and** how to reach the provider (host, port, API key). Not env. Nullable columns; **defaults live in application code**, not SQL `DEFAULT`. Single row `id = 'default'`. Empty/missing row must still embed using those defaults.
+Runtime embed config ([04-embed.md](./04-embed.md#settings-in-the-database)): model **and** how to reach the provider (host, port, API key). Not env. Nullable columns; **defaults live in application code**, not SQL `DEFAULT`. Single row `id = 'default'`. Empty/missing row must still embed using those defaults.
 
 `embedding_model` is vector identity (compare to `kb_children.embedding_model`). `provider` / `host` / `port` / `api_key` are connection only — changing them does not stale children. Do not log `api_key`.
 
@@ -106,7 +106,7 @@ CREATE TABLE kb_embed_settings (
 
 ## Synthesis settings table
 
-Runtime synthesis config ([05-synthesis.md](./05-synthesis.md#settings-in-the-database)): how to reach the LLM (provider, model, base URL, API key, max tokens) and **`context_window_tokens`** (must be known before `synthesize`). Not env. Not a `kb_*` table — Ask uses this for memory + chat + knowledge parents. Nullable columns; **defaults live in application code**, not SQL `DEFAULT`. Single row `id = 'default'`. Empty/missing row must still synthesize using those defaults. Clearing columns is a reset to MiniMax.
+Runtime synthesis config ([06-synthesis.md](./06-synthesis.md#settings-in-the-database)): how to reach the LLM (provider, model, base URL, API key, max tokens) and **`context_window_tokens`** (must be known before `synthesize`). Not env. Not a `kb_*` table — Ask uses this for memory + chat + knowledge parents. Nullable columns; **defaults live in application code**, not SQL `DEFAULT`. Single row `id = 'default'`. Empty/missing row must still synthesize using those defaults. Clearing columns is a reset to MiniMax.
 
 Do not log `api_key`. Changing these fields does not stale embeddings.
 
