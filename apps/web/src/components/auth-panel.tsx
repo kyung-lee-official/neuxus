@@ -17,6 +17,7 @@ import {
   UserQueryKey,
 } from "@/lib/api";
 import { displayName } from "@/lib/display-name";
+import { AdminBadge } from "./admin-badge";
 import { Modal } from "./modal";
 
 const createUserSchema = z.object({
@@ -170,8 +171,15 @@ export function AuthPanel() {
         {signedInUserId ? (
           <p className="mt-0 mb-4 text-muted text-sm">
             Currently signed in as{" "}
-            <strong className="text-ink">{signedInUserId}</strong>. You can keep
-            that session or sign in as someone else.
+            <strong className="inline-flex items-center gap-1.5 text-ink">
+              {signedInUserId}
+              {users.some(
+                (u) => u.id === signedInUserId && u.role === "admin",
+              ) ? (
+                <AdminBadge />
+              ) : null}
+            </strong>
+            . You can keep that session or sign in as someone else.
           </p>
         ) : null}
         {actionError ? (
@@ -206,8 +214,9 @@ export function AuthPanel() {
                     onClick={() => setSelectedId(user.id)}
                     disabled={busy}
                   >
-                    <span className="flex items-baseline gap-2 font-display text-base">
+                    <span className="flex items-center gap-2 font-display text-base">
                       {displayName(user.id)}
+                      {user.role === "admin" ? <AdminBadge /> : null}
                       {signedIn ? (
                         <span className="font-mono text-muted text-xs">
                           (signed in)

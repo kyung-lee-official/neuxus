@@ -16,6 +16,7 @@ import {
 } from "@/lib/api";
 import { formatDateTime } from "@/lib/date-time";
 import { displayName } from "@/lib/display-name";
+import { AdminBadge } from "./admin-badge";
 import { Modal } from "./modal";
 
 function shortSessionId(id: string): string {
@@ -254,8 +255,9 @@ export function ActiveUserPanel({ active }: { active: ApiUser | null }) {
           </div>
 
           <div className="flex shrink-0 flex-col gap-1.5 border-line border-t pt-3">
-            <h2 className="m-0 font-display text-ink text-lg">
+            <h2 className="m-0 flex items-center gap-2 font-display text-ink text-lg">
               {displayName(live.id)}
+              {live.role === "admin" ? <AdminBadge /> : null}
             </h2>
             <Link
               href={`/settings/${encodeURIComponent(live.id)}`}
