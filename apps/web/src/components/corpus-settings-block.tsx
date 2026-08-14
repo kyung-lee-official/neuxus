@@ -246,14 +246,6 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
             </button>
             <button
               type="button"
-              className="rounded border border-accent bg-transparent px-3.5 py-1.5 text-accent text-sm disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={busy || !hasSavedRepo}
-              onClick={() => syncMutation.mutate()}
-            >
-              {syncRunning ? "Syncing…" : "Sync"}
-            </button>
-            <button
-              type="button"
               className="rounded border border-line bg-transparent px-3.5 py-1.5 text-ink text-sm disabled:cursor-not-allowed disabled:opacity-60"
               disabled={busy || !hasSavedRepo}
               onClick={() => cloneMutation.mutate()}
@@ -267,6 +259,14 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
               onClick={() => pullMutation.mutate()}
             >
               {pullMutation.isPending ? "Pulling…" : "Pull"}
+            </button>
+            <button
+              type="button"
+              className="rounded border border-accent bg-transparent px-3.5 py-1.5 text-accent text-sm disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={busy || !hasSavedRepo}
+              onClick={() => syncMutation.mutate()}
+            >
+              {syncRunning ? "Syncing…" : "Sync"}
             </button>
           </div>
           <p className="m-0 text-muted text-xs">
