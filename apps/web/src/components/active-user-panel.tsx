@@ -189,7 +189,7 @@ export function ActiveUserPanel({ active }: { active: ApiUser | null }) {
       <div className="flex shrink-0 items-center justify-between gap-2">
         <Link
           href="/ask"
-          className="m-0 font-display text-ink text-xl no-underline hover:text-accent"
+          className="m-0 font-display text-ink text-xl uppercase no-underline hover:text-accent"
         >
           neuxus
         </Link>
