@@ -4,7 +4,7 @@
 
 **`body`** is ingest-normalized page markdown ([01-ingest.md](./01-ingest.md)), stored as `kb_pages.body`, **before** `chunkify`. Parents and children are slices of this string, not a second copy of the file.
 
-Related: [01-ingest.md](./01-ingest.md), [03-embed.md](./03-embed.md), [04-query.md](./04-query.md), [appendix-a-data-model.md](./appendix-a-data-model.md).
+Related: [01-ingest.md](./01-ingest.md), [03-embed.md](./03-embed.md), [04-query.md](./04-query.md), [05-synthesis.md](./05-synthesis.md), [appendix-a-data-model.md](./appendix-a-data-model.md).
 
 ## Pure function
 

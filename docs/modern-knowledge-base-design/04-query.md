@@ -1,6 +1,6 @@
 # Query (question → parents)
 
-Read-path: embed the question, similarity-search `kb_children.embedding`, expand to parents for the LLM. Schema/index: [appendix-a-data-model.md](./appendix-a-data-model.md). Chunk roles: [02-chunkify.md](./02-chunkify.md). Embed: [03-embed.md](./03-embed.md).
+Read-path: embed the question, similarity-search `kb_children.embedding`, expand to parents for the LLM. Schema/index: [appendix-a-data-model.md](./appendix-a-data-model.md). Chunk roles: [02-chunkify.md](./02-chunkify.md). Embed: [03-embed.md](./03-embed.md). Synthesis: [05-synthesis.md](./05-synthesis.md).
 
 ## Flow
 
@@ -10,7 +10,7 @@ Read-path: embed the question, similarity-search `kb_children.embedding`, expand
 3. Resolve parents (+ page title / slug)
 4. Dedupe parents; keep best child score per parent
 5. Cap by max parents / max characters
-6. LLM gets parent texts (+ title / slug) — not child windows alone
+6. LLM gets parent texts (+ title / slug) — not child windows alone ([05-synthesis.md](./05-synthesis.md))
 ```
 
 Vector-only for now. Optional later: hybrid FTS + RRF.

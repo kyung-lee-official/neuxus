@@ -1,6 +1,6 @@
 # Ingest (file → page `body`)
 
-Ingest turns a markdown **file** into page columns. Chunking starts after that: [02-chunkify.md](./02-chunkify.md). Embed: [03-embed.md](./03-embed.md). Query: [04-query.md](./04-query.md). Schema: [appendix-a-data-model.md](./appendix-a-data-model.md).
+Ingest turns a markdown **file** into page columns. Chunking starts after that: [02-chunkify.md](./02-chunkify.md). Embed: [03-embed.md](./03-embed.md). Query: [04-query.md](./04-query.md). Synthesis: [05-synthesis.md](./05-synthesis.md). Schema: [appendix-a-data-model.md](./appendix-a-data-model.md).
 
 ```text
 file.md → strip leading YAML frontmatter → normalize → kb_pages.body → chunkify(body)
