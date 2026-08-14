@@ -82,6 +82,20 @@ model AppSynthesisSettings {
     @@map("app_synthesis_settings")
 }
 
+/// Corpus git remote (`kb_corpus_settings`). Nullable columns — app defaults
+/// live in code, not SQL DEFAULT. Single row: id = `"default"`.
+/// `repo_url` null means no remote (do not clone).
+model KnowledgeCorpusSettings {
+    id String @id @default("default")
+
+    repoUrl       String? @map("repo_url")
+    branch        String?
+    docsRoot      String? @map("docs_root")
+    lastSyncedSha String? @map("last_synced_sha")
+
+    @@map("kb_corpus_settings")
+}
+
 /// Chunkify knobs (`kb_chunk_settings`). Nullable columns — app defaults live in code
 /// (`CHUNKIFY_DEFAULTS`), not SQL DEFAULT. Single row: id = `"default"`.
 model KnowledgeChunkSettings {
