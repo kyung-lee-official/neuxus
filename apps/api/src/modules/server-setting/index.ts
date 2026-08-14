@@ -26,6 +26,12 @@ export const serverSetting = new Elysia({ prefix: "/server-setting" })
     requireAdmin: true,
     body: ServerSettingModel.corpusBody,
   })
+  .post("/corpus/clone", () => ServerSetting.cloneCorpus(), {
+    requireAdmin: true,
+  })
+  .post("/corpus/pull", () => ServerSetting.pullCorpus(), {
+    requireAdmin: true,
+  })
   .post("/nuke", ({ body }) => ServerSetting.nuke(body), {
     requireAdmin: true,
     body: ServerSettingModel.nukeBody,

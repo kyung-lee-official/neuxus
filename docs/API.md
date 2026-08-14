@@ -6,20 +6,21 @@ All responses are JSON (`Content-Type: application/json`).
 
 ## Auth
 
-| Endpoint                                                 | Auth                                                |
-| -------------------------------------------------------- | --------------------------------------------------- |
-| `GET /health`                                            | none                                                |
-| `GET /users`, `GET /users/:id`                           | none (sandbox convenience)                          |
-| `GET /users/:id/data`                                    | `Authorization: Bearer <api-key>`                   |
-| `DELETE /users/:id/memories/:memoryId`                   | `Authorization: Bearer <api-key>`                   |
-| `GET /sessions`, `POST /sessions`, `PATCH /sessions/:id` | `Authorization: Bearer <api-key>`                   |
-| `POST /users`                                            | Bearer if any users exist; open when table is empty |
-| `PATCH /users/:id`, `DELETE /users/:id`                  | `Authorization: Bearer <api-key>`                   |
-| `POST /query`, `POST /remember`                          | `Authorization: Bearer <api-key>`                   |
-| `GET /server-setting/embed`, `PUT /server-setting/embed` | Bearer **admin**                                    |
-| `GET /server-setting/synthesis`, `PUT /server-setting/synthesis` | Bearer **admin**                                    |
-| `GET /server-setting/corpus`, `PUT /server-setting/corpus` | Bearer **admin**                                    |
-| `POST /server-setting/nuke`                              | Bearer **admin**                                    |
+| Endpoint                                                                | Auth                                                |
+| ----------------------------------------------------------------------- | --------------------------------------------------- |
+| `GET /health`                                                           | none                                                |
+| `GET /users`, `GET /users/:id`                                          | none (sandbox convenience)                          |
+| `GET /users/:id/data`                                                   | `Authorization: Bearer <api-key>`                   |
+| `DELETE /users/:id/memories/:memoryId`                                  | `Authorization: Bearer <api-key>`                   |
+| `GET /sessions`, `POST /sessions`, `PATCH /sessions/:id`                | `Authorization: Bearer <api-key>`                   |
+| `POST /users`                                                           | Bearer if any users exist; open when table is empty |
+| `PATCH /users/:id`, `DELETE /users/:id`                                 | `Authorization: Bearer <api-key>`                   |
+| `POST /query`, `POST /remember`                                         | `Authorization: Bearer <api-key>`                   |
+| `GET /server-setting/embed`, `PUT /server-setting/embed`                | Bearer **admin**                                    |
+| `GET /server-setting/synthesis`, `PUT /server-setting/synthesis`        | Bearer **admin**                                    |
+| `GET /server-setting/corpus`, `PUT /server-setting/corpus`              | Bearer **admin**                                    |
+| `POST /server-setting/corpus/clone`, `POST /server-setting/corpus/pull` | Bearer **admin**                                    |
+| `POST /server-setting/nuke`                                             | Bearer **admin**                                    |
 
 Seed users (after `bun run seed`; stored in `app_users`):
 
@@ -160,7 +161,13 @@ Empty / `null` fields store as null (app defaults on read). Unknown model with n
 }
 ```
 
-Empty / `null` fields store as null. Null `repoUrl` means do not clone. `lastSyncedSha` is read-only (sync writes it). Non-admin → `403`.
+Empty / `null` fields store as null. Null `repoUrl` means do not clone. `lastSyncedSha` is read-only (clone/pull writes it). Non-admin → `403`.
+
+`POST /server-setting/corpus/clone` — `git clone` saved `repoUrl` into `apps/api/data/corpus`. Optional saved `branch`. 409 if already cloned.
+
+`POST /server-setting/corpus/pull` — `git fetch` + `git pull --ff-only` in that checkout. 400 if not cloned yet.
+
+Both return the stored corpus settings (including `lastSyncedSha`). Uses the last **saved** row, not unsaved form fields. Bearer admin. Git must be on `PATH`. SSH uses the API process user’s keys.
 
 ## Env
 

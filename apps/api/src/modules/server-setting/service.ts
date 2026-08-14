@@ -1,7 +1,10 @@
 import { status } from "elysia";
 import {
+  CorpusGitError,
   type CorpusSettingsRow,
+  cloneCorpus,
   loadCorpusSettings,
+  pullCorpus,
   saveCorpusSettings,
 } from "../../shared/corpus/index.ts";
 import { nukeDatabases } from "../../shared/db.ts";
@@ -60,6 +63,30 @@ export abstract class ServerSetting {
       docsRoot: body.docsRoot,
     };
     return saveCorpusSettings(row);
+  }
+
+  static async cloneCorpus() {
+    try {
+      return await cloneCorpus();
+    } catch (err) {
+      if (err instanceof CorpusGitError) {
+        throw status(err.httpStatus, { error: err.message });
+      }
+      const msg = err instanceof Error ? err.message : String(err);
+      throw status(500, { error: msg });
+    }
+  }
+
+  static async pullCorpus() {
+    try {
+      return await pullCorpus();
+    } catch (err) {
+      if (err instanceof CorpusGitError) {
+        throw status(err.httpStatus, { error: err.message });
+      }
+      const msg = err instanceof Error ? err.message : String(err);
+      throw status(500, { error: msg });
+    }
   }
 
   static async nuke(body: ServerSettingModel["nukeBody"]) {

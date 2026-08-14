@@ -46,6 +46,19 @@ export async function saveCorpusSettings(
   return loadCorpusSettings();
 }
 
+/** Record `last_synced_sha` after clone/pull. Does not change remote fields. */
+export async function saveCorpusLastSyncedSha(
+  sha: string,
+): Promise<StoredCorpusSettings> {
+  await db()`
+    INSERT INTO kb_corpus_settings (id, last_synced_sha)
+    VALUES (${SETTINGS_ID}, ${sha})
+    ON CONFLICT (id) DO UPDATE SET
+      last_synced_sha = EXCLUDED.last_synced_sha
+  `;
+  return loadCorpusSettings();
+}
+
 /** Load `kb_corpus_settings` id `default`. Nulls stay null. */
 export async function loadCorpusSettings(): Promise<StoredCorpusSettings> {
   const rows = await db()`
