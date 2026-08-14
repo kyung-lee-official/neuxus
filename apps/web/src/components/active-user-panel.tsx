@@ -197,8 +197,8 @@ export function ActiveUserPanel({ active }: { active: ApiUser | null }) {
           <Link
             href="/server-settings"
             className="flex h-8 w-8 items-center justify-center rounded text-muted no-underline hover:bg-canvas hover:text-ink"
-            aria-label="Server settings"
-            title="Server settings"
+            aria-label="Admin"
+            title="Admin"
           >
             <GearIcon />
           </Link>
