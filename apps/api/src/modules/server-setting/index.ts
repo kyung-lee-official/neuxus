@@ -12,12 +12,18 @@ export const serverSetting = new Elysia({ prefix: "/server-setting" })
     requireAdmin: true,
     body: ServerSettingModel.embedBody,
   })
+  .post("/embed/reset", () => ServerSetting.resetEmbed(), {
+    requireAdmin: true,
+  })
   .get("/synthesis", () => ServerSetting.getSynthesis(), {
     requireAdmin: true,
   })
   .put("/synthesis", ({ body }) => ServerSetting.putSynthesis(body), {
     requireAdmin: true,
     body: ServerSettingModel.synthesisBody,
+  })
+  .post("/synthesis/reset", () => ServerSetting.resetSynthesis(), {
+    requireAdmin: true,
   })
   .get("/corpus", () => ServerSetting.getCorpus(), {
     requireAdmin: true,

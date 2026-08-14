@@ -9,12 +9,14 @@ import {
 } from "../../shared/corpus/index.ts";
 import { nukeDatabases } from "../../shared/db.ts";
 import {
+  adminEmbedSettings,
   type EmbedSettingsRow,
-  loadEmbedSettings,
+  resetEmbedSettings,
   saveEmbedSettings,
 } from "../../shared/embed/index.ts";
 import {
-  loadSynthesisSettings,
+  adminSynthesisSettings,
+  resetSynthesisSettings,
   type SynthesisSettingsRow,
   saveSynthesisSettings,
 } from "../../shared/synthesis/index.ts";
@@ -22,7 +24,7 @@ import type { ServerSettingModel } from "./model.ts";
 
 export abstract class ServerSetting {
   static async getEmbed() {
-    return loadEmbedSettings();
+    return adminEmbedSettings();
   }
 
   static async putEmbed(body: ServerSettingModel["embedBody"]) {
@@ -33,11 +35,16 @@ export abstract class ServerSetting {
       port: body.port,
       apiKey: body.apiKey,
     };
-    return saveEmbedSettings(row);
+    await saveEmbedSettings(row);
+    return adminEmbedSettings();
+  }
+
+  static async resetEmbed() {
+    return resetEmbedSettings();
   }
 
   static async getSynthesis() {
-    return loadSynthesisSettings();
+    return adminSynthesisSettings();
   }
 
   static async putSynthesis(body: ServerSettingModel["synthesisBody"]) {
@@ -49,7 +56,12 @@ export abstract class ServerSetting {
       maxTokens: body.maxTokens,
       contextWindowTokens: body.contextWindowTokens,
     };
-    return saveSynthesisSettings(row);
+    await saveSynthesisSettings(row);
+    return adminSynthesisSettings();
+  }
+
+  static async resetSynthesis() {
+    return resetSynthesisSettings();
   }
 
   static async getCorpus() {

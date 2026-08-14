@@ -256,11 +256,18 @@ export async function postRemember(input: {
 }
 
 export type EmbedSettings = {
-  embeddingModel: string;
-  provider: string;
-  host: string;
-  port: number;
+  embeddingModel: string | null;
+  provider: string | null;
+  host: string | null;
+  port: number | null;
   apiKey: string | null;
+  defaults: {
+    embeddingModel: string;
+    provider: string;
+    host: string;
+    port: number;
+    apiKey: string | null;
+  };
 };
 
 export async function getEmbedSettings(apiKey: string): Promise<EmbedSettings> {
@@ -284,13 +291,30 @@ export async function putEmbedSettings(input: {
   });
 }
 
+export async function resetEmbedSettings(
+  apiKey: string,
+): Promise<EmbedSettings> {
+  return apiFetch<EmbedSettings>("/server-setting/embed/reset", {
+    method: "POST",
+    apiKey,
+  });
+}
+
 export type SynthesisSettings = {
-  provider: string;
-  synthesisModel: string;
-  baseUrl: string;
+  provider: string | null;
+  synthesisModel: string | null;
+  baseUrl: string | null;
   apiKey: string | null;
-  maxTokens: number;
-  contextWindowTokens: number;
+  maxTokens: number | null;
+  contextWindowTokens: number | null;
+  defaults: {
+    provider: string;
+    synthesisModel: string;
+    baseUrl: string;
+    apiKey: string | null;
+    maxTokens: number;
+    contextWindowTokens: number;
+  };
 };
 
 export async function getSynthesisSettings(
@@ -314,6 +338,15 @@ export async function putSynthesisSettings(input: {
     method: "PUT",
     apiKey: input.apiKey,
     body: JSON.stringify(input.settings),
+  });
+}
+
+export async function resetSynthesisSettings(
+  apiKey: string,
+): Promise<SynthesisSettings> {
+  return apiFetch<SynthesisSettings>("/server-setting/synthesis/reset", {
+    method: "POST",
+    apiKey,
   });
 }
 

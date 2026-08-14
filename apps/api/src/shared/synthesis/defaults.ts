@@ -27,6 +27,15 @@ export type ResolvedSynthesisSettings = {
   contextWindowTokens: number;
 };
 
+export type StoredSynthesisSettings = {
+  provider: string | null;
+  synthesisModel: string | null;
+  baseUrl: string | null;
+  apiKey: string | null;
+  maxTokens: number | null;
+  contextWindowTokens: number | null;
+};
+
 function nonEmpty(value: string | null | undefined): string | undefined {
   if (value == null) return undefined;
   const t = value.trim();
@@ -37,6 +46,19 @@ function positiveInt(value: number | null | undefined): number | undefined {
   return typeof value === "number" && Number.isInteger(value) && value > 0
     ? value
     : undefined;
+}
+
+export function storedSynthesisSettings(
+  row?: SynthesisSettingsRow | null,
+): StoredSynthesisSettings {
+  return {
+    provider: nonEmpty(row?.provider) ?? null,
+    synthesisModel: nonEmpty(row?.synthesisModel) ?? null,
+    baseUrl: nonEmpty(row?.baseUrl) ?? null,
+    apiKey: nonEmpty(row?.apiKey) ?? null,
+    maxTokens: positiveInt(row?.maxTokens) ?? null,
+    contextWindowTokens: positiveInt(row?.contextWindowTokens) ?? null,
+  };
 }
 
 export function resolveSynthesisSettings(

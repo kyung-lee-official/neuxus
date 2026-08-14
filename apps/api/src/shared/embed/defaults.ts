@@ -24,10 +24,34 @@ export type ResolvedEmbedSettings = {
   apiKey: string | null;
 };
 
+export type StoredEmbedSettings = {
+  embeddingModel: string | null;
+  provider: string | null;
+  host: string | null;
+  port: number | null;
+  apiKey: string | null;
+};
+
 function nonEmpty(value: string | null | undefined): string | undefined {
   if (value == null) return undefined;
   const t = value.trim();
   return t === "" ? undefined : t;
+}
+
+export function storedEmbedSettings(
+  row?: EmbedSettingsRow | null,
+): StoredEmbedSettings {
+  const port = row?.port;
+  return {
+    embeddingModel: nonEmpty(row?.embeddingModel) ?? null,
+    provider: nonEmpty(row?.provider) ?? null,
+    host: nonEmpty(row?.host) ?? null,
+    port:
+      typeof port === "number" && Number.isInteger(port) && port > 0
+        ? port
+        : null,
+    apiKey: nonEmpty(row?.apiKey) ?? null,
+  };
 }
 
 export function resolveEmbedSettings(

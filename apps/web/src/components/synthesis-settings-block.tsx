@@ -9,6 +9,7 @@ import {
   ApiError,
   getSynthesisSettings,
   putSynthesisSettings,
+  resetSynthesisSettings,
   UserQueryKey,
 } from "@/lib/api";
 
@@ -68,12 +69,15 @@ export function SynthesisSettingsBlock({
     const data = settingsQuery.data;
     if (!data) return;
     form.reset({
-      provider: data.provider,
-      synthesisModel: data.synthesisModel,
-      baseUrl: data.baseUrl,
+      provider: data.provider ?? "",
+      synthesisModel: data.synthesisModel ?? "",
+      baseUrl: data.baseUrl ?? "",
       apiKey: data.apiKey ?? "",
-      maxTokens: String(data.maxTokens),
-      contextWindowTokens: String(data.contextWindowTokens),
+      maxTokens: data.maxTokens != null ? String(data.maxTokens) : "",
+      contextWindowTokens:
+        data.contextWindowTokens != null
+          ? String(data.contextWindowTokens)
+          : "",
     });
   }, [settingsQuery.data, form]);
 
@@ -98,18 +102,7 @@ export function SynthesisSettingsBlock({
   });
 
   const resetMutation = useMutation({
-    mutationFn: () =>
-      putSynthesisSettings({
-        apiKey: actorApiKey,
-        settings: {
-          provider: null,
-          synthesisModel: null,
-          baseUrl: null,
-          apiKey: null,
-          maxTokens: null,
-          contextWindowTokens: null,
-        },
-      }),
+    mutationFn: () => resetSynthesisSettings(actorApiKey),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: UserQueryKey.SynthesisSettings,
@@ -128,12 +121,14 @@ export function SynthesisSettingsBlock({
     (resetMutation.isError ? errorMessage(resetMutation.error) : null) ||
     (settingsQuery.isError ? errorMessage(settingsQuery.error) : null);
 
+  const placeholders = settingsQuery.data?.defaults;
+
   return (
     <section className="flex flex-col gap-3.5 rounded-md border border-line bg-surface p-6">
       <h2 className="m-0 font-display text-ink text-lg">Synthesis</h2>
       <p className="m-0 text-muted text-sm">
-        Ask answer provider. Empty fields reset to MiniMax defaults on save.
-        Context window is required for non-default models.
+        Ask answer provider. Empty fields use app defaults at runtime. Context
+        window is required for non-default models.
       </p>
 
       {settingsQuery.isLoading ? (
@@ -147,6 +142,7 @@ export function SynthesisSettingsBlock({
             <span>Provider</span>
             <input
               className="w-full rounded border border-line bg-canvas px-2.5 py-2 text-ink disabled:opacity-60"
+              placeholder={placeholders?.provider}
               disabled={busy}
               {...form.register("provider")}
             />
@@ -155,6 +151,7 @@ export function SynthesisSettingsBlock({
             <span>Model</span>
             <input
               className="w-full rounded border border-line bg-canvas px-2.5 py-2 text-ink disabled:opacity-60"
+              placeholder={placeholders?.synthesisModel}
               disabled={busy}
               {...form.register("synthesisModel")}
             />
@@ -163,6 +160,7 @@ export function SynthesisSettingsBlock({
             <span>Base URL</span>
             <input
               className="w-full rounded border border-line bg-canvas px-2.5 py-2 text-ink disabled:opacity-60"
+              placeholder={placeholders?.baseUrl}
               disabled={busy}
               {...form.register("baseUrl")}
             />
@@ -182,6 +180,9 @@ export function SynthesisSettingsBlock({
             <input
               className="w-full rounded border border-line bg-canvas px-2.5 py-2 text-ink disabled:opacity-60"
               inputMode="numeric"
+              placeholder={
+                placeholders ? String(placeholders.maxTokens) : undefined
+              }
               disabled={busy}
               {...form.register("maxTokens")}
             />
@@ -191,6 +192,11 @@ export function SynthesisSettingsBlock({
             <input
               className="w-full rounded border border-line bg-canvas px-2.5 py-2 text-ink disabled:opacity-60"
               inputMode="numeric"
+              placeholder={
+                placeholders
+                  ? String(placeholders.contextWindowTokens)
+                  : undefined
+              }
               disabled={busy}
               {...form.register("contextWindowTokens")}
             />

@@ -17,7 +17,9 @@ All responses are JSON (`Content-Type: application/json`).
 | `PATCH /users/:id`, `DELETE /users/:id`                                 | `Authorization: Bearer <api-key>`                   |
 | `POST /query`, `POST /remember`                                         | `Authorization: Bearer <api-key>`                   |
 | `GET /server-setting/embed`, `PUT /server-setting/embed`                | Bearer **admin**                                    |
+| `POST /server-setting/embed/reset`                                      | Bearer **admin**                                    |
 | `GET /server-setting/synthesis`, `PUT /server-setting/synthesis`        | Bearer **admin**                                    |
+| `POST /server-setting/synthesis/reset`                                  | Bearer **admin**                                    |
 | `GET /server-setting/corpus`, `PUT /server-setting/corpus`              | Bearer **admin**                                    |
 | `POST /server-setting/corpus/clone`, `POST /server-setting/corpus/pull` | Bearer **admin**                                    |
 | `POST /server-setting/nuke`                                             | Bearer **admin**                                    |
@@ -112,40 +114,19 @@ Bearer. Body `{ "content": "…" }` — inserts a personal memory note.
 
 ### Embed settings (admin)
 
-`GET /server-setting/embed` — resolved `kb_embed_settings` (app defaults filled in). Bearer admin.
+`GET /server-setting/embed` — stored `kb_embed_settings` (`null` stays `null`) plus `defaults` (hardcoded app values). Bearer admin.
 
-`PUT /server-setting/embed` body:
+`PUT /server-setting/embed` body: same fields as today. Empty / `null` store as null (runtime still uses `defaults`).
 
-```json
-{
-  "embeddingModel": "nomic-embed-text:latest",
-  "provider": "ollama",
-  "host": "127.0.0.1",
-  "port": 11434,
-  "apiKey": null
-}
-```
-
-Empty / `null` fields store as null (app defaults on read). Non-admin → `403`.
+`POST /server-setting/embed/reset` — writes hardcoded `defaults` into the row (`nomic-embed-text:latest`, `ollama`, `127.0.0.1`, `11434`, `apiKey` null). Non-admin → `403`.
 
 ### Synthesis settings (admin)
 
-`GET /server-setting/synthesis` — resolved `app_synthesis_settings` (app defaults filled in). Bearer admin.
+`GET /server-setting/synthesis` — stored `app_synthesis_settings` (`null` stays `null`) plus `defaults`. Bearer admin.
 
-`PUT /server-setting/synthesis` body:
+`PUT /server-setting/synthesis` body: same fields as today. Empty / `null` store as null.
 
-```json
-{
-  "provider": "minimax",
-  "synthesisModel": "MiniMax-M3",
-  "baseUrl": "https://api.minimaxi.com/anthropic",
-  "apiKey": null,
-  "maxTokens": 4096,
-  "contextWindowTokens": 1000000
-}
-```
-
-Empty / `null` fields store as null (app defaults on read). Unknown model with no `contextWindowTokens` resolves to `0` and Ask will refuse to synthesize. Non-admin → `403`. Do not log `apiKey`.
+`POST /server-setting/synthesis/reset` — writes hardcoded `defaults` (`minimax`, `MiniMax-M3`, `https://api.minimaxi.com/anthropic`, `maxTokens` 4096, `contextWindowTokens` 1000000, `apiKey` null). Unknown model with no `contextWindowTokens` still resolves to `0` on the Ask path. Non-admin → `403`. Do not log `apiKey`.
 
 ### Corpus settings (admin)
 

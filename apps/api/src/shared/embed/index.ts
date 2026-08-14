@@ -12,8 +12,16 @@ export {
   type EmbedSettingsRow,
   type ResolvedEmbedSettings,
   resolveEmbedSettings,
+  type StoredEmbedSettings,
+  storedEmbedSettings,
 } from "./defaults.ts";
 export { createOllamaEmbedder } from "./ollama.ts";
 export { createEmbedder } from "./provider.ts";
-export { loadEmbedSettings, saveEmbedSettings } from "./settings.ts";
+export {
+  type AdminEmbedSettings,
+  adminEmbedSettings,
+  loadEmbedSettings,
+  resetEmbedSettings,
+  saveEmbedSettings,
+} from "./settings.ts";
 export type { Embedder } from "./types.ts";

@@ -9,6 +9,7 @@ import {
   ApiError,
   getEmbedSettings,
   putEmbedSettings,
+  resetEmbedSettings,
   UserQueryKey,
 } from "@/lib/api";
 
@@ -62,10 +63,10 @@ export function EmbedSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
     const data = settingsQuery.data;
     if (!data) return;
     form.reset({
-      provider: data.provider,
-      embeddingModel: data.embeddingModel,
-      host: data.host,
-      port: String(data.port),
+      provider: data.provider ?? "",
+      embeddingModel: data.embeddingModel ?? "",
+      host: data.host ?? "",
+      port: data.port != null ? String(data.port) : "",
       apiKey: data.apiKey ?? "",
     });
   }, [settingsQuery.data, form]);
@@ -90,17 +91,7 @@ export function EmbedSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
   });
 
   const resetMutation = useMutation({
-    mutationFn: () =>
-      putEmbedSettings({
-        apiKey: actorApiKey,
-        settings: {
-          provider: null,
-          embeddingModel: null,
-          host: null,
-          port: null,
-          apiKey: null,
-        },
-      }),
+    mutationFn: () => resetEmbedSettings(actorApiKey),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: UserQueryKey.EmbedSettings,
@@ -119,12 +110,14 @@ export function EmbedSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
     (resetMutation.isError ? errorMessage(resetMutation.error) : null) ||
     (settingsQuery.isError ? errorMessage(settingsQuery.error) : null);
 
+  const placeholders = settingsQuery.data?.defaults;
+
   return (
     <section className="flex flex-col gap-3.5 rounded-md border border-line bg-surface p-6">
       <h2 className="m-0 font-display text-ink text-lg">Embedder</h2>
       <p className="m-0 text-muted text-sm">
-        Ollama connection for child and question embeddings. Empty fields reset
-        to app defaults on save.
+        Ollama connection for child and question embeddings. Empty fields use
+        app defaults at runtime.
       </p>
 
       {settingsQuery.isLoading ? (
@@ -138,6 +131,7 @@ export function EmbedSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
             <span>Provider</span>
             <input
               className="w-full rounded border border-line bg-canvas px-2.5 py-2 text-ink disabled:opacity-60"
+              placeholder={placeholders?.provider}
               disabled={busy}
               {...form.register("provider")}
             />
@@ -146,6 +140,7 @@ export function EmbedSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
             <span>Model</span>
             <input
               className="w-full rounded border border-line bg-canvas px-2.5 py-2 text-ink disabled:opacity-60"
+              placeholder={placeholders?.embeddingModel}
               disabled={busy}
               {...form.register("embeddingModel")}
             />
@@ -154,6 +149,7 @@ export function EmbedSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
             <span>Host</span>
             <input
               className="w-full rounded border border-line bg-canvas px-2.5 py-2 text-ink disabled:opacity-60"
+              placeholder={placeholders?.host}
               disabled={busy}
               {...form.register("host")}
             />
@@ -163,6 +159,7 @@ export function EmbedSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
             <input
               className="w-full rounded border border-line bg-canvas px-2.5 py-2 text-ink disabled:opacity-60"
               inputMode="numeric"
+              placeholder={placeholders ? String(placeholders.port) : undefined}
               disabled={busy}
               {...form.register("port")}
             />
