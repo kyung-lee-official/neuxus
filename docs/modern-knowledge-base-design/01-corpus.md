@@ -115,6 +115,7 @@ Idempotent: the same SHA with unchanged files is all skips (unless embed setting
 | Caller                               | Role                                                                 |
 | ------------------------------------ | -------------------------------------------------------------------- |
 | Local CLI / folder                   | Same walker on a checkout (dev)                                      |
+| neuxus admin Sync                    | `POST /server-setting/corpus/sync` in the API process                |
 | GitHub Action on push to the kb repo | Checkout SHA, run walker or `POST` a sync job                        |
 | Push webhook                         | Only acceptable if it still checks out that SHA and uses this walker |
 

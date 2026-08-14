@@ -2,7 +2,7 @@
 
 Base URL: `http://localhost:3001` (override with `PORT`).
 
-All responses are JSON (`Content-Type: application/json`).
+All JSON responses use `Content-Type: application/json`. Corpus sync events are SSE (`text/event-stream`).
 
 ## Auth
 
@@ -22,6 +22,8 @@ All responses are JSON (`Content-Type: application/json`).
 | `POST /server-setting/synthesis/reset`                                  | Bearer **admin**                                    |
 | `GET /server-setting/corpus`, `PUT /server-setting/corpus`              | Bearer **admin**                                    |
 | `POST /server-setting/corpus/clone`, `POST /server-setting/corpus/pull` | Bearer **admin**                                    |
+| `POST /server-setting/corpus/sync`                                      | Bearer **admin**                                    |
+| `GET /server-setting/corpus/sync/events`                                | Bearer **admin**                                    |
 | `POST /server-setting/nuke`                                             | Bearer **admin**                                    |
 
 Seed users (after `bun run seed`; stored in `app_users`):
@@ -142,13 +144,17 @@ Bearer. Body `{ "content": "…" }` — inserts a personal memory note.
 }
 ```
 
-Empty / `null` fields store as null. Null `repoUrl` means do not clone. `lastSyncedSha` is read-only (clone/pull writes it). Non-admin → `403`.
+Empty / `null` fields store as null. Null `repoUrl` means do not clone. `lastSyncedSha` is read-only (clone, pull, and a finished Sync write it). Non-admin → `403`.
 
 `POST /server-setting/corpus/clone` — `git clone` saved `repoUrl` into `apps/api/data/corpus`. Optional saved `branch`. 409 if already cloned.
 
 `POST /server-setting/corpus/pull` — `git fetch` + `git pull --ff-only` in that checkout. 400 if not cloned yet.
 
 Both return the stored corpus settings (including `lastSyncedSha`). Uses the last **saved** row, not unsaved form fields. Bearer admin. Git must be on `PATH`. SSH uses the API process user’s keys.
+
+`POST /server-setting/corpus/sync` — start a background singleton Sync: clone-if-missing else pull, walk `docs_root`, ingest/chunkify/persist (hash skip), delete missing `source_path` rows, embed stale children, then write `last_synced_sha` from `HEAD`. Returns **202** `{ "ok": true }`. Second concurrent Sync → **409**. Fail-fast; no job table. In-process lock (one API process).
+
+`GET /server-setting/corpus/sync/events` — stay-open SSE. Snapshot on connect, then `{ "running": boolean, "stage": "pull"|"ingest"|"embed"|null, "lastError": string|null }`. Comment pings keep the socket alive. Use `fetch` with `Authorization` (the browser `EventSource` API cannot set Bearer). Non-admin → `403`.
 
 ## Env
 
