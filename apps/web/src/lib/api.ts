@@ -344,3 +344,17 @@ export async function putCorpusSettings(input: {
     body: JSON.stringify(input.settings),
   });
 }
+
+export async function cloneCorpus(apiKey: string): Promise<CorpusSettings> {
+  return apiFetch<CorpusSettings>("/server-setting/corpus/clone", {
+    method: "POST",
+    apiKey,
+  });
+}
+
+export async function pullCorpus(apiKey: string): Promise<CorpusSettings> {
+  return apiFetch<CorpusSettings>("/server-setting/corpus/pull", {
+    method: "POST",
+    apiKey,
+  });
+}

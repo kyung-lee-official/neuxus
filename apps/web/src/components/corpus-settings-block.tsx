@@ -7,7 +7,9 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
   ApiError,
+  cloneCorpus,
   getCorpusSettings,
+  pullCorpus,
   putCorpusSettings,
   UserQueryKey,
 } from "@/lib/api";
@@ -74,16 +76,39 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
     },
   });
 
+  const cloneMutation = useMutation({
+    mutationFn: () => cloneCorpus(actorApiKey),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: UserQueryKey.CorpusSettings,
+      });
+    },
+  });
+
+  const pullMutation = useMutation({
+    mutationFn: () => pullCorpus(actorApiKey),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: UserQueryKey.CorpusSettings,
+      });
+    },
+  });
+
   const busy =
     settingsQuery.isFetching ||
     saveMutation.isPending ||
+    cloneMutation.isPending ||
+    pullMutation.isPending ||
     form.formState.isSubmitting;
 
   const actionError =
     (saveMutation.isError ? errorMessage(saveMutation.error) : null) ||
+    (cloneMutation.isError ? errorMessage(cloneMutation.error) : null) ||
+    (pullMutation.isError ? errorMessage(pullMutation.error) : null) ||
     (settingsQuery.isError ? errorMessage(settingsQuery.error) : null);
 
   const lastSyncedSha = settingsQuery.data?.lastSyncedSha;
+  const hasSavedRepo = Boolean(settingsQuery.data?.repoUrl);
 
   return (
     <section className="flex flex-col gap-3.5 rounded-md border border-line bg-surface p-6">
@@ -139,6 +164,12 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
           {saveMutation.isSuccess ? (
             <p className="m-0 text-ok text-sm">Saved.</p>
           ) : null}
+          {cloneMutation.isSuccess ? (
+            <p className="m-0 text-ok text-sm">Cloned.</p>
+          ) : null}
+          {pullMutation.isSuccess ? (
+            <p className="m-0 text-ok text-sm">Pulled.</p>
+          ) : null}
           <div className="flex flex-wrap gap-2">
             <button
               type="submit"
@@ -147,7 +178,26 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
             >
               {saveMutation.isPending ? "Saving…" : "Save corpus"}
             </button>
+            <button
+              type="button"
+              className="rounded border border-line bg-transparent px-3.5 py-1.5 text-ink text-sm disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={busy || !hasSavedRepo}
+              onClick={() => cloneMutation.mutate()}
+            >
+              {cloneMutation.isPending ? "Cloning…" : "Clone"}
+            </button>
+            <button
+              type="button"
+              className="rounded border border-line bg-transparent px-3.5 py-1.5 text-ink text-sm disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={busy || !hasSavedRepo}
+              onClick={() => pullMutation.mutate()}
+            >
+              {pullMutation.isPending ? "Pulling…" : "Pull"}
+            </button>
           </div>
+          <p className="m-0 text-muted text-xs">
+            Clone and Pull use the last saved URL and branch.
+          </p>
         </form>
       )}
     </section>
