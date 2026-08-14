@@ -68,6 +68,24 @@ CREATE INDEX kb_children_embedding_hnsw
 | Page / parent / child text and metadata        | Ordinary SQL (or any ORM)                             |
 | Insert / update `embedding`, similarity search | SQL against pgvector (ORM vector support is optional) |
 
+## Corpus settings table
+
+Runtime corpus connection ([01-corpus.md](./01-corpus.md#settings-in-the-database)): git remote **and** which commit line to follow. Not env. Nullable columns; **defaults live in application code**, not SQL `DEFAULT`. Single row `id = 'default'`. Empty/missing row means **no remote** (`repo_url` null): do not clone; layout rules still apply to an explicit local checkout.
+
+`repo_url` / `branch` / `docs_root` are how we fetch and where we walk. `last_synced_sha` is last successful sync (not vector identity). Changing the remote does not stale embeddings by itself; the next SHA sync does. Do not log future credential columns.
+
+App defaults (when null / no row): `repo_url` = none, `branch` = `main`, `docs_root` = `docs`, `last_synced_sha` = none.
+
+```sql
+CREATE TABLE kb_corpus_settings (
+  id               TEXT PRIMARY KEY DEFAULT 'default',
+  repo_url         TEXT,
+  branch           TEXT,
+  docs_root        TEXT,
+  last_synced_sha  TEXT
+);
+```
+
 ## Chunk knobs table
 
 Nullable columns; **defaults live in application code** ([03-chunkify.md](./03-chunkify.md#knobs)), not SQL `DEFAULT`. Shape: single row `id = 'default'`.

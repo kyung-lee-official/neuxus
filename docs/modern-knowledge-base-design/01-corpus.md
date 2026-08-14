@@ -16,6 +16,16 @@ Canonical corpus is an **independent git repository** of markdown (not the neuxu
 
 A local directory that matches this layout is a valid checkout. Same walker as CI.
 
+## Settings in the database
+
+How to **reach** the corpus (git remote, branch, optional docs-root override, last synced SHA) lives in Postgres (`kb_corpus_settings`), not in env. `DATABASE_URL` remains process env so the app can reach the database.
+
+Same shape as other knobs: single row `id = 'default'`, **nullable columns**, **app defaults in code** when missing. Schema: [appendix-a-data-model.md](./appendix-a-data-model.md#corpus-settings-table).
+
+`repo_url` has **no** useful app default. Null / missing means the remote is not configured: do not clone. Local CLI may still walk a folder the operator already checked out. Do not log credentials if a later column is added for private remotes.
+
+Changing `repo_url` / `branch` does not rewrite `kb_pages`. The next sync at a SHA applies this contract (including deletes).
+
 ## Docs root
 
 After clone/pull, only this tree is ingested:
@@ -36,7 +46,7 @@ kb.git/
 | Missing `docs/` | Fail the sync; do not walk `.`                                |
 | Path separators | POSIX `/` in stored `source_path` and `slug`, even on Windows |
 
-Later a single config key (app or env) may override the root directory name. Until then, `docs/` is the contract.
+Later a nullable `docs_root` column on `kb_corpus_settings` may override this directory name (app default still `docs`). Until a non-null override exists, `docs/` is the contract.
 
 ## Include and exclude
 
