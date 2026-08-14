@@ -66,6 +66,22 @@ model Message {
     @@map("app_messages")
 }
 
+/// Synthesis LLM config (`app_synthesis_settings`). Nullable columns — app
+/// defaults live in code, not SQL DEFAULT. Single row: id = `"default"`.
+/// `context_window_tokens` is required at runtime (app default when null).
+model AppSynthesisSettings {
+    id String @id @default("default")
+
+    provider            String?
+    synthesisModel      String? @map("synthesis_model")
+    baseUrl             String? @map("base_url")
+    apiKey              String? @map("api_key")
+    maxTokens           Int?    @map("max_tokens")
+    contextWindowTokens Int?    @map("context_window_tokens")
+
+    @@map("app_synthesis_settings")
+}
+
 /// Chunkify knobs (`kb_chunk_settings`). Nullable columns — app defaults live in code
 /// (`CHUNKIFY_DEFAULTS`), not SQL DEFAULT. Single row: id = `"default"`.
 model KnowledgeChunkSettings {
