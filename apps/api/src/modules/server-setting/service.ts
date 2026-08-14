@@ -5,6 +5,11 @@ import {
   loadEmbedSettings,
   saveEmbedSettings,
 } from "../../shared/embed/index.ts";
+import {
+  loadSynthesisSettings,
+  type SynthesisSettingsRow,
+  saveSynthesisSettings,
+} from "../../shared/synthesis/index.ts";
 import type { ServerSettingModel } from "./model.ts";
 
 export abstract class ServerSetting {
@@ -21,6 +26,22 @@ export abstract class ServerSetting {
       apiKey: body.apiKey,
     };
     return saveEmbedSettings(row);
+  }
+
+  static async getSynthesis() {
+    return loadSynthesisSettings();
+  }
+
+  static async putSynthesis(body: ServerSettingModel["synthesisBody"]) {
+    const row: SynthesisSettingsRow = {
+      provider: body.provider,
+      synthesisModel: body.synthesisModel,
+      baseUrl: body.baseUrl,
+      apiKey: body.apiKey,
+      maxTokens: body.maxTokens,
+      contextWindowTokens: body.contextWindowTokens,
+    };
+    return saveSynthesisSettings(row);
   }
 
   static async nuke(body: ServerSettingModel["nukeBody"]) {

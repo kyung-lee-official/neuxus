@@ -17,6 +17,7 @@ All responses are JSON (`Content-Type: application/json`).
 | `PATCH /users/:id`, `DELETE /users/:id`                  | `Authorization: Bearer <api-key>`                   |
 | `POST /query`, `POST /remember`                          | `Authorization: Bearer <api-key>`                   |
 | `GET /server-setting/embed`, `PUT /server-setting/embed` | Bearer **admin**                                    |
+| `GET /server-setting/synthesis`, `PUT /server-setting/synthesis` | Bearer **admin**                                    |
 | `POST /server-setting/nuke`                              | Bearer **admin**                                    |
 
 Seed users (after `bun run seed`; stored in `app_users`):
@@ -124,6 +125,25 @@ Bearer. Body `{ "content": "…" }` — inserts a personal memory note.
 ```
 
 Empty / `null` fields store as null (app defaults on read). Non-admin → `403`.
+
+### Synthesis settings (admin)
+
+`GET /server-setting/synthesis` — resolved `app_synthesis_settings` (app defaults filled in). Bearer admin.
+
+`PUT /server-setting/synthesis` body:
+
+```json
+{
+  "provider": "minimax",
+  "synthesisModel": "MiniMax-M3",
+  "baseUrl": "https://api.minimaxi.com/anthropic",
+  "apiKey": null,
+  "maxTokens": 4096,
+  "contextWindowTokens": 1000000
+}
+```
+
+Empty / `null` fields store as null (app defaults on read). Unknown model with no `contextWindowTokens` resolves to `0` and Ask will refuse to synthesize. Non-admin → `403`. Do not log `apiKey`.
 
 ## Env
 

@@ -43,7 +43,7 @@ console.log(
   "Sessions: GET/POST /sessions, PATCH /sessions/:id; POST /query accepts body.sessionId",
 );
 console.log(
-  "Server setting: GET/PUT /server-setting/embed; POST /server-setting/nuke { target: app }",
+  "Server setting: GET/PUT /server-setting/embed, /server-setting/synthesis; POST /server-setting/nuke",
 );
 
 export type App = typeof app;

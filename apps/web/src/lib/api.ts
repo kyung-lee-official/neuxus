@@ -92,6 +92,7 @@ export const UserQueryKey = {
     ["users", id, "data", messagePage] as const,
   Sessions: (userId: string) => ["sessions", userId] as const,
   EmbedSettings: ["server-setting", "embed"] as const,
+  SynthesisSettings: ["server-setting", "synthesis"] as const,
 } as const;
 
 export async function getHealth(): Promise<{ ok: boolean }> {
@@ -276,6 +277,39 @@ export async function putEmbedSettings(input: {
   };
 }): Promise<EmbedSettings> {
   return apiFetch<EmbedSettings>("/server-setting/embed", {
+    method: "PUT",
+    apiKey: input.apiKey,
+    body: JSON.stringify(input.settings),
+  });
+}
+
+export type SynthesisSettings = {
+  provider: string;
+  synthesisModel: string;
+  baseUrl: string;
+  apiKey: string | null;
+  maxTokens: number;
+  contextWindowTokens: number;
+};
+
+export async function getSynthesisSettings(
+  apiKey: string,
+): Promise<SynthesisSettings> {
+  return apiFetch<SynthesisSettings>("/server-setting/synthesis", { apiKey });
+}
+
+export async function putSynthesisSettings(input: {
+  apiKey: string;
+  settings: {
+    provider: string | null;
+    synthesisModel: string | null;
+    baseUrl: string | null;
+    apiKey: string | null;
+    maxTokens: number | null;
+    contextWindowTokens: number | null;
+  };
+}): Promise<SynthesisSettings> {
+  return apiFetch<SynthesisSettings>("/server-setting/synthesis", {
     method: "PUT",
     apiKey: input.apiKey,
     body: JSON.stringify(input.settings),

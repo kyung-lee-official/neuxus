@@ -12,6 +12,13 @@ export const serverSetting = new Elysia({ prefix: "/server-setting" })
     requireAdmin: true,
     body: ServerSettingModel.embedBody,
   })
+  .get("/synthesis", () => ServerSetting.getSynthesis(), {
+    requireAdmin: true,
+  })
+  .put("/synthesis", ({ body }) => ServerSetting.putSynthesis(body), {
+    requireAdmin: true,
+    body: ServerSettingModel.synthesisBody,
+  })
   .post("/nuke", ({ body }) => ServerSetting.nuke(body), {
     requireAdmin: true,
     body: ServerSettingModel.nukeBody,

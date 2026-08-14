@@ -2,9 +2,22 @@ import { db } from "../db.ts";
 import {
   type ResolvedSynthesisSettings,
   resolveSynthesisSettings,
+  type SynthesisSettingsRow,
 } from "./defaults.ts";
 
 const SETTINGS_ID = "default";
+
+function blankToNull(value: string | null | undefined): string | null {
+  if (value == null) return null;
+  const t = value.trim();
+  return t === "" ? null : t;
+}
+
+function positiveIntOrNull(value: number | null | undefined): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value > 0
+    ? value
+    : null;
+}
 
 function intColumn(value: unknown): number | null {
   if (typeof value === "number" && Number.isInteger(value)) return value;
@@ -12,6 +25,48 @@ function intColumn(value: unknown): number | null {
     return Number.parseInt(value, 10);
   }
   return null;
+}
+
+/** Upsert `app_synthesis_settings` id `default`. Empty strings stored as null. */
+export async function saveSynthesisSettings(
+  row: SynthesisSettingsRow,
+): Promise<ResolvedSynthesisSettings> {
+  const provider = blankToNull(row.provider);
+  const synthesisModel = blankToNull(row.synthesisModel);
+  const baseUrl = blankToNull(row.baseUrl);
+  const apiKey = blankToNull(row.apiKey);
+  const maxTokens = positiveIntOrNull(row.maxTokens);
+  const contextWindowTokens = positiveIntOrNull(row.contextWindowTokens);
+
+  await db()`
+    INSERT INTO app_synthesis_settings (
+      id,
+      provider,
+      synthesis_model,
+      base_url,
+      api_key,
+      max_tokens,
+      context_window_tokens
+    )
+    VALUES (
+      ${SETTINGS_ID},
+      ${provider},
+      ${synthesisModel},
+      ${baseUrl},
+      ${apiKey},
+      ${maxTokens},
+      ${contextWindowTokens}
+    )
+    ON CONFLICT (id) DO UPDATE SET
+      provider = EXCLUDED.provider,
+      synthesis_model = EXCLUDED.synthesis_model,
+      base_url = EXCLUDED.base_url,
+      api_key = EXCLUDED.api_key,
+      max_tokens = EXCLUDED.max_tokens,
+      context_window_tokens = EXCLUDED.context_window_tokens
+  `;
+
+  return loadSynthesisSettings();
 }
 
 /** Load `app_synthesis_settings` id `default` and apply `SYNTHESIS_DEFAULTS` for nulls. */

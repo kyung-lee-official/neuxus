@@ -12,5 +12,5 @@ export {
 } from "./defaults.ts";
 export { createMinimaxSynthesizer } from "./minimax.ts";
 export { createSynthesizer } from "./provider.ts";
-export { loadSynthesisSettings } from "./settings.ts";
+export { loadSynthesisSettings, saveSynthesisSettings } from "./settings.ts";
 export type { Synthesizer } from "./types.ts";

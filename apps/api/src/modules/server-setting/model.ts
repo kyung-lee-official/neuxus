@@ -11,6 +11,14 @@ export const ServerSettingModel = {
   nukeBody: t.Object({
     target: t.Literal("app"),
   }),
+  synthesisBody: t.Object({
+    provider: t.Union([t.String(), t.Null()]),
+    synthesisModel: t.Union([t.String(), t.Null()]),
+    baseUrl: t.Union([t.String(), t.Null()]),
+    apiKey: t.Union([t.String(), t.Null()]),
+    maxTokens: t.Union([t.Integer({ minimum: 1 }), t.Null()]),
+    contextWindowTokens: t.Union([t.Integer({ minimum: 1 }), t.Null()]),
+  }),
 } as const;
 
 export type ServerSettingModel = {

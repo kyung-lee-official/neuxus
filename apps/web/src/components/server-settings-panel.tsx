@@ -8,6 +8,7 @@ import { useActiveUserStore } from "@/lib/active-user-store";
 import { ApiError, listUsers, nukeDatabase, UserQueryKey } from "@/lib/api";
 import { EmbedSettingsBlock } from "./embed-settings-block";
 import { Modal } from "./modal";
+import { SynthesisSettingsBlock } from "./synthesis-settings-block";
 
 function errorMessage(err: unknown): string {
   if (err instanceof ApiError) return err.message;
@@ -74,7 +75,7 @@ export function ServerSettingsPanel() {
   }
 
   return (
-    <div className="flex w-full max-w-lg flex-col gap-4">
+    <div className="flex w-full flex-col gap-4">
       <section className="flex flex-col gap-2 rounded-md border border-line bg-surface p-6 shadow-sm">
         <div className="flex items-center justify-between gap-2">
           <h1 className="m-0 font-display text-2xl text-ink">
@@ -85,10 +86,11 @@ export function ServerSettingsPanel() {
           </Link>
         </div>
         <p className="m-0 text-muted text-sm">
-          Admin-only provider config. Synthesis settings come next.
+          Admin-only provider config for embeddings and Ask synthesis.
         </p>
       </section>
       <EmbedSettingsBlock actorApiKey={user.apiKey} />
+      <SynthesisSettingsBlock actorApiKey={user.apiKey} />
       <NukeDbBlock
         actorApiKey={user.apiKey}
         confirmOpen={nukeConfirmOpen}
