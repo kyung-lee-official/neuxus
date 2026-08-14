@@ -2,15 +2,18 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
   ApiError,
+  type CorpusSyncStatus,
   cloneCorpus,
   getCorpusSettings,
   pullCorpus,
   putCorpusSettings,
+  startCorpusSync,
+  subscribeCorpusSyncEvents,
   UserQueryKey,
 } from "@/lib/api";
 
@@ -33,8 +36,18 @@ function blankToNull(value: string): string | null {
   return t === "" ? null : t;
 }
 
+function stageLabel(status: CorpusSyncStatus | null): string | null {
+  if (!status?.running) return null;
+  if (status.stage === "pull") return "Pulling corpus…";
+  if (status.stage === "ingest") return "Ingesting pages…";
+  if (status.stage === "embed") return "Embedding…";
+  return "Syncing…";
+}
+
 export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
   const queryClient = useQueryClient();
+  const [syncStatus, setSyncStatus] = useState<CorpusSyncStatus | null>(null);
+  const wasRunning = useRef(false);
   const settingsQuery = useQuery({
     queryKey: UserQueryKey.CorpusSettings,
     queryFn: () => getCorpusSettings(actorApiKey),
@@ -58,6 +71,46 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
       docsRoot: data.docsRoot ?? "",
     });
   }, [settingsQuery.data, form]);
+
+  useEffect(() => {
+    const ac = new AbortController();
+    const sleep = (ms: number) =>
+      new Promise<void>((resolve) => {
+        const id = setTimeout(resolve, ms);
+        ac.signal.addEventListener("abort", () => {
+          clearTimeout(id);
+          resolve();
+        });
+      });
+
+    const run = async () => {
+      while (!ac.signal.aborted) {
+        try {
+          await subscribeCorpusSyncEvents(
+            actorApiKey,
+            setSyncStatus,
+            ac.signal,
+          );
+        } catch {
+          if (ac.signal.aborted) return;
+        }
+        if (ac.signal.aborted) return;
+        await sleep(2000);
+      }
+    };
+    void run();
+    return () => ac.abort();
+  }, [actorApiKey]);
+
+  useEffect(() => {
+    const running = syncStatus?.running ?? false;
+    if (wasRunning.current && !running) {
+      void queryClient.invalidateQueries({
+        queryKey: UserQueryKey.CorpusSettings,
+      });
+    }
+    wasRunning.current = running;
+  }, [syncStatus?.running, queryClient]);
 
   const saveMutation = useMutation({
     mutationFn: (values: CorpusValues) =>
@@ -94,21 +147,31 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
     },
   });
 
+  const syncMutation = useMutation({
+    mutationFn: () => startCorpusSync(actorApiKey),
+  });
+
+  const syncRunning = syncStatus?.running === true;
   const busy =
     settingsQuery.isFetching ||
     saveMutation.isPending ||
     cloneMutation.isPending ||
     pullMutation.isPending ||
+    syncMutation.isPending ||
+    syncRunning ||
     form.formState.isSubmitting;
 
   const actionError =
     (saveMutation.isError ? errorMessage(saveMutation.error) : null) ||
     (cloneMutation.isError ? errorMessage(cloneMutation.error) : null) ||
     (pullMutation.isError ? errorMessage(pullMutation.error) : null) ||
+    (syncMutation.isError ? errorMessage(syncMutation.error) : null) ||
+    syncStatus?.lastError ||
     (settingsQuery.isError ? errorMessage(settingsQuery.error) : null);
 
   const lastSyncedSha = settingsQuery.data?.lastSyncedSha;
   const hasSavedRepo = Boolean(settingsQuery.data?.repoUrl);
+  const syncStageText = stageLabel(syncStatus);
 
   return (
     <section className="flex flex-col gap-3.5 rounded-md border border-line bg-surface p-6">
@@ -161,6 +224,9 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
           {actionError ? (
             <p className="m-0 text-danger text-sm">{actionError}</p>
           ) : null}
+          {syncStageText ? (
+            <p className="m-0 text-muted text-sm">{syncStageText}</p>
+          ) : null}
           {saveMutation.isSuccess ? (
             <p className="m-0 text-ok text-sm">Saved.</p>
           ) : null}
@@ -180,6 +246,14 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
             </button>
             <button
               type="button"
+              className="rounded border border-accent bg-transparent px-3.5 py-1.5 text-accent text-sm disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={busy || !hasSavedRepo}
+              onClick={() => syncMutation.mutate()}
+            >
+              {syncRunning ? "Syncing…" : "Sync"}
+            </button>
+            <button
+              type="button"
               className="rounded border border-line bg-transparent px-3.5 py-1.5 text-ink text-sm disabled:cursor-not-allowed disabled:opacity-60"
               disabled={busy || !hasSavedRepo}
               onClick={() => cloneMutation.mutate()}
@@ -196,7 +270,8 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
             </button>
           </div>
           <p className="m-0 text-muted text-xs">
-            Clone and Pull use the last saved URL and branch.
+            Sync clones if needed, then ingest, chunkify, and embed. Clone and
+            Pull only update the git checkout.
           </p>
         </form>
       )}

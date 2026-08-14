@@ -1,4 +1,4 @@
-import { apiFetch } from "./api-client";
+import { ApiError, apiBaseUrl, apiFetch } from "./api-client";
 
 export { ApiError, apiBaseUrl } from "./api-client";
 
@@ -390,4 +390,95 @@ export async function pullCorpus(apiKey: string): Promise<CorpusSettings> {
     method: "POST",
     apiKey,
   });
+}
+
+export type CorpusSyncStage = "pull" | "ingest" | "embed";
+
+export type CorpusSyncStatus = {
+  running: boolean;
+  stage: CorpusSyncStage | null;
+  lastError: string | null;
+};
+
+function parseCorpusSyncStatus(value: unknown): CorpusSyncStatus | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as {
+    running?: unknown;
+    stage?: unknown;
+    lastError?: unknown;
+  };
+  if (typeof row.running !== "boolean") return null;
+  const stage = row.stage;
+  if (
+    stage !== null &&
+    stage !== "pull" &&
+    stage !== "ingest" &&
+    stage !== "embed"
+  ) {
+    return null;
+  }
+  if (row.lastError !== null && typeof row.lastError !== "string") return null;
+  return {
+    running: row.running,
+    stage,
+    lastError: row.lastError,
+  };
+}
+
+export async function startCorpusSync(apiKey: string): Promise<{ ok: true }> {
+  return apiFetch<{ ok: true }>("/server-setting/corpus/sync", {
+    method: "POST",
+    apiKey,
+  });
+}
+
+function consumeSseBuffer(
+  buffer: string,
+  onStatus: (status: CorpusSyncStatus) => void,
+): string {
+  const blocks = buffer.split("\n\n");
+  const rest = blocks.pop() ?? "";
+  for (const block of blocks) {
+    for (const line of block.split("\n")) {
+      if (!line.startsWith("data:")) continue;
+      const raw = line.slice("data:".length).trim();
+      if (raw === "") continue;
+      try {
+        const parsed = parseCorpusSyncStatus(JSON.parse(raw) as unknown);
+        if (parsed) onStatus(parsed);
+      } catch {
+        /* ignore a truncated JSON frame */
+      }
+    }
+  }
+  return rest;
+}
+
+/** Stay-open SSE via fetch (Bearer). Resolves when the stream ends. */
+export async function subscribeCorpusSyncEvents(
+  apiKey: string,
+  onStatus: (status: CorpusSyncStatus) => void,
+  signal: AbortSignal,
+): Promise<void> {
+  const res = await fetch(`${apiBaseUrl()}/server-setting/corpus/sync/events`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+    signal,
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new ApiError(`HTTP ${res.status}`, res.status);
+  }
+  if (!res.body) {
+    throw new ApiError("No event stream", res.status);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    buffer = consumeSseBuffer(buffer, onStatus);
+  }
 }

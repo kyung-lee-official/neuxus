@@ -162,4 +162,27 @@ describe("embedChildRows", () => {
     expect(result).toEqual({ embedded: 1, skipped: 2 });
     expect(written).toEqual([{ id: "a", vector: [1, 0, 0] }]);
   });
+
+  test("failFast throws on the first provider failure", async () => {
+    const embedder: Embedder = {
+      async embed(texts) {
+        if (texts[0] === "fail") throw new Error("limit");
+        return [[1, 0, 0]];
+      },
+    };
+
+    await expect(
+      embedChildRows(
+        [
+          { id: "a", text: "ok" },
+          { id: "c", text: "fail" },
+        ],
+        {
+          embedder,
+          failFast: true,
+          writeVector: async () => {},
+        },
+      ),
+    ).rejects.toThrow("limit");
+  });
 });

@@ -120,3 +120,22 @@ export async function persistKnowledgePage(
 
   return { contentHash, skipped: false };
 }
+
+/**
+ * Drop corpus pages whose `source_path` is not in the current walker list.
+ * Rows with null `source_path` are left alone.
+ */
+export async function deleteKnowledgePagesMissingSourcePaths(
+  keepSourcePaths: string[],
+): Promise<void> {
+  const sql = db();
+  if (keepSourcePaths.length === 0) {
+    await sql`DELETE FROM kb_pages WHERE source_path IS NOT NULL`;
+    return;
+  }
+  await sql`
+    DELETE FROM kb_pages
+    WHERE source_path IS NOT NULL
+      AND NOT (source_path = ANY(${sql.array(keepSourcePaths)}::text[]))
+  `;
+}

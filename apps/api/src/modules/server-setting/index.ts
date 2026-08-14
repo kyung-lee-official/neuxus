@@ -38,6 +38,12 @@ export const serverSetting = new Elysia({ prefix: "/server-setting" })
   .post("/corpus/pull", () => ServerSetting.pullCorpus(), {
     requireAdmin: true,
   })
+  .get("/corpus/sync/events", () => ServerSetting.corpusSyncEvents(), {
+    requireAdmin: true,
+  })
+  .post("/corpus/sync", () => ServerSetting.startCorpusSync(), {
+    requireAdmin: true,
+  })
   .post("/nuke", ({ body }) => ServerSetting.nuke(body), {
     requireAdmin: true,
     body: ServerSettingModel.nukeBody,

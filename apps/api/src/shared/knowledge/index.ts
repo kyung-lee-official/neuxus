@@ -4,6 +4,7 @@ export {
   pageContentHash,
 } from "./hash.ts";
 export {
+  deleteKnowledgePagesMissingSourcePaths,
   findPageContentHash,
   type PersistKnowledgePageInput,
   type PersistKnowledgePageResult,

@@ -3,9 +3,11 @@ import {
   CorpusGitError,
   type CorpusSettingsRow,
   cloneCorpus,
+  corpusSyncEventStream,
   loadCorpusSettings,
   pullCorpus,
   saveCorpusSettings,
+  tryStartCorpusSync,
 } from "../../shared/corpus/index.ts";
 import { nukeDatabases } from "../../shared/db.ts";
 import {
@@ -99,6 +101,17 @@ export abstract class ServerSetting {
       const msg = err instanceof Error ? err.message : String(err);
       throw status(500, { error: msg });
     }
+  }
+
+  static startCorpusSync() {
+    if (!tryStartCorpusSync()) {
+      throw status(409, { error: "Sync already running." });
+    }
+    return status(202, { ok: true as const });
+  }
+
+  static corpusSyncEvents() {
+    return corpusSyncEventStream();
   }
 
   static async nuke(body: ServerSettingModel["nukeBody"]) {

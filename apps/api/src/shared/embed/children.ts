@@ -16,6 +16,8 @@ export type EmbedChildRowsResult = {
 export type EmbedStaleChildrenOptions = {
   pageId?: string;
   embedder?: Embedder;
+  /** Throw on the first provider failure instead of skipping the child. */
+  failFast?: boolean;
 };
 
 export type EmbedStaleChildrenResult = EmbedChildRowsResult & {
@@ -39,6 +41,7 @@ export async function embedChildRows(
   args: {
     embedder: Embedder;
     writeVector: (id: string, vector: number[]) => Promise<void>;
+    failFast?: boolean;
   },
 ): Promise<EmbedChildRowsResult> {
   let embedded = 0;
@@ -53,12 +56,16 @@ export async function embedChildRows(
       const vectors = await args.embedder.embed([row.text]);
       const vector = vectors[0];
       if (!vector) {
+        if (args.failFast) {
+          throw new Error("embedder returned no vector");
+        }
         skipped += 1;
         continue;
       }
       await args.writeVector(row.id, vector);
       embedded += 1;
-    } catch {
+    } catch (err) {
+      if (args.failFast) throw err;
       skipped += 1;
     }
   }
@@ -103,6 +110,7 @@ export async function embedStaleChildren(
 
   const result = await embedChildRows(children, {
     embedder,
+    failFast: options?.failFast,
     writeVector: async (id, vector) => {
       const literal = pgvectorLiteral(vector);
       await sql`

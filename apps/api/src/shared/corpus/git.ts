@@ -101,8 +101,9 @@ async function requireRepoUrl(): Promise<
   return { ...settings, repoUrl: settings.repoUrl };
 }
 
-export async function cloneCorpus(): Promise<StoredCorpusSettings> {
-  const settings = await requireRepoUrl();
+async function cloneIntoCheckout(
+  settings: StoredCorpusSettings & { repoUrl: string },
+): Promise<void> {
   const checkout = corpusCheckoutDir();
   if (existsSync(gitDir(checkout))) {
     throw new CorpusGitError(409, "Already cloned. Use Pull.");
@@ -119,8 +120,7 @@ export async function cloneCorpus(): Promise<StoredCorpusSettings> {
   if (settings.branch) {
     args.push("--branch", settings.branch, "--single-branch");
   }
-  const repoUrl = settings.repoUrl;
-  args.push(repoUrl, checkout);
+  args.push(settings.repoUrl, checkout);
   const result = await runGit(args);
   if (result.code !== 0) {
     if (existsSync(checkout) && !existsSync(gitDir(checkout))) {
@@ -128,12 +128,11 @@ export async function cloneCorpus(): Promise<StoredCorpusSettings> {
     }
     throw new CorpusGitError(500, redact(result.stderr) || "git clone failed");
   }
-  const sha = await requireHeadSha(checkout);
-  return saveCorpusLastSyncedSha(sha);
 }
 
-export async function pullCorpus(): Promise<StoredCorpusSettings> {
-  const settings = await requireRepoUrl();
+async function pullInCheckout(
+  settings: StoredCorpusSettings & { repoUrl: string },
+): Promise<void> {
   const checkout = corpusCheckoutDir();
   if (!existsSync(gitDir(checkout))) {
     throw new CorpusGitError(400, "Not cloned yet. Use Clone.");
@@ -159,6 +158,33 @@ export async function pullCorpus(): Promise<StoredCorpusSettings> {
   if (pull.code !== 0) {
     throw new CorpusGitError(500, redact(pull.stderr) || "git pull failed");
   }
-  const sha = await requireHeadSha(checkout);
+}
+
+export async function cloneCorpus(): Promise<StoredCorpusSettings> {
+  const settings = await requireRepoUrl();
+  await cloneIntoCheckout(settings);
+  const sha = await requireHeadSha(corpusCheckoutDir());
   return saveCorpusLastSyncedSha(sha);
+}
+
+export async function pullCorpus(): Promise<StoredCorpusSettings> {
+  const settings = await requireRepoUrl();
+  await pullInCheckout(settings);
+  const sha = await requireHeadSha(corpusCheckoutDir());
+  return saveCorpusLastSyncedSha(sha);
+}
+
+/**
+ * Clone if missing, otherwise pull. Returns HEAD; does not write
+ * `last_synced_sha` (full Sync writes that after ingest + embed).
+ */
+export async function refreshCorpusCheckout(): Promise<string> {
+  const settings = await requireRepoUrl();
+  const checkout = corpusCheckoutDir();
+  if (existsSync(gitDir(checkout))) {
+    await pullInCheckout(settings);
+  } else {
+    await cloneIntoCheckout(settings);
+  }
+  return requireHeadSha(checkout);
 }
