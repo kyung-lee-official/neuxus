@@ -21,7 +21,7 @@ neuxus/
 | MiniMax             | Ask-mode LLM synthesis              |
 | Next.js             | Sign-in, chat UI, settings          |
 
-Ask mode uses **personal memories** + **recent session messages**, then synthesizes with MiniMax. There is no external knowledge base.
+Ask mode retrieves knowledge-base parents, then synthesizes with MiniMax (config in `app_synthesis_settings`).
 
 ## Setup
 
@@ -35,7 +35,7 @@ CREATE DATABASE neuxus;
 
 ```powershell
 Copy-Item .env.example .env
-# edit DATABASE_URL / MINIMAX_API_KEY
+# edit DATABASE_URL
 ```
 
 3. Install and migrate (from `apps/api`):

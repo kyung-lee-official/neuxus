@@ -1,20 +1,23 @@
 import type { AppMemory, AppMessage } from "../../shared/db.ts";
+import type { RetrievedParent } from "../../shared/retrieve/index.ts";
 
 const MAX_CONTEXT_CHARS = 12_000;
 
 /**
- * Build the synthesis prompt for Bun-side LLM (personal memory + chat history).
+ * Build the synthesis prompt (personal memory, KB parents, chat).
  */
 export function buildSynthesisPrompt(
   recentMessages: AppMessage[],
   userMessage: string,
   personalMemories: AppMemory[] = [],
+  parents: RetrievedParent[] = [],
 ): string {
   const history = formatHistory(recentMessages);
   const personal = formatPersonalMemories(personalMemories);
+  const knowledge = formatParents(parents);
   const parts = [
     "You are answering for a single user.",
-    "Use any personal memory block below and the recent conversation.",
+    "Use the knowledge-base parents, personal memory, and recent conversation below.",
     "Personal memory is private to this user; do not invent facts that are not present.",
     "If the available context does not contain the answer, say so clearly.",
     "",
@@ -22,11 +25,24 @@ export function buildSynthesisPrompt(
   if (personal) {
     parts.push("Personal memory (private to this user only):", personal, "");
   }
+  if (knowledge) {
+    parts.push("Knowledge base (parent context):", knowledge, "");
+  }
   if (history) {
     parts.push("Recent conversation (for context only):", history, "");
   }
   parts.push("Current question:", userMessage.trim());
   return trimToMax(parts.join("\n"), MAX_CONTEXT_CHARS);
+}
+
+function formatParents(parents: RetrievedParent[]): string {
+  if (parents.length === 0) return "";
+  return parents
+    .map((p) => {
+      const heading = [p.title, p.slug].filter((s) => s.length > 0).join(" · ");
+      return heading ? `### ${heading}\n${p.text}` : p.text;
+    })
+    .join("\n\n");
 }
 
 function formatHistory(messages: AppMessage[]): string {

@@ -9,6 +9,7 @@ import {
   searchMemoriesByUser,
 } from "../../shared/db.ts";
 import { isHttpStatus } from "../../shared/http.ts";
+import { retrieveParentsByQuestion } from "../../shared/retrieve/index.ts";
 import { answerFromContext } from "./answer.ts";
 import { slugForMemoryNote } from "./context.ts";
 import type { QueryModel } from "./model.ts";
@@ -30,7 +31,13 @@ export abstract class Query {
       }
       const recent = await listRecentMessages(sessionId);
       const personalMemories = await searchMemoriesByUser(user.id, message);
-      const answer = await answerFromContext(recent, message, personalMemories);
+      const { parents } = await retrieveParentsByQuestion(message);
+      const answer = await answerFromContext(
+        recent,
+        message,
+        personalMemories,
+        parents,
+      );
       await insertMessage(sessionId, "user", message);
       await insertMessage(sessionId, "assistant", answer);
       return {

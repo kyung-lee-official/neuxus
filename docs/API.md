@@ -108,9 +108,9 @@ Bearer. Body `{ "content": "…" }` — inserts a personal memory note.
 
 ## Env
 
-| Variable          | Purpose                                |
-| ----------------- | -------------------------------------- |
-| `DATABASE_URL`    | Postgres URL (database name `neuxus`)  |
-| `MINIMAX_API_KEY` | Ask synthesis                          |
-| `SYNTHESIS_MODEL` | Optional model id (default MiniMax-M3) |
-| `PORT`            | API port (default 3001)                |
+| Variable       | Purpose                               |
+| -------------- | ------------------------------------- |
+| `DATABASE_URL` | Postgres URL (database name `neuxus`) |
+| `PORT`         | API port (default 3001)               |
+
+Ask synthesis (MiniMax key, model, base URL, window) is `app_synthesis_settings`, not env.
