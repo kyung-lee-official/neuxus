@@ -12,9 +12,11 @@ This doc is the **synthesis contract**: read settings, call the provider, return
 
 Talk to the provider through a **synthesizer** interface (`synthesize(prompt) → string`). The first implementation is **MiniMax** (Anthropic-compatible Messages API). Callers must not import MiniMax HTTP details.
 
-**All synthesis runtime config lives in Postgres** (`app_synthesis_settings`), not in env: provider, model, base URL, API key, max tokens. `DATABASE_URL` remains process env so the app can reach the database.
+**All synthesis runtime config lives in Postgres** (`app_synthesis_settings`), not in env: provider, model, base URL, API key, max tokens, context window. `DATABASE_URL` remains process env so the app can reach the database.
 
-**Reset / default** when the settings row is missing or a column is null: provider **`minimax`**, model **`MiniMax-M3`**, base URL **`https://api.minimaxi.com/anthropic`**, `max_tokens` **`4096`**. Clearing columns back to null is a reset to those defaults.
+**Reset / default** when the settings row is missing or a column is null: provider **`minimax`**, model **`MiniMax-M3`**, base URL **`https://api.minimaxi.com/anthropic`**, `max_tokens` **`4096`**, `context_window_tokens` **`1000000`**. Clearing columns back to null is a reset to those defaults.
+
+`context_window_tokens` is **must-known** for the current `synthesis_model`. If it is still unknown after applying defaults, do not call the provider. Prompt + `max_tokens` must fit in that window (tokens). Product caps (trim memory/chat/parents) sit inside the window; they do not replace it.
 
 ## Settings in the database
 

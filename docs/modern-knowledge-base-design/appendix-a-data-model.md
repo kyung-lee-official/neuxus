@@ -106,19 +106,20 @@ CREATE TABLE kb_embed_settings (
 
 ## Synthesis settings table
 
-Runtime synthesis config ([05-synthesis.md](./05-synthesis.md#settings-in-the-database)): how to reach the LLM (provider, model, base URL, API key, max tokens). Not env. Not a `kb_*` table — Ask uses this for memory + chat + knowledge parents. Nullable columns; **defaults live in application code**, not SQL `DEFAULT`. Single row `id = 'default'`. Empty/missing row must still synthesize using those defaults. Clearing columns is a reset to MiniMax.
+Runtime synthesis config ([05-synthesis.md](./05-synthesis.md#settings-in-the-database)): how to reach the LLM (provider, model, base URL, API key, max tokens) and **`context_window_tokens`** (must be known before `synthesize`). Not env. Not a `kb_*` table — Ask uses this for memory + chat + knowledge parents. Nullable columns; **defaults live in application code**, not SQL `DEFAULT`. Single row `id = 'default'`. Empty/missing row must still synthesize using those defaults. Clearing columns is a reset to MiniMax.
 
 Do not log `api_key`. Changing these fields does not stale embeddings.
 
-App defaults (when null / no row): `provider` = `minimax`, `synthesis_model` = `MiniMax-M3`, `base_url` = `https://api.minimaxi.com/anthropic`, `max_tokens` = `4096`.
+App defaults (when null / no row): `provider` = `minimax`, `synthesis_model` = `MiniMax-M3`, `base_url` = `https://api.minimaxi.com/anthropic`, `max_tokens` = `4096`, `context_window_tokens` = `1000000`.
 
 ```sql
 CREATE TABLE app_synthesis_settings (
-  id                TEXT PRIMARY KEY DEFAULT 'default',
-  provider          TEXT,
-  synthesis_model   TEXT,
-  base_url          TEXT,
-  api_key           TEXT,
-  max_tokens        INT
+  id                     TEXT PRIMARY KEY DEFAULT 'default',
+  provider               TEXT,
+  synthesis_model        TEXT,
+  base_url               TEXT,
+  api_key                TEXT,
+  max_tokens             INT,
+  context_window_tokens  INT
 );
 ```
