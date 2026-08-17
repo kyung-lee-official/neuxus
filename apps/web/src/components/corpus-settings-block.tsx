@@ -36,17 +36,61 @@ function blankToNull(value: string): string | null {
   return t === "" ? null : t;
 }
 
-function stageLabel(status: CorpusSyncStatus | null): string | null {
-  if (!status?.running) return null;
-  if (status.stage === "pull") return "Pulling corpus…";
-  if (status.stage === "ingest") return "Ingesting pages…";
-  if (status.stage === "embed") return "Embedding…";
-  return "Syncing…";
+type SyncHint = {
+  tone: "muted" | "ok" | "danger";
+  text: string;
+};
+
+function hintClass(tone: SyncHint["tone"]): string {
+  if (tone === "ok") return "m-0 text-ok text-sm";
+  if (tone === "danger") return "m-0 text-danger text-sm";
+  return "m-0 text-muted text-sm";
+}
+
+function syncHint(args: {
+  status: CorpusSyncStatus | null;
+  syncMutationError: string | null;
+  hasSavedRepo: boolean;
+  syncFinished: boolean;
+}): SyncHint | null {
+  const { status, syncMutationError, hasSavedRepo, syncFinished } = args;
+  if (status?.running) {
+    if (status.stage === "pull") {
+      return {
+        tone: "muted",
+        text: "Updating git checkout (clone if missing, otherwise pull)…",
+      };
+    }
+    if (status.stage === "ingest") {
+      return {
+        tone: "muted",
+        text: "Walking docs, ingesting and chunkifying pages…",
+      };
+    }
+    if (status.stage === "embed") {
+      return { tone: "muted", text: "Embedding stale children…" };
+    }
+    return { tone: "muted", text: "Syncing…" };
+  }
+  if (syncMutationError) {
+    return { tone: "danger", text: syncMutationError };
+  }
+  if (status?.lastError) {
+    return { tone: "danger", text: `Sync failed: ${status.lastError}` };
+  }
+  if (syncFinished) {
+    return { tone: "ok", text: "Sync finished." };
+  }
+  if (!hasSavedRepo) {
+    return { tone: "muted", text: "Save a repo URL before Sync." };
+  }
+  return null;
 }
 
 export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
   const queryClient = useQueryClient();
   const [syncStatus, setSyncStatus] = useState<CorpusSyncStatus | null>(null);
+  const [syncFinished, setSyncFinished] = useState(false);
   const wasRunning = useRef(false);
   const settingsQuery = useQuery({
     queryKey: UserQueryKey.CorpusSettings,
@@ -104,7 +148,11 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
 
   useEffect(() => {
     const running = syncStatus?.running ?? false;
+    if (running) {
+      setSyncFinished(false);
+    }
     if (wasRunning.current && !running) {
+      setSyncFinished(!syncStatus?.lastError);
       void queryClient.invalidateQueries({
         queryKey: UserQueryKey.CorpusSettings,
       });
@@ -113,7 +161,7 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
       });
     }
     wasRunning.current = running;
-  }, [syncStatus?.running, queryClient]);
+  }, [syncStatus, queryClient]);
 
   const saveMutation = useMutation({
     mutationFn: (values: CorpusValues) =>
@@ -168,13 +216,18 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
     (saveMutation.isError ? errorMessage(saveMutation.error) : null) ||
     (cloneMutation.isError ? errorMessage(cloneMutation.error) : null) ||
     (pullMutation.isError ? errorMessage(pullMutation.error) : null) ||
-    (syncMutation.isError ? errorMessage(syncMutation.error) : null) ||
-    syncStatus?.lastError ||
     (settingsQuery.isError ? errorMessage(settingsQuery.error) : null);
 
   const lastSyncedSha = settingsQuery.data?.lastSyncedSha;
   const hasSavedRepo = Boolean(settingsQuery.data?.repoUrl);
-  const syncStageText = stageLabel(syncStatus);
+  const hint = syncHint({
+    status: syncStatus,
+    syncMutationError: syncMutation.isError
+      ? errorMessage(syncMutation.error)
+      : null,
+    hasSavedRepo,
+    syncFinished,
+  });
 
   return (
     <section className="flex flex-col gap-3.5 rounded-md border border-line bg-surface p-6">
@@ -227,9 +280,7 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
           {actionError ? (
             <p className="m-0 text-danger text-sm">{actionError}</p>
           ) : null}
-          {syncStageText ? (
-            <p className="m-0 text-muted text-sm">{syncStageText}</p>
-          ) : null}
+          {hint ? <p className={hintClass(hint.tone)}>{hint.text}</p> : null}
           {saveMutation.isSuccess ? (
             <p className="m-0 text-ok text-sm">Saved.</p>
           ) : null}
@@ -272,10 +323,12 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
               {syncRunning ? "Syncing…" : "Sync"}
             </button>
           </div>
-          <p className="m-0 text-muted text-xs">
-            Sync clones if needed, then ingest, chunkify, and embed. Clone and
-            Pull only update the git checkout.
-          </p>
+          {!syncRunning ? (
+            <p className="m-0 text-muted text-xs">
+              Sync clones if needed, then ingest, chunkify, and embed. Clone and
+              Pull only update the git checkout.
+            </p>
+          ) : null}
         </form>
       )}
     </section>
