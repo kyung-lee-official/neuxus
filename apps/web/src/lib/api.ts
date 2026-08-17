@@ -94,6 +94,8 @@ export const UserQueryKey = {
   EmbedSettings: ["server-setting", "embed"] as const,
   SynthesisSettings: ["server-setting", "synthesis"] as const,
   CorpusSettings: ["server-setting", "corpus"] as const,
+  KnowledgePages: ["knowledge", "pages"] as const,
+  KnowledgePage: (id: string) => ["knowledge", "pages", id] as const,
 } as const;
 
 export async function getHealth(): Promise<{ ok: boolean }> {
@@ -481,4 +483,73 @@ export async function subscribeCorpusSyncEvents(
     buffer += decoder.decode(value, { stream: true });
     buffer = consumeSseBuffer(buffer, onStatus);
   }
+}
+
+export type KnowledgePageListItem = {
+  id: string;
+  slug: string;
+  title: string;
+  type: string | null;
+  tags: string[];
+  sourcePath: string | null;
+  contentHash: string;
+  updatedAt: string | null;
+  parentCount: number;
+  childCount: number;
+};
+
+export type KnowledgeChildInspect = {
+  id: string;
+  childIndex: number;
+  text: string;
+  startOffset: number | null;
+  endOffset: number | null;
+  embeddingModel: string | null;
+  embeddedAt: string | null;
+  embedded: boolean;
+};
+
+export type KnowledgeParentInspect = {
+  id: string;
+  parentIndex: number;
+  text: string;
+  startOffset: number | null;
+  endOffset: number | null;
+  children: KnowledgeChildInspect[];
+};
+
+export type KnowledgePageDetail = {
+  id: string;
+  slug: string;
+  title: string;
+  type: string | null;
+  tags: string[];
+  body: string;
+  sourcePath: string | null;
+  contentHash: string;
+  updatedAt: string | null;
+  parents: KnowledgeParentInspect[];
+};
+
+function knowledgePageApiPath(id: string): string {
+  const encoded = id
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+  return `/knowledge/pages/${encoded}`;
+}
+
+export async function listKnowledgePages(
+  apiKey: string,
+): Promise<{ pages: KnowledgePageListItem[] }> {
+  return apiFetch<{ pages: KnowledgePageListItem[] }>("/knowledge/pages", {
+    apiKey,
+  });
+}
+
+export async function getKnowledgePage(
+  apiKey: string,
+  id: string,
+): Promise<KnowledgePageDetail> {
+  return apiFetch<KnowledgePageDetail>(knowledgePageApiPath(id), { apiKey });
 }

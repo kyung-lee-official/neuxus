@@ -108,6 +108,9 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
       void queryClient.invalidateQueries({
         queryKey: UserQueryKey.CorpusSettings,
       });
+      void queryClient.invalidateQueries({
+        queryKey: UserQueryKey.KnowledgePages,
+      });
     }
     wasRunning.current = running;
   }, [syncStatus?.running, queryClient]);

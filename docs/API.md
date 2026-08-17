@@ -24,6 +24,7 @@ All JSON responses use `Content-Type: application/json`. Corpus sync events are 
 | `POST /server-setting/corpus/clone`, `POST /server-setting/corpus/pull` | Bearer **admin**                                    |
 | `POST /server-setting/corpus/sync`                                      | Bearer **admin**                                    |
 | `GET /server-setting/corpus/sync/events`                                | Bearer **admin**                                    |
+| `GET /knowledge/pages`, `GET /knowledge/pages/*`                        | Bearer **admin**                                    |
 | `POST /server-setting/nuke`                                             | Bearer **admin**                                    |
 
 Seed users (after `bun run seed`; stored in `app_users`):
@@ -155,6 +156,14 @@ Both return the stored corpus settings (including `lastSyncedSha`). Uses the las
 `POST /server-setting/corpus/sync` — start a background singleton Sync: clone-if-missing else pull, walk `docs_root`, ingest/chunkify/persist (hash skip), delete missing `source_path` rows, embed stale children, then write `last_synced_sha` from `HEAD`. Returns **202** `{ "ok": true }`. Second concurrent Sync → **409**. Fail-fast; no job table. In-process lock (one API process).
 
 `GET /server-setting/corpus/sync/events` — stay-open SSE. Snapshot on connect, then `{ "running": boolean, "stage": "pull"|"ingest"|"embed"|null, "lastError": string|null }`. Comment pings keep the socket alive. Use `fetch` with `Authorization` (the browser `EventSource` API cannot set Bearer). Non-admin → `403`.
+
+### Knowledge pages (admin)
+
+Inspect stored `kb_pages` / `kb_parents` / `kb_children`. Read-only. Does not return embedding vectors.
+
+`GET /knowledge/pages` — all pages, ordered by `slug`. Each item: `id`, `slug`, `title`, `type`, `tags`, `sourcePath`, `contentHash`, `updatedAt`, `parentCount`, `childCount`. No `body`. Bearer admin.
+
+`GET /knowledge/pages/*` — one page by `id` (same as `slug`; path may contain `/`, e.g. `/knowledge/pages/guide/install`). 404 if missing. Includes `body` and `parents` (by `parentIndex`), each with `children` (by `childIndex`). Child fields: `text`, offsets, `embeddingModel`, `embeddedAt`, `embedded` (`true` when a vector is stored). Bearer admin.
 
 ## Env
 

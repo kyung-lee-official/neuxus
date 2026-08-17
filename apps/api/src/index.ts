@@ -1,6 +1,7 @@
 import { cors } from "@elysiajs/cors";
 import { Elysia, status } from "elysia";
 import { health } from "./modules/health/index.ts";
+import { knowledge } from "./modules/knowledge/index.ts";
 import { query } from "./modules/query/index.ts";
 import { serverSetting } from "./modules/server-setting/index.ts";
 import { sessions } from "./modules/sessions/index.ts";
@@ -29,6 +30,7 @@ const app = new Elysia()
     }
   })
   .use(health)
+  .use(knowledge)
   .use(serverSetting)
   .use(query)
   .use(sessions)
@@ -42,6 +44,7 @@ console.log(
 console.log(
   "Sessions: GET/POST /sessions, PATCH /sessions/:id; POST /query accepts body.sessionId",
 );
+console.log("Knowledge: GET /knowledge/pages, GET /knowledge/pages/*");
 console.log(
   "Server setting: GET/PUT /server-setting/embed, /synthesis, /corpus; POST /embed/reset, /synthesis/reset, /corpus/clone, /corpus/pull, /corpus/sync; GET /corpus/sync/events; POST /nuke",
 );

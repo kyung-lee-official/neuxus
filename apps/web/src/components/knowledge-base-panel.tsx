@@ -1,7 +1,9 @@
 "use client";
 
+import { Suspense } from "react";
 import { useAdminUser } from "./admin-shell";
 import { CorpusSettingsBlock } from "./corpus-settings-block";
+import { KnowledgePagesBlock } from "./knowledge-pages-block";
 
 export function KnowledgeBasePanel() {
   const user = useAdminUser();
@@ -16,13 +18,15 @@ export function KnowledgeBasePanel() {
         </p>
       </section>
       <CorpusSettingsBlock actorApiKey={user.apiKey} />
-      <section className="flex flex-col gap-2 rounded-md border border-line bg-surface p-6">
-        <h2 className="m-0 font-display text-ink text-lg">Pages</h2>
-        <p className="m-0 text-muted text-sm">
-          No pages API yet. This list will show slug, title, content hash, and
-          updated time once listing is wired.
-        </p>
-      </section>
+      <Suspense
+        fallback={
+          <section className="flex flex-col gap-2 rounded-md border border-line bg-surface p-6">
+            <p className="m-0 text-muted text-sm">Loading pages…</p>
+          </section>
+        }
+      >
+        <KnowledgePagesBlock actorApiKey={user.apiKey} />
+      </Suspense>
     </div>
   );
 }
