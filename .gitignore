@@ -15,6 +15,7 @@ Thumbs.db
 .vscode/
 .idea/
 .cursor/
+.opencode/
 
 # Prisma Client (generated)
 apps/api/src/generated/
