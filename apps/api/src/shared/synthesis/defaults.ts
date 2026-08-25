@@ -48,6 +48,11 @@ function positiveInt(value: number | null | undefined): number | undefined {
     : undefined;
 }
 
+/** Dev/CI convenience: read `MINIMAX_API_KEY` from process env. */
+function apiKeyFromEnv(): string | undefined {
+  return nonEmpty(process.env.MINIMAX_API_KEY);
+}
+
 export function storedSynthesisSettings(
   row?: SynthesisSettingsRow | null,
 ): StoredSynthesisSettings {
@@ -80,7 +85,8 @@ export function resolveSynthesisSettings(
       /\/$/,
       "",
     ),
-    apiKey: nonEmpty(row?.apiKey) ?? SYNTHESIS_DEFAULTS.apiKey,
+    apiKey:
+      nonEmpty(row?.apiKey) ?? apiKeyFromEnv() ?? SYNTHESIS_DEFAULTS.apiKey,
     maxTokens: positiveInt(row?.maxTokens) ?? SYNTHESIS_DEFAULTS.maxTokens,
     contextWindowTokens,
   };
