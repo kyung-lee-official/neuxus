@@ -46,7 +46,7 @@ console.log(
 );
 console.log("Knowledge: GET /knowledge/pages, GET /knowledge/pages/*");
 console.log(
-  "Server setting: GET/PUT /server-setting/embed, /synthesis, /corpus; POST /embed/reset, /synthesis/reset, /corpus/clone, /corpus/pull, /corpus/sync; GET /corpus/sync/events; POST /nuke",
+  "Server setting: GET/PUT /server-setting/embed, /synthesis, /corpus; POST /embed/reset, /synthesis/reset, /corpus/clone, /corpus/pull, /corpus/chunkify, /corpus/embed, /corpus/sync; GET /corpus/events; POST /nuke",
 );
 
 export type App = typeof app;

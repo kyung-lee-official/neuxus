@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -30,6 +31,12 @@ function errorMessage(err: unknown): string {
   if (err instanceof ApiError) return err.message;
   if (err instanceof Error) return err.message;
   return String(err);
+}
+
+const API_KEY_REQUIRED_MARKER = "api_key is required";
+
+function isApiKeyRequiredError(message: string): boolean {
+  return message.includes(API_KEY_REQUIRED_MARKER);
 }
 
 export function DemoPanel() {
@@ -197,7 +204,20 @@ export function DemoPanel() {
                 <p className="m-0 text-muted text-sm">Calling API…</p>
               ) : null}
               {payload?.error ? (
-                <p className="m-0 text-danger text-sm">{payload.error}</p>
+                <p className="m-0 text-danger text-sm">
+                  {payload.error}
+                  {isApiKeyRequiredError(payload.error) ? (
+                    <>
+                      {" "}
+                      <Link
+                        href="/server-settings"
+                        className="text-accent underline"
+                      >
+                        Set the MiniMax API key in Server settings.
+                      </Link>
+                    </>
+                  ) : null}
+                </p>
               ) : null}
             </form>
           </div>

@@ -394,117 +394,33 @@ export async function pullCorpus(apiKey: string): Promise<CorpusSettings> {
   });
 }
 
-export type CorpusSyncStage = "pull" | "ingest" | "embed";
+export type CorpusOperation = "clone" | "pull" | "chunkify" | "embed" | "sync";
 
-export type CorpusSyncStatus = {
-  running: boolean;
-  stage: CorpusSyncStage | null;
-  lastError: string | null;
-};
+export type CorpusStage =
+  | "clone"
+  | "fetch"
+  | "checkout"
+  | "merge"
+  | "ingest"
+  | "chunkify"
+  | "embed";
 
-function parseCorpusSyncStatus(value: unknown): CorpusSyncStatus | null {
-  if (!value || typeof value !== "object") return null;
-  const row = value as {
-    running?: unknown;
-    stage?: unknown;
-    lastError?: unknown;
-  };
-  if (typeof row.running !== "boolean") return null;
-  const stage = row.stage;
-  if (
-    stage !== null &&
-    stage !== "pull" &&
-    stage !== "ingest" &&
-    stage !== "embed"
-  ) {
-    return null;
-  }
-  if (row.lastError !== null && typeof row.lastError !== "string") return null;
-  return {
-    running: row.running,
-    stage,
-    lastError: row.lastError,
-  };
-}
-
-export async function startCorpusSync(apiKey: string): Promise<{ ok: true }> {
-  return apiFetch<{ ok: true }>("/server-setting/corpus/sync", {
-    method: "POST",
-    apiKey,
-  });
-}
-
-function consumeSseBuffer(
-  buffer: string,
-  onStatus: (status: CorpusSyncStatus) => void,
-): string {
-  const blocks = buffer.split("\n\n");
-  const rest = blocks.pop() ?? "";
-  for (const block of blocks) {
-    for (const line of block.split("\n")) {
-      if (!line.startsWith("data:")) continue;
-      const raw = line.slice("data:".length).trim();
-      if (raw === "") continue;
-      try {
-        const parsed = parseCorpusSyncStatus(JSON.parse(raw) as unknown);
-        if (parsed) onStatus(parsed);
-      } catch {
-        /* ignore a truncated JSON frame */
-      }
-    }
-  }
-  return rest;
-}
-
-/** Stay-open SSE via fetch (Bearer). Resolves when the stream ends. */
-export async function subscribeCorpusSyncEvents(
-  apiKey: string,
-  onStatus: (status: CorpusSyncStatus) => void,
-  signal: AbortSignal,
-): Promise<void> {
-  const res = await fetch(`${apiBaseUrl()}/server-setting/corpus/sync/events`, {
-    headers: { Authorization: `Bearer ${apiKey}` },
-    signal,
-    cache: "no-store",
-  });
-  if (!res.ok) {
-    throw new ApiError(`HTTP ${res.status}`, res.status);
-  }
-  if (!res.body) {
-    throw new ApiError("No event stream", res.status);
-  }
-
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    buffer = consumeSseBuffer(buffer, onStatus);
-  }
-}
-
-export type CorpusGitOperation = "clone" | "pull";
-
-export type CorpusGitStage = "clone" | "fetch" | "checkout" | "merge";
-
-export type CorpusGitProgress = {
+export type CorpusProgress = {
   phase: "receiving" | "resolving" | "checking-out";
   percent: number;
   processed?: number;
   total?: number;
 };
 
-export type CorpusGitStatus = {
+export type CorpusStatus = {
   running: boolean;
-  operation: CorpusGitOperation | null;
-  stage: CorpusGitStage | null;
-  progress: CorpusGitProgress | null;
+  operation: CorpusOperation | null;
+  stage: CorpusStage | null;
+  progress: CorpusProgress | null;
   lastError: string | null;
 };
 
-function parseCorpusGitStatus(value: unknown): CorpusGitStatus | null {
+function parseCorpusStatus(value: unknown): CorpusStatus | null {
   if (!value || typeof value !== "object") return null;
   const row = value as {
     running?: unknown;
@@ -515,17 +431,24 @@ function parseCorpusGitStatus(value: unknown): CorpusGitStatus | null {
   };
   if (typeof row.running !== "boolean") return null;
   const operation =
-    row.operation === "clone" || row.operation === "pull"
+    row.operation === "clone" ||
+    row.operation === "pull" ||
+    row.operation === "chunkify" ||
+    row.operation === "embed" ||
+    row.operation === "sync"
       ? row.operation
       : null;
   const stage =
     row.stage === "clone" ||
     row.stage === "fetch" ||
     row.stage === "checkout" ||
-    row.stage === "merge"
+    row.stage === "merge" ||
+    row.stage === "ingest" ||
+    row.stage === "chunkify" ||
+    row.stage === "embed"
       ? row.stage
       : null;
-  let progress: CorpusGitProgress | null = null;
+  let progress: CorpusProgress | null = null;
   if (row.progress && typeof row.progress === "object") {
     const p = row.progress as {
       phase?: unknown;
@@ -558,9 +481,30 @@ function parseCorpusGitStatus(value: unknown): CorpusGitStatus | null {
   };
 }
 
-function consumeGitSseBuffer(
+export async function startChunkify(apiKey: string): Promise<{ ok: true }> {
+  return apiFetch<{ ok: true }>("/server-setting/corpus/chunkify", {
+    method: "POST",
+    apiKey,
+  });
+}
+
+export async function startEmbed(apiKey: string): Promise<{ ok: true }> {
+  return apiFetch<{ ok: true }>("/server-setting/corpus/embed", {
+    method: "POST",
+    apiKey,
+  });
+}
+
+export async function startCorpusSync(apiKey: string): Promise<{ ok: true }> {
+  return apiFetch<{ ok: true }>("/server-setting/corpus/sync", {
+    method: "POST",
+    apiKey,
+  });
+}
+
+function consumeCorpusSseBuffer(
   buffer: string,
-  onStatus: (status: CorpusGitStatus) => void,
+  onStatus: (status: CorpusStatus) => void,
 ): string {
   const blocks = buffer.split("\n\n");
   const rest = blocks.pop() ?? "";
@@ -570,7 +514,7 @@ function consumeGitSseBuffer(
       const raw = line.slice("data:".length).trim();
       if (raw === "") continue;
       try {
-        const parsed = parseCorpusGitStatus(JSON.parse(raw) as unknown);
+        const parsed = parseCorpusStatus(JSON.parse(raw) as unknown);
         if (parsed) onStatus(parsed);
       } catch {
         /* ignore a truncated JSON frame */
@@ -581,19 +525,16 @@ function consumeGitSseBuffer(
 }
 
 /** Stay-open SSE via fetch (Bearer). Resolves when the stream ends. */
-export async function subscribeCorpusGitEvents(
+export async function subscribeCorpusEvents(
   apiKey: string,
-  onStatus: (status: CorpusGitStatus) => void,
+  onStatus: (status: CorpusStatus) => void,
   signal: AbortSignal,
 ): Promise<void> {
-  const res = await fetch(
-    `${apiBaseUrl()}/server-setting/corpus/clone/events`,
-    {
-      headers: { Authorization: `Bearer ${apiKey}` },
-      signal,
-      cache: "no-store",
-    },
-  );
+  const res = await fetch(`${apiBaseUrl()}/server-setting/corpus/events`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+    signal,
+    cache: "no-store",
+  });
   if (!res.ok) {
     throw new ApiError(`HTTP ${res.status}`, res.status);
   }
@@ -608,7 +549,7 @@ export async function subscribeCorpusGitEvents(
     const { done, value } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
-    buffer = consumeGitSseBuffer(buffer, onStatus);
+    buffer = consumeCorpusSseBuffer(buffer, onStatus);
   }
 }
 

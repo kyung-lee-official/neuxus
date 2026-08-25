@@ -1,35 +1,42 @@
 import type { CloneProgress } from "./git.ts";
 
-export type CorpusGitOperation = "clone" | "pull";
+export type CorpusOperation = "clone" | "pull" | "chunkify" | "embed" | "sync";
 
-export type CorpusGitStage = "clone" | "fetch" | "checkout" | "merge";
+export type CorpusStage =
+  | "clone"
+  | "fetch"
+  | "checkout"
+  | "merge"
+  | "ingest"
+  | "chunkify"
+  | "embed";
 
-export type CorpusGitProgress = CloneProgress;
+export type CorpusProgress = CloneProgress;
 
-export type CorpusGitStatus = {
+export type CorpusStatus = {
   running: boolean;
-  operation: CorpusGitOperation | null;
-  stage: CorpusGitStage | null;
-  progress: CorpusGitProgress | null;
+  operation: CorpusOperation | null;
+  stage: CorpusStage | null;
+  progress: CorpusProgress | null;
   lastError: string | null;
 };
 
 const PING_MS = 15_000;
 
 let running = false;
-let operation: CorpusGitOperation | null = null;
-let stage: CorpusGitStage | null = null;
-let progress: CorpusGitProgress | null = null;
+let operation: CorpusOperation | null = null;
+let stage: CorpusStage | null = null;
+let progress: CorpusProgress | null = null;
 let lastError: string | null = null;
 
-const listeners = new Set<(status: CorpusGitStatus) => void>();
+const listeners = new Set<(status: CorpusStatus) => void>();
 
-export function getCorpusGitStatus(): CorpusGitStatus {
+export function getCorpusStatus(): CorpusStatus {
   return { running, operation, stage, progress, lastError };
 }
 
-export function subscribeCorpusGit(
-  listener: (status: CorpusGitStatus) => void,
+export function subscribeCorpusStatus(
+  listener: (status: CorpusStatus) => void,
 ): () => void {
   listeners.add(listener);
   return () => {
@@ -38,32 +45,10 @@ export function subscribeCorpusGit(
 }
 
 function broadcast(): void {
-  const snapshot = getCorpusGitStatus();
+  const snapshot = getCorpusStatus();
   for (const listener of listeners) {
     listener(snapshot);
   }
-}
-
-function start(op: CorpusGitOperation): boolean {
-  if (running) return false;
-  running = true;
-  operation = op;
-  stage = op === "clone" ? "clone" : "fetch";
-  progress = null;
-  lastError = null;
-  broadcast();
-  return true;
-}
-
-function setStage(next: CorpusGitStage): void {
-  stage = next;
-  progress = null;
-  broadcast();
-}
-
-function setProgress(next: CorpusGitProgress): void {
-  progress = next;
-  broadcast();
 }
 
 function errorMessage(err: unknown): string {
@@ -71,23 +56,48 @@ function errorMessage(err: unknown): string {
   return String(err);
 }
 
-export function tryStartClone(): boolean {
-  return start("clone");
+function startOp(op: CorpusOperation): boolean {
+  if (running) return false;
+  running = true;
+  operation = op;
+  stage = initialStage(op);
+  progress = null;
+  lastError = null;
+  broadcast();
+  return true;
 }
 
-export function tryStartPull(): boolean {
-  return start("pull");
+function initialStage(op: CorpusOperation): CorpusStage {
+  switch (op) {
+    case "clone":
+      return "clone";
+    case "pull":
+      return "fetch";
+    case "chunkify":
+      return "chunkify";
+    case "embed":
+      return "embed";
+    case "sync":
+      return "fetch";
+  }
 }
 
-export function emitStage(next: CorpusGitStage): void {
-  setStage(next);
+export function tryStartCorpusOp(op: CorpusOperation): boolean {
+  return startOp(op);
 }
 
-export function emitProgress(next: CorpusGitProgress): void {
-  setProgress(next);
+export function emitStage(next: CorpusStage): void {
+  stage = next;
+  progress = null;
+  broadcast();
 }
 
-export function finishOperation(err: unknown): void {
+export function emitProgress(next: CorpusProgress): void {
+  progress = next;
+  broadcast();
+}
+
+export function finishCorpusOp(err?: unknown): void {
   if (err) lastError = errorMessage(err);
   running = false;
   operation = null;
@@ -101,21 +111,21 @@ function encodeSse(chunk: string): Uint8Array {
 }
 
 /** Stay-open SSE: snapshot on connect, then status updates and comment pings. */
-export function corpusGitEventStream(): Response {
+export function corpusEventStream(): Response {
   let unsub: (() => void) | undefined;
   let ping: ReturnType<typeof setInterval> | undefined;
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
-      const send = (status: CorpusGitStatus) => {
+      const send = (status: CorpusStatus) => {
         try {
           controller.enqueue(encodeSse(`data: ${JSON.stringify(status)}\n\n`));
         } catch {
           /* closed */
         }
       };
-      send(getCorpusGitStatus());
-      unsub = subscribeCorpusGit(send);
+      send(getCorpusStatus());
+      unsub = subscribeCorpusStatus(send);
       ping = setInterval(() => {
         try {
           controller.enqueue(encodeSse(": ping\n\n"));

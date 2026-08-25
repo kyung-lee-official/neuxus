@@ -3,19 +3,19 @@ import {
   CorpusGitError,
   type CorpusSettingsRow,
   cloneCorpusStream,
-  corpusGitEventStream,
-  corpusSyncEventStream,
+  corpusEventStream,
   emitProgress,
   emitStage,
-  finishOperation,
+  finishCorpusOp,
   loadCorpusSettings,
   pullCorpusStream,
+  rechunkAllPages,
+  runCorpusSync,
   saveCorpusSettings,
-  tryStartClone,
-  tryStartCorpusSync,
-  tryStartPull,
+  tryStartCorpusOp,
 } from "../../shared/corpus/index.ts";
 import { nukeDatabases } from "../../shared/db.ts";
+import { embedStaleChildren } from "../../shared/embed/children.ts";
 import {
   adminEmbedSettings,
   type EmbedSettingsRow,
@@ -29,6 +29,16 @@ import {
   saveSynthesisSettings,
 } from "../../shared/synthesis/index.ts";
 import type { ServerSettingModel } from "./model.ts";
+
+const LOCKED_MESSAGE = "A corpus operation is already running.";
+
+function mapCorpusError(err: unknown): never {
+  if (err instanceof CorpusGitError) {
+    throw status(err.httpStatus, { error: err.message });
+  }
+  const msg = err instanceof Error ? err.message : String(err);
+  throw status(500, { error: msg });
+}
 
 export abstract class ServerSetting {
   static async getEmbed() {
@@ -86,50 +96,77 @@ export abstract class ServerSetting {
   }
 
   static async cloneCorpus() {
-    if (!tryStartClone()) {
-      throw status(409, { error: "Git operation already running." });
+    if (!tryStartCorpusOp("clone")) {
+      throw status(409, { error: LOCKED_MESSAGE });
     }
     try {
-      return await cloneCorpusStream(emitProgress);
+      const result = await cloneCorpusStream(emitProgress);
+      finishCorpusOp();
+      return result;
     } catch (err) {
-      finishOperation(err);
-      if (err instanceof CorpusGitError) {
-        throw status(err.httpStatus, { error: err.message });
-      }
+      finishCorpusOp(err);
+      return mapCorpusError(err);
+    }
+  }
+
+  static async pullCorpus() {
+    if (!tryStartCorpusOp("pull")) {
+      throw status(409, { error: LOCKED_MESSAGE });
+    }
+    try {
+      const result = await pullCorpusStream(emitStage);
+      finishCorpusOp();
+      return result;
+    } catch (err) {
+      finishCorpusOp(err);
+      return mapCorpusError(err);
+    }
+  }
+
+  static async chunkifyCorpus() {
+    if (!tryStartCorpusOp("chunkify")) {
+      throw status(409, { error: LOCKED_MESSAGE });
+    }
+    try {
+      emitStage("chunkify");
+      const result = await rechunkAllPages();
+      finishCorpusOp();
+      return { ok: true as const, ...result };
+    } catch (err) {
+      finishCorpusOp(err);
       const msg = err instanceof Error ? err.message : String(err);
       throw status(500, { error: msg });
     }
   }
 
-  static async pullCorpus() {
-    if (!tryStartPull()) {
-      throw status(409, { error: "Git operation already running." });
+  static async embedCorpus() {
+    if (!tryStartCorpusOp("embed")) {
+      throw status(409, { error: LOCKED_MESSAGE });
     }
     try {
-      return await pullCorpusStream(emitStage);
+      emitStage("embed");
+      const result = await embedStaleChildren({ failFast: true });
+      finishCorpusOp();
+      return { ok: true as const, ...result };
     } catch (err) {
-      finishOperation(err);
-      if (err instanceof CorpusGitError) {
-        throw status(err.httpStatus, { error: err.message });
-      }
+      finishCorpusOp(err);
       const msg = err instanceof Error ? err.message : String(err);
       throw status(500, { error: msg });
     }
   }
 
   static startCorpusSync() {
-    if (!tryStartCorpusSync()) {
-      throw status(409, { error: "Sync already running." });
+    if (!tryStartCorpusOp("sync")) {
+      throw status(409, { error: LOCKED_MESSAGE });
     }
+    void runCorpusSync().catch(() => {
+      /* errors already recorded in status via finishCorpusOp(err) */
+    });
     return status(202, { ok: true as const });
   }
 
-  static corpusSyncEvents() {
-    return corpusSyncEventStream();
-  }
-
-  static corpusGitEvents() {
-    return corpusGitEventStream();
+  static corpusEvents() {
+    return corpusEventStream();
   }
 
   static async nuke(body: ServerSettingModel["nukeBody"]) {

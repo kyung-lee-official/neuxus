@@ -7,15 +7,17 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
   ApiError,
-  type CorpusGitStatus,
-  type CorpusSyncStatus,
+  type CorpusOperation,
+  type CorpusStatus,
   cloneCorpus,
   getCorpusSettings,
+  listKnowledgePages,
   pullCorpus,
   putCorpusSettings,
+  startChunkify,
   startCorpusSync,
-  subscribeCorpusGitEvents,
-  subscribeCorpusSyncEvents,
+  startEmbed,
+  subscribeCorpusEvents,
   UserQueryKey,
 } from "@/lib/api";
 
@@ -49,62 +51,30 @@ function hintClass(tone: SyncHint["tone"]): string {
   return "m-0 text-muted text-sm";
 }
 
-function syncHint(args: {
-  status: CorpusSyncStatus | null;
-  syncMutationError: string | null;
-  hasSavedRepo: boolean;
-  syncFinished: boolean;
-}): SyncHint | null {
-  const { status, syncMutationError, hasSavedRepo, syncFinished } = args;
-  if (status?.running) {
-    if (status.stage === "pull") {
-      return {
-        tone: "muted",
-        text: "Updating git checkout (clone if missing, otherwise pull)…",
-      };
-    }
-    if (status.stage === "ingest") {
-      return {
-        tone: "muted",
-        text: "Walking docs, ingesting and chunkifying pages…",
-      };
-    }
-    if (status.stage === "embed") {
-      return { tone: "muted", text: "Embedding stale children…" };
-    }
-    return { tone: "muted", text: "Syncing…" };
-  }
-  if (syncMutationError) {
-    return { tone: "danger", text: syncMutationError };
-  }
-  if (status?.lastError) {
-    return { tone: "danger", text: `Sync failed: ${status.lastError}` };
-  }
-  if (syncFinished) {
-    return { tone: "ok", text: "Sync finished." };
-  }
-  if (!hasSavedRepo) {
-    return { tone: "muted", text: "Save a repo URL before Sync." };
-  }
-  return null;
-}
-
-const CLONE_STEP_LABELS: Record<
-  "clone" | "fetch" | "checkout" | "merge",
-  string
-> = {
+const STAGE_LABELS: Record<Exclude<CorpusStatus["stage"], null>, string> = {
   clone: "Cloning",
   fetch: "Fetching",
   checkout: "Checking out",
   merge: "Merging",
+  ingest: "Ingesting",
+  chunkify: "Chunkifying",
+  embed: "Embedding",
 };
 
-function gitStageLabel(stage: CorpusGitStatus["stage"]): string {
+function stageLabel(stage: CorpusStatus["stage"]): string {
   if (!stage) return "Working";
-  return CLONE_STEP_LABELS[stage] ?? "Working";
+  return STAGE_LABELS[stage];
 }
 
-function gitProgressText(progress: CorpusGitStatus["progress"]): string | null {
+const OPERATION_PAST: Record<CorpusOperation, string> = {
+  clone: "Clone",
+  pull: "Pull",
+  chunkify: "Chunkify",
+  embed: "Embed",
+  sync: "Sync",
+};
+
+function progressText(progress: CorpusStatus["progress"]): string | null {
   if (!progress) return null;
   const { phase, percent, processed, total } = progress;
   const phaseLabel =
@@ -119,20 +89,37 @@ function gitProgressText(progress: CorpusGitStatus["progress"]): string | null {
   return `${phaseLabel}: ${percent}%`;
 }
 
-function gitHint(status: CorpusGitStatus | null): SyncHint | null {
-  if (!status) return null;
-  if (status.running) {
-    const stageText = gitStageLabel(status.stage);
-    const progressText = gitProgressText(status.progress);
+function operationHint(args: {
+  status: CorpusStatus | null;
+  mutationError: string | null;
+  hasSavedRepo: boolean;
+  finished: CorpusOperation | null;
+}): SyncHint | null {
+  const { status, mutationError, hasSavedRepo, finished } = args;
+  if (status?.running) {
+    const stageText = stageLabel(status.stage);
+    const p = progressText(status.progress);
     return {
       tone: "muted",
-      text: progressText ? `${stageText} — ${progressText}` : `${stageText}…`,
+      text: p ? `${stageText} — ${p}` : `${stageText}…`,
     };
   }
-  if (status.lastError) {
+  if (mutationError) {
+    return { tone: "danger", text: mutationError };
+  }
+  if (status?.lastError) {
     return {
       tone: "danger",
-      text: `Git operation failed: ${status.lastError}`,
+      text: `Corpus operation failed: ${status.lastError}`,
+    };
+  }
+  if (finished) {
+    return { tone: "ok", text: `${OPERATION_PAST[finished]} finished.` };
+  }
+  if (!hasSavedRepo) {
+    return {
+      tone: "muted",
+      text: "Save a repo URL before cloning, pulling, or syncing.",
     };
   }
   return null;
@@ -140,13 +127,17 @@ function gitHint(status: CorpusGitStatus | null): SyncHint | null {
 
 export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
   const queryClient = useQueryClient();
-  const [syncStatus, setSyncStatus] = useState<CorpusSyncStatus | null>(null);
-  const [gitStatus, setGitStatus] = useState<CorpusGitStatus | null>(null);
-  const [syncFinished, setSyncFinished] = useState(false);
+  const [status, setStatus] = useState<CorpusStatus | null>(null);
+  const [finished, setFinished] = useState<CorpusOperation | null>(null);
   const wasRunning = useRef(false);
+  const lastOpRef = useRef<CorpusOperation | null>(null);
   const settingsQuery = useQuery({
     queryKey: UserQueryKey.CorpusSettings,
     queryFn: () => getCorpusSettings(actorApiKey),
+  });
+  const pagesQuery = useQuery({
+    queryKey: UserQueryKey.KnowledgePages,
+    queryFn: () => listKnowledgePages(actorApiKey),
   });
 
   const form = useForm<CorpusValues>({
@@ -182,11 +173,7 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
     const run = async () => {
       while (!ac.signal.aborted) {
         try {
-          await subscribeCorpusSyncEvents(
-            actorApiKey,
-            setSyncStatus,
-            ac.signal,
-          );
+          await subscribeCorpusEvents(actorApiKey, setStatus, ac.signal);
         } catch {
           if (ac.signal.aborted) return;
         }
@@ -199,38 +186,13 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
   }, [actorApiKey]);
 
   useEffect(() => {
-    const ac = new AbortController();
-    const sleep = (ms: number) =>
-      new Promise<void>((resolve) => {
-        const id = setTimeout(resolve, ms);
-        ac.signal.addEventListener("abort", () => {
-          clearTimeout(id);
-          resolve();
-        });
-      });
-
-    const run = async () => {
-      while (!ac.signal.aborted) {
-        try {
-          await subscribeCorpusGitEvents(actorApiKey, setGitStatus, ac.signal);
-        } catch {
-          if (ac.signal.aborted) return;
-        }
-        if (ac.signal.aborted) return;
-        await sleep(2000);
-      }
-    };
-    void run();
-    return () => ac.abort();
-  }, [actorApiKey]);
-
-  useEffect(() => {
-    const running = syncStatus?.running ?? false;
+    const running = status?.running ?? false;
     if (running) {
-      setSyncFinished(false);
+      setFinished(null);
+      if (status?.operation) lastOpRef.current = status.operation;
     }
     if (wasRunning.current && !running) {
-      setSyncFinished(!syncStatus?.lastError);
+      setFinished(status?.lastError ? null : lastOpRef.current);
       void queryClient.invalidateQueries({
         queryKey: UserQueryKey.CorpusSettings,
       });
@@ -239,7 +201,7 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
       });
     }
     wasRunning.current = running;
-  }, [syncStatus, queryClient]);
+  }, [status, queryClient]);
 
   const saveMutation = useMutation({
     mutationFn: (values: CorpusValues) =>
@@ -276,39 +238,56 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
     },
   });
 
+  const chunkifyMutation = useMutation({
+    mutationFn: () => startChunkify(actorApiKey),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: UserQueryKey.KnowledgePages,
+      });
+    },
+  });
+
+  const embedMutation = useMutation({
+    mutationFn: () => startEmbed(actorApiKey),
+  });
+
   const syncMutation = useMutation({
     mutationFn: () => startCorpusSync(actorApiKey),
   });
 
-  const syncRunning = syncStatus?.running === true;
-  const gitRunning = gitStatus?.running === true;
+  const running = status?.running === true;
   const busy =
     settingsQuery.isFetching ||
     saveMutation.isPending ||
     cloneMutation.isPending ||
     pullMutation.isPending ||
+    chunkifyMutation.isPending ||
+    embedMutation.isPending ||
     syncMutation.isPending ||
-    syncRunning ||
-    gitRunning ||
+    running ||
     form.formState.isSubmitting;
 
   const actionError =
     (saveMutation.isError ? errorMessage(saveMutation.error) : null) ||
     (cloneMutation.isError ? errorMessage(cloneMutation.error) : null) ||
     (pullMutation.isError ? errorMessage(pullMutation.error) : null) ||
+    (chunkifyMutation.isError ? errorMessage(chunkifyMutation.error) : null) ||
+    (embedMutation.isError ? errorMessage(embedMutation.error) : null) ||
+    (syncMutation.isError ? errorMessage(syncMutation.error) : null) ||
     (settingsQuery.isError ? errorMessage(settingsQuery.error) : null);
 
   const lastSyncedSha = settingsQuery.data?.lastSyncedSha;
   const hasSavedRepo = Boolean(settingsQuery.data?.repoUrl);
-  const hint = syncHint({
-    status: syncStatus,
-    syncMutationError: syncMutation.isError
-      ? errorMessage(syncMutation.error)
-      : null,
+  const hasPages = (pagesQuery.data?.pages.length ?? 0) > 0;
+  const hint = operationHint({
+    status,
+    mutationError: actionError,
     hasSavedRepo,
-    syncFinished,
+    finished,
   });
-  const gitHintText = gitHint(gitStatus);
+
+  const opButtonLabel = (op: CorpusOperation, idle: string) =>
+    running && status?.operation === op ? `${stageLabel(status.stage)}…` : idle;
 
   return (
     <section className="flex flex-col gap-3.5 rounded-md border border-line bg-surface p-6">
@@ -358,21 +337,9 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
           <p className="m-0 font-mono text-muted text-xs">
             Last synced SHA: {lastSyncedSha ?? "none"}
           </p>
-          {actionError ? (
-            <p className="m-0 text-danger text-sm">{actionError}</p>
-          ) : null}
           {hint ? <p className={hintClass(hint.tone)}>{hint.text}</p> : null}
-          {gitHintText ? (
-            <p className={hintClass(gitHintText.tone)}>{gitHintText.text}</p>
-          ) : null}
           {saveMutation.isSuccess ? (
             <p className="m-0 text-ok text-sm">Saved.</p>
-          ) : null}
-          {cloneMutation.isSuccess ? (
-            <p className="m-0 text-ok text-sm">Cloned.</p>
-          ) : null}
-          {pullMutation.isSuccess ? (
-            <p className="m-0 text-ok text-sm">Pulled.</p>
           ) : null}
           <div className="flex flex-wrap gap-2">
             <button
@@ -388,9 +355,7 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
               disabled={busy || !hasSavedRepo}
               onClick={() => cloneMutation.mutate()}
             >
-              {gitRunning && gitStatus?.operation === "clone"
-                ? `${gitStageLabel(gitStatus.stage)}…`
-                : "Clone"}
+              {opButtonLabel("clone", "Clone")}
             </button>
             <button
               type="button"
@@ -398,9 +363,23 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
               disabled={busy || !hasSavedRepo}
               onClick={() => pullMutation.mutate()}
             >
-              {gitRunning && gitStatus?.operation === "pull"
-                ? `${gitStageLabel(gitStatus.stage)}…`
-                : "Pull"}
+              {opButtonLabel("pull", "Pull")}
+            </button>
+            <button
+              type="button"
+              className="rounded border border-line bg-transparent px-3.5 py-1.5 text-ink text-sm disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={busy || !hasPages}
+              onClick={() => chunkifyMutation.mutate()}
+            >
+              {opButtonLabel("chunkify", "Chunkify")}
+            </button>
+            <button
+              type="button"
+              className="rounded border border-line bg-transparent px-3.5 py-1.5 text-ink text-sm disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={busy || !hasPages}
+              onClick={() => embedMutation.mutate()}
+            >
+              {opButtonLabel("embed", "Embed")}
             </button>
             <button
               type="button"
@@ -408,13 +387,14 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
               disabled={busy || !hasSavedRepo}
               onClick={() => syncMutation.mutate()}
             >
-              {syncRunning ? "Syncing…" : "Sync"}
+              {opButtonLabel("sync", "Sync")}
             </button>
           </div>
-          {!syncRunning ? (
+          {!running ? (
             <p className="m-0 text-muted text-xs">
-              Sync clones if needed, then ingest, chunkify, and embed. Clone and
-              Pull only update the git checkout.
+              Sync clones if needed, then ingests, chunkifies, and embeds. Clone
+              and Pull only update the git checkout. Chunkify re-chunks all
+              pages; Embed fills stale embeddings.
             </p>
           ) : null}
         </form>

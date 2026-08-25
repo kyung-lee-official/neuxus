@@ -38,13 +38,16 @@ export const serverSetting = new Elysia({ prefix: "/server-setting" })
   .post("/corpus/pull", () => ServerSetting.pullCorpus(), {
     requireAdmin: true,
   })
-  .get("/corpus/sync/events", () => ServerSetting.corpusSyncEvents(), {
+  .post("/corpus/chunkify", () => ServerSetting.chunkifyCorpus(), {
     requireAdmin: true,
   })
-  .get("/corpus/clone/events", () => ServerSetting.corpusGitEvents(), {
+  .post("/corpus/embed", () => ServerSetting.embedCorpus(), {
     requireAdmin: true,
   })
   .post("/corpus/sync", () => ServerSetting.startCorpusSync(), {
+    requireAdmin: true,
+  })
+  .get("/corpus/events", () => ServerSetting.corpusEvents(), {
     requireAdmin: true,
   })
   .post("/nuke", ({ body }) => ServerSetting.nuke(body), {
