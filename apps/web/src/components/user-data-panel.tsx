@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { ApiError, type ApiUser, getUserData, UserQueryKey } from "@/lib/api";
 import { formatDateTime } from "@/lib/date-time";
+import { CopyButton } from "./copy-button";
 import { MarkdownBubble } from "./markdown-bubble";
 import { Modal } from "./modal";
 import type { ApiPayload } from "./response-view";
@@ -161,8 +162,8 @@ export function UserDataPanel({
                     <div
                       className={
                         isUser
-                          ? "max-w-[85%] rounded-2xl rounded-br-md border border-accent bg-accent/15 px-3 py-2"
-                          : "relative max-w-[85%] rounded-2xl rounded-bl-md border border-line bg-canvas px-3 py-2"
+                          ? "flex max-w-[85%] flex-col rounded-2xl rounded-br-md border border-accent bg-accent/15 px-3 py-2"
+                          : "relative flex max-w-[85%] flex-col rounded-2xl rounded-bl-md border border-line bg-canvas px-3 py-2"
                       }
                     >
                       <div
@@ -189,6 +190,9 @@ export function UserDataPanel({
                         ) : null}
                       </div>
                       <MarkdownBubble source={m.content} className="text-sm" />
+                      <div className="mt-1 flex justify-end">
+                        <CopyButton text={m.content} />
+                      </div>
                     </div>
                   </li>
                 );
