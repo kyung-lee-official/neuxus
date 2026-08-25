@@ -208,7 +208,7 @@ export function UserDataPanel({
         titleId="chat-raw-response-title"
         onClose={() => setRawOpen(false)}
       >
-        <pre className="m-0 max-h-[60vh] overflow-auto whitespace-pre-wrap break-words rounded border border-line bg-canvas p-2.5 font-mono text-ink text-xs leading-snug">
+        <pre className="wrap-break-word m-0 max-h-[60vh] overflow-auto whitespace-pre-wrap rounded border border-line bg-canvas p-2.5 font-mono text-ink text-xs leading-snug">
           {rawForLatestAssistant
             ? JSON.stringify(rawForLatestAssistant, null, 2)
             : ""}
