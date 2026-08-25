@@ -2,12 +2,18 @@ import { status } from "elysia";
 import {
   CorpusGitError,
   type CorpusSettingsRow,
-  cloneCorpus,
+  cloneCorpusStream,
+  corpusGitEventStream,
   corpusSyncEventStream,
+  emitProgress,
+  emitStage,
+  finishOperation,
   loadCorpusSettings,
-  pullCorpus,
+  pullCorpusStream,
   saveCorpusSettings,
+  tryStartClone,
   tryStartCorpusSync,
+  tryStartPull,
 } from "../../shared/corpus/index.ts";
 import { nukeDatabases } from "../../shared/db.ts";
 import {
@@ -80,9 +86,13 @@ export abstract class ServerSetting {
   }
 
   static async cloneCorpus() {
+    if (!tryStartClone()) {
+      throw status(409, { error: "Git operation already running." });
+    }
     try {
-      return await cloneCorpus();
+      return await cloneCorpusStream(emitProgress);
     } catch (err) {
+      finishOperation(err);
       if (err instanceof CorpusGitError) {
         throw status(err.httpStatus, { error: err.message });
       }
@@ -92,9 +102,13 @@ export abstract class ServerSetting {
   }
 
   static async pullCorpus() {
+    if (!tryStartPull()) {
+      throw status(409, { error: "Git operation already running." });
+    }
     try {
-      return await pullCorpus();
+      return await pullCorpusStream(emitStage);
     } catch (err) {
+      finishOperation(err);
       if (err instanceof CorpusGitError) {
         throw status(err.httpStatus, { error: err.message });
       }
@@ -112,6 +126,10 @@ export abstract class ServerSetting {
 
   static corpusSyncEvents() {
     return corpusSyncEventStream();
+  }
+
+  static corpusGitEvents() {
+    return corpusGitEventStream();
   }
 
   static async nuke(body: ServerSettingModel["nukeBody"]) {

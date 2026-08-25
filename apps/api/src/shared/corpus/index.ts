@@ -7,12 +7,30 @@ export {
   storedCorpusSettings,
 } from "./defaults.ts";
 export {
+  type CloneProgress,
   CorpusGitError,
   cloneCorpus,
+  cloneCorpusStream,
   corpusCheckoutDir,
+  type PullStage,
+  parseCloneProgress,
   pullCorpus,
+  pullCorpusStream,
   refreshCorpusCheckout,
 } from "./git.ts";
+export {
+  type CorpusGitOperation,
+  type CorpusGitProgress,
+  type CorpusGitStage,
+  type CorpusGitStatus,
+  corpusGitEventStream,
+  emitProgress,
+  emitStage,
+  finishOperation,
+  getCorpusGitStatus,
+  tryStartClone,
+  tryStartPull,
+} from "./git-status.ts";
 export { ingestCorpusCheckout } from "./ingest-checkout.ts";
 export { loadCorpusSettings, saveCorpusSettings } from "./settings.ts";
 export {

@@ -3,7 +3,7 @@
 export const CORPUS_DEFAULTS = {
   repoUrl: null as string | null,
   branch: "main",
-  docsRoot: "docs",
+  docsRoot: "",
   lastSyncedSha: null as string | null,
 } as const;
 

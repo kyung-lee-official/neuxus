@@ -12,6 +12,7 @@ export type CorpusMarkdownFile = {
 const DOCS_ROOT_PATTERN = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/;
 
 export function assertSafeDocsRoot(docsRoot: string): void {
+  if (docsRoot === "") return;
   const unsafe =
     !DOCS_ROOT_PATTERN.test(docsRoot) ||
     docsRoot.split("/").some((s) => s.startsWith("."));

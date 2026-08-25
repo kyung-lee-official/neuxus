@@ -41,6 +41,9 @@ export const serverSetting = new Elysia({ prefix: "/server-setting" })
   .get("/corpus/sync/events", () => ServerSetting.corpusSyncEvents(), {
     requireAdmin: true,
   })
+  .get("/corpus/clone/events", () => ServerSetting.corpusGitEvents(), {
+    requireAdmin: true,
+  })
   .post("/corpus/sync", () => ServerSetting.startCorpusSync(), {
     requireAdmin: true,
   })
