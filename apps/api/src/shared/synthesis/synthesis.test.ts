@@ -9,15 +9,7 @@ import { createMinimaxSynthesizer } from "./minimax.ts";
 import { createSynthesizer } from "./provider.ts";
 
 describe("resolveSynthesisSettings", () => {
-  const originalApiKey = process.env.MINIMAX_API_KEY;
-
-  afterEach(() => {
-    if (originalApiKey === undefined) delete process.env.MINIMAX_API_KEY;
-    else process.env.MINIMAX_API_KEY = originalApiKey;
-  });
-
   test("uses MiniMax reset defaults when the row is missing", () => {
-    delete process.env.MINIMAX_API_KEY;
     expect(resolveSynthesisSettings(null)).toEqual({
       provider: SYNTHESIS_DEFAULTS.provider,
       synthesisModel: SYNTHESIS_DEFAULTS.synthesisModel,
@@ -28,20 +20,7 @@ describe("resolveSynthesisSettings", () => {
     });
   });
 
-  test("falls back to MINIMAX_API_KEY env var when the row omits the key", () => {
-    delete process.env.MINIMAX_API_KEY;
-    expect(
-      resolveSynthesisSettings({ synthesisModel: "MiniMax-M3" }).apiKey,
-    ).toBeNull();
-
-    process.env.MINIMAX_API_KEY = "env-key";
-    expect(
-      resolveSynthesisSettings({ synthesisModel: "MiniMax-M3" }).apiKey,
-    ).toBe("env-key");
-  });
-
-  test("prefers a stored row key over the env var", () => {
-    process.env.MINIMAX_API_KEY = "env-key";
+  test("uses the stored api key when the row has one", () => {
     expect(
       resolveSynthesisSettings({
         synthesisModel: "MiniMax-M3",
@@ -51,7 +30,6 @@ describe("resolveSynthesisSettings", () => {
   });
 
   test("does not invent a window for an unknown model", () => {
-    delete process.env.MINIMAX_API_KEY;
     const resolved = resolveSynthesisSettings({
       synthesisModel: "other-llm",
       contextWindowTokens: null,
@@ -64,7 +42,6 @@ describe("resolveSynthesisSettings", () => {
   });
 
   test("keeps a stored window for a custom model", () => {
-    delete process.env.MINIMAX_API_KEY;
     expect(
       resolveSynthesisSettings({
         provider: "minimax",
