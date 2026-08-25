@@ -1,5 +1,6 @@
 import type { AskMode } from "@/lib/api";
 import { modeLabel } from "@/lib/query-modes";
+import { MarkdownBubble } from "./markdown-bubble";
 
 export type ApiPayload = {
   userId?: string;
@@ -56,9 +57,7 @@ export function ResponseView({
             </p>
           </div>
         ) : typeof payload.answer === "string" ? (
-          <p className="m-0 font-display text-base text-ink leading-snug">
-            {payload.answer}
-          </p>
+          <MarkdownBubble source={payload.answer} />
         ) : (
           <p className="m-0 text-muted text-sm">No answer field.</p>
         )}

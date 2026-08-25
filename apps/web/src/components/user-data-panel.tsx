@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { ApiError, type ApiUser, getUserData, UserQueryKey } from "@/lib/api";
 import { formatDateTime } from "@/lib/date-time";
+import { MarkdownBubble } from "./markdown-bubble";
 import { Modal } from "./modal";
 import type { ApiPayload } from "./response-view";
 
@@ -187,9 +188,7 @@ export function UserDataPanel({
                           </button>
                         ) : null}
                       </div>
-                      <pre className="m-0 whitespace-pre-wrap break-words font-display text-ink text-sm leading-snug">
-                        {m.content}
-                      </pre>
+                      <MarkdownBubble source={m.content} className="text-sm" />
                     </div>
                   </li>
                 );
