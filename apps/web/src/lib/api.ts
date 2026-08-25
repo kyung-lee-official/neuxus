@@ -485,6 +485,133 @@ export async function subscribeCorpusSyncEvents(
   }
 }
 
+export type CorpusGitOperation = "clone" | "pull";
+
+export type CorpusGitStage = "clone" | "fetch" | "checkout" | "merge";
+
+export type CorpusGitProgress = {
+  phase: "receiving" | "resolving" | "checking-out";
+  percent: number;
+  processed?: number;
+  total?: number;
+};
+
+export type CorpusGitStatus = {
+  running: boolean;
+  operation: CorpusGitOperation | null;
+  stage: CorpusGitStage | null;
+  progress: CorpusGitProgress | null;
+  lastError: string | null;
+};
+
+function parseCorpusGitStatus(value: unknown): CorpusGitStatus | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as {
+    running?: unknown;
+    operation?: unknown;
+    stage?: unknown;
+    progress?: unknown;
+    lastError?: unknown;
+  };
+  if (typeof row.running !== "boolean") return null;
+  const operation =
+    row.operation === "clone" || row.operation === "pull"
+      ? row.operation
+      : null;
+  const stage =
+    row.stage === "clone" ||
+    row.stage === "fetch" ||
+    row.stage === "checkout" ||
+    row.stage === "merge"
+      ? row.stage
+      : null;
+  let progress: CorpusGitProgress | null = null;
+  if (row.progress && typeof row.progress === "object") {
+    const p = row.progress as {
+      phase?: unknown;
+      percent?: unknown;
+      processed?: unknown;
+      total?: unknown;
+    };
+    if (
+      (p.phase === "receiving" ||
+        p.phase === "resolving" ||
+        p.phase === "checking-out") &&
+      typeof p.percent === "number" &&
+      Number.isFinite(p.percent)
+    ) {
+      progress = {
+        phase: p.phase,
+        percent: p.percent,
+        processed: typeof p.processed === "number" ? p.processed : undefined,
+        total: typeof p.total === "number" ? p.total : undefined,
+      };
+    }
+  }
+  if (row.lastError !== null && typeof row.lastError !== "string") return null;
+  return {
+    running: row.running,
+    operation,
+    stage,
+    progress,
+    lastError: row.lastError,
+  };
+}
+
+function consumeGitSseBuffer(
+  buffer: string,
+  onStatus: (status: CorpusGitStatus) => void,
+): string {
+  const blocks = buffer.split("\n\n");
+  const rest = blocks.pop() ?? "";
+  for (const block of blocks) {
+    for (const line of block.split("\n")) {
+      if (!line.startsWith("data:")) continue;
+      const raw = line.slice("data:".length).trim();
+      if (raw === "") continue;
+      try {
+        const parsed = parseCorpusGitStatus(JSON.parse(raw) as unknown);
+        if (parsed) onStatus(parsed);
+      } catch {
+        /* ignore a truncated JSON frame */
+      }
+    }
+  }
+  return rest;
+}
+
+/** Stay-open SSE via fetch (Bearer). Resolves when the stream ends. */
+export async function subscribeCorpusGitEvents(
+  apiKey: string,
+  onStatus: (status: CorpusGitStatus) => void,
+  signal: AbortSignal,
+): Promise<void> {
+  const res = await fetch(
+    `${apiBaseUrl()}/server-setting/corpus/clone/events`,
+    {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal,
+      cache: "no-store",
+    },
+  );
+  if (!res.ok) {
+    throw new ApiError(`HTTP ${res.status}`, res.status);
+  }
+  if (!res.body) {
+    throw new ApiError("No event stream", res.status);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    buffer = consumeGitSseBuffer(buffer, onStatus);
+  }
+}
+
 export type KnowledgePageListItem = {
   id: string;
   slug: string;

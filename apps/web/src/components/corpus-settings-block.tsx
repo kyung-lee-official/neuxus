@@ -7,12 +7,14 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
   ApiError,
+  type CorpusGitStatus,
   type CorpusSyncStatus,
   cloneCorpus,
   getCorpusSettings,
   pullCorpus,
   putCorpusSettings,
   startCorpusSync,
+  subscribeCorpusGitEvents,
   subscribeCorpusSyncEvents,
   UserQueryKey,
 } from "@/lib/api";
@@ -87,9 +89,59 @@ function syncHint(args: {
   return null;
 }
 
+const CLONE_STEP_LABELS: Record<
+  "clone" | "fetch" | "checkout" | "merge",
+  string
+> = {
+  clone: "Cloning",
+  fetch: "Fetching",
+  checkout: "Checking out",
+  merge: "Merging",
+};
+
+function gitStageLabel(stage: CorpusGitStatus["stage"]): string {
+  if (!stage) return "Working";
+  return CLONE_STEP_LABELS[stage] ?? "Working";
+}
+
+function gitProgressText(progress: CorpusGitStatus["progress"]): string | null {
+  if (!progress) return null;
+  const { phase, percent, processed, total } = progress;
+  const phaseLabel =
+    phase === "receiving"
+      ? "Receiving objects"
+      : phase === "resolving"
+        ? "Resolving deltas"
+        : "Checking out files";
+  if (processed !== undefined && total !== undefined) {
+    return `${phaseLabel}: ${percent}% (${processed}/${total})`;
+  }
+  return `${phaseLabel}: ${percent}%`;
+}
+
+function gitHint(status: CorpusGitStatus | null): SyncHint | null {
+  if (!status) return null;
+  if (status.running) {
+    const stageText = gitStageLabel(status.stage);
+    const progressText = gitProgressText(status.progress);
+    return {
+      tone: "muted",
+      text: progressText ? `${stageText} — ${progressText}` : `${stageText}…`,
+    };
+  }
+  if (status.lastError) {
+    return {
+      tone: "danger",
+      text: `Git operation failed: ${status.lastError}`,
+    };
+  }
+  return null;
+}
+
 export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
   const queryClient = useQueryClient();
   const [syncStatus, setSyncStatus] = useState<CorpusSyncStatus | null>(null);
+  const [gitStatus, setGitStatus] = useState<CorpusGitStatus | null>(null);
   const [syncFinished, setSyncFinished] = useState(false);
   const wasRunning = useRef(false);
   const settingsQuery = useQuery({
@@ -135,6 +187,32 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
             setSyncStatus,
             ac.signal,
           );
+        } catch {
+          if (ac.signal.aborted) return;
+        }
+        if (ac.signal.aborted) return;
+        await sleep(2000);
+      }
+    };
+    void run();
+    return () => ac.abort();
+  }, [actorApiKey]);
+
+  useEffect(() => {
+    const ac = new AbortController();
+    const sleep = (ms: number) =>
+      new Promise<void>((resolve) => {
+        const id = setTimeout(resolve, ms);
+        ac.signal.addEventListener("abort", () => {
+          clearTimeout(id);
+          resolve();
+        });
+      });
+
+    const run = async () => {
+      while (!ac.signal.aborted) {
+        try {
+          await subscribeCorpusGitEvents(actorApiKey, setGitStatus, ac.signal);
         } catch {
           if (ac.signal.aborted) return;
         }
@@ -203,6 +281,7 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
   });
 
   const syncRunning = syncStatus?.running === true;
+  const gitRunning = gitStatus?.running === true;
   const busy =
     settingsQuery.isFetching ||
     saveMutation.isPending ||
@@ -210,6 +289,7 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
     pullMutation.isPending ||
     syncMutation.isPending ||
     syncRunning ||
+    gitRunning ||
     form.formState.isSubmitting;
 
   const actionError =
@@ -228,6 +308,7 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
     hasSavedRepo,
     syncFinished,
   });
+  const gitHintText = gitHint(gitStatus);
 
   return (
     <section className="flex flex-col gap-3.5 rounded-md border border-line bg-surface p-6">
@@ -269,7 +350,7 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
             <span>Docs root</span>
             <input
               className="w-full rounded border border-line bg-canvas px-2.5 py-2 text-ink disabled:opacity-60"
-              placeholder="docs"
+              placeholder="repo root if empty"
               disabled={busy}
               {...form.register("docsRoot")}
             />
@@ -281,6 +362,9 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
             <p className="m-0 text-danger text-sm">{actionError}</p>
           ) : null}
           {hint ? <p className={hintClass(hint.tone)}>{hint.text}</p> : null}
+          {gitHintText ? (
+            <p className={hintClass(gitHintText.tone)}>{gitHintText.text}</p>
+          ) : null}
           {saveMutation.isSuccess ? (
             <p className="m-0 text-ok text-sm">Saved.</p>
           ) : null}
@@ -304,7 +388,9 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
               disabled={busy || !hasSavedRepo}
               onClick={() => cloneMutation.mutate()}
             >
-              {cloneMutation.isPending ? "Cloning…" : "Clone"}
+              {gitRunning && gitStatus?.operation === "clone"
+                ? `${gitStageLabel(gitStatus.stage)}…`
+                : "Clone"}
             </button>
             <button
               type="button"
@@ -312,7 +398,9 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
               disabled={busy || !hasSavedRepo}
               onClick={() => pullMutation.mutate()}
             >
-              {pullMutation.isPending ? "Pulling…" : "Pull"}
+              {gitRunning && gitStatus?.operation === "pull"
+                ? `${gitStageLabel(gitStatus.stage)}…`
+                : "Pull"}
             </button>
             <button
               type="button"
