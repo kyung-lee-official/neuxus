@@ -30,6 +30,7 @@ export { BoundedQueue } from "./queue.ts";
 export {
   adminLogSettings,
   loadLogSettings,
+  purgeLogs,
   resetLogSettings,
   saveLogSettings,
 } from "./settings.ts";

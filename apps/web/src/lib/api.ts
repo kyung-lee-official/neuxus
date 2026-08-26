@@ -409,6 +409,15 @@ export async function resetLogSettings(apiKey: string): Promise<LogSettings> {
   });
 }
 
+export async function purgeLogSettings(
+  apiKey: string,
+): Promise<{ deleted: number }> {
+  return apiFetch<{ deleted: number }>("/server-setting/log/purge", {
+    method: "POST",
+    apiKey,
+  });
+}
+
 export type CorpusSettings = {
   repoUrl: string | null;
   branch: string | null;

@@ -35,6 +35,9 @@ export const serverSetting = new Elysia({ prefix: "/server-setting" })
   .post("/log/reset", () => ServerSetting.resetLog(), {
     requireAdmin: true,
   })
+  .post("/log/purge", () => ServerSetting.purgeLogs(), {
+    requireAdmin: true,
+  })
   .get("/corpus", () => ServerSetting.getCorpus(), {
     requireAdmin: true,
   })

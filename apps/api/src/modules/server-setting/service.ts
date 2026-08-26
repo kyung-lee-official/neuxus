@@ -25,6 +25,7 @@ import {
 import {
   adminLogSettings,
   type LogSettingsRow,
+  purgeLogs,
   resetLogSettings,
   saveLogSettings,
 } from "../../shared/log/index.ts";
@@ -105,6 +106,10 @@ export abstract class ServerSetting {
 
   static async resetLog() {
     return resetLogSettings();
+  }
+
+  static async purgeLogs() {
+    return purgeLogs();
   }
 
   static async getCorpus() {

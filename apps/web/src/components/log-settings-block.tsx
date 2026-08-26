@@ -2,17 +2,19 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
   ApiError,
   getLogSettings,
   type LogSink,
+  purgeLogSettings,
   putLogSettings,
   resetLogSettings,
   UserQueryKey,
 } from "@/lib/api";
+import { Modal } from "./modal";
 
 const logSchema = z.object({
   console: z.boolean(),
@@ -46,6 +48,7 @@ function sinksFromForm(values: LogValues): readonly LogSink[] | null {
 
 export function LogSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
   const queryClient = useQueryClient();
+  const [purgeConfirmOpen, setPurgeConfirmOpen] = useState(false);
   const settingsQuery = useQuery({
     queryKey: UserQueryKey.LogSettings,
     queryFn: () => getLogSettings(actorApiKey),
@@ -102,15 +105,27 @@ export function LogSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
     },
   });
 
+  const purgeMutation = useMutation({
+    mutationFn: () => purgeLogSettings(actorApiKey),
+    onSuccess: (result) => {
+      setPurgeConfirmOpen(false);
+      window.alert(
+        `Deleted ${result.deleted} log ${result.deleted === 1 ? "row" : "rows"}.`,
+      );
+    },
+  });
+
   const busy =
     settingsQuery.isFetching ||
     saveMutation.isPending ||
     resetMutation.isPending ||
+    purgeMutation.isPending ||
     form.formState.isSubmitting;
 
   const actionError =
     (saveMutation.isError ? errorMessage(saveMutation.error) : null) ||
     (resetMutation.isError ? errorMessage(resetMutation.error) : null) ||
+    (purgeMutation.isError ? errorMessage(purgeMutation.error) : null) ||
     (settingsQuery.isError ? errorMessage(settingsQuery.error) : null);
 
   const placeholders = settingsQuery.data?.defaults;
@@ -235,6 +250,68 @@ export function LogSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
           </div>
         </form>
       )}
+
+      <div className="mt-2 flex flex-col gap-2 border-line border-t pt-3">
+        <h3 className="m-0 font-display text-base text-danger">Danger zone</h3>
+        <p className="m-0 text-muted text-sm">
+          Drop every row currently in{" "}
+          <code className="font-mono text-xs">app_log</code>. Configuration is
+          untouched.
+        </p>
+        {purgeMutation.isError ? (
+          <p className="m-0 text-danger text-sm">{actionError}</p>
+        ) : null}
+        <button
+          type="button"
+          className="self-start rounded border border-danger bg-transparent px-3.5 py-2 text-danger text-sm disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={busy}
+          onClick={() => setPurgeConfirmOpen(true)}
+        >
+          Delete all logs
+        </button>
+      </div>
+
+      <Modal
+        open={purgeConfirmOpen}
+        title="Delete all logs?"
+        titleId="purge-logs-dialog-title"
+        onClose={() => {
+          if (!purgeMutation.isPending) setPurgeConfirmOpen(false);
+        }}
+        closeDisabled={purgeMutation.isPending}
+      >
+        <p className="m-0 text-ink text-sm">
+          Delete every row in <code className="font-mono text-xs">app_log</code>
+          ?
+        </p>
+        <p className="mt-2 mb-0 text-muted text-sm">
+          This cannot be undone. Log configuration (sinks, queue size, drain
+          timeout, pretty) is not affected.
+        </p>
+        {purgeMutation.isError ? (
+          <p className="mt-3 mb-0 text-danger text-sm">
+            {errorMessage(purgeMutation.error)}
+          </p>
+        ) : null}
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            className="rounded border border-line bg-transparent px-3.5 py-2 text-ink text-sm disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={purgeMutation.isPending}
+            onClick={() => setPurgeConfirmOpen(false)}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="rounded border border-danger bg-danger px-3.5 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={purgeMutation.isPending}
+            onClick={() => purgeMutation.mutate()}
+          >
+            {purgeMutation.isPending ? "Deleting…" : "Delete all logs"}
+          </button>
+        </div>
+      </Modal>
     </section>
   );
 }

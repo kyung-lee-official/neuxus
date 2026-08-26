@@ -165,3 +165,9 @@ export async function resetLogSettings(): Promise<AdminLogSettings> {
   });
   return adminLogSettings();
 }
+
+/** Delete every row in `app_log`. Returns the count of rows removed. */
+export async function purgeLogs(): Promise<{ deleted: number }> {
+  const { count } = await getPrisma().appLog.deleteMany({});
+  return { deleted: count };
+}
