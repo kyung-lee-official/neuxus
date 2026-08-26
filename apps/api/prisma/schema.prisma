@@ -200,3 +200,23 @@ model AppLog {
     @@index([name, createdAt(sort: Desc)], map: "app_log_name_created_at_idx")
     @@map("app_log")
 }
+
+/// Logger runtime config (`app_log_settings`). Nullable columns — app
+/// defaults live in code (`LOG_DEFAULTS`), not SQL DEFAULT. Single row:
+/// id = `"default"`. Mirrors the `app_synthesis_settings` /
+/// `kb_chunk_settings` pattern.
+model AppLogSettings {
+    id String @id @default("default")
+
+    /// Comma-separated sinks: `console`, `postgres`, or `console,postgres`.
+    /// `null` falls back to the app default.
+    sink           String?  @map("sink")
+    /// Bounded queue capacity for the postgres sink. `null` falls back.
+    queueSize      Int?     @map("queue_size")
+    /// Drain budget (ms) for the worker on shutdown / `flushLogs()`.
+    drainTimeoutMs Int?     @map("drain_timeout_ms")
+    /// Pretty-print logixlysia's stdout via pino-pretty. `null` falls back.
+    pretty         Boolean?
+
+    @@map("app_log_settings")
+}
