@@ -178,3 +178,25 @@ model KnowledgeChild {
     @@unique([parentId, childIndex])
     @@map("kb_children")
 }
+
+/// Generic structured app log row (`app_log`). One row per logixlysia
+/// record. `meta` carries logixlysia's `time` / `pid` / `hostname` /
+/// context tree / any app bindings. `level`, `msg`, and `name` are
+/// top-level for cheap filtering. No FK to `app_users` — the logger
+/// must never block a request on referential checks.
+model AppLog {
+    id        BigInt   @id @default(autoincrement())
+    /// `trace` | `debug` | `info` | `warn` | `error` | `fatal`
+    level     String
+    msg       String
+    /// logixlysia child logger name (e.g. `"synthesis"`, `"auth"`). Null for root.
+    name      String?
+    /// Full logixlysia record minus the columns above (time, pid, hostname, bindings, …).
+    meta      Json
+    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+    @@index([createdAt(sort: Desc)], map: "app_log_created_at_idx")
+    @@index([level, createdAt(sort: Desc)], map: "app_log_level_created_at_idx")
+    @@index([name, createdAt(sort: Desc)], map: "app_log_name_created_at_idx")
+    @@map("app_log")
+}
