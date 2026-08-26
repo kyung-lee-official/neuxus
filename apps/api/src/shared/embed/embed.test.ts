@@ -133,6 +133,23 @@ describe("createOllamaEmbedder", () => {
       "Ollama embed failed (413)",
     );
   });
+
+  test("wraps connection failures with the embedder URL", async () => {
+    globalThis.fetch = (async () => {
+      throw new Error(
+        "Unable to connect. Is the computer able to access the url?",
+      );
+    }) as unknown as typeof fetch;
+    const embedder = createOllamaEmbedder({
+      host: "127.0.0.1",
+      port: 11434,
+      apiKey: null,
+      embeddingModel: "nomic-embed-text:latest",
+    });
+    await expect(embedder.embed(["hi"])).rejects.toThrow(
+      /Ollama embedder at http:\/\/127\.0\.0\.1:11434 unreachable.*is Ollama running\?.*Unable to connect/,
+    );
+  });
 });
 
 describe("embedChildRows", () => {

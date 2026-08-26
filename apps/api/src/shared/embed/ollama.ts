@@ -50,14 +50,22 @@ export function createOllamaEmbedder(
         headers.Authorization = `Bearer ${settings.apiKey}`;
       }
 
-      const res = await fetch(`${base}/api/embed`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          model: settings.embeddingModel,
-          input: texts.length === 1 ? texts[0] : texts,
-        }),
-      });
+      let res: Response;
+      try {
+        res = await fetch(`${base}/api/embed`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            model: settings.embeddingModel,
+            input: texts.length === 1 ? texts[0] : texts,
+          }),
+        });
+      } catch (err) {
+        const cause = err instanceof Error ? err.message : String(err);
+        throw new Error(
+          `Ollama embedder at ${base} unreachable (is Ollama running?): ${cause}`,
+        );
+      }
       const body = await res.text();
       if (!res.ok) {
         throw new Error(`Ollama embed failed (${res.status})`);
