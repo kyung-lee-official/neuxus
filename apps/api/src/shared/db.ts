@@ -1,11 +1,7 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import postgres from "postgres";
 import { PrismaClient } from "../generated/prisma/client.ts";
-import {
-  apiKeyForSeedUser,
-  requireDatabaseUrl,
-  SEED_USER_IDS,
-} from "./config.ts";
+import { requireDatabaseUrl } from "./config.ts";
 
 export type AppUserRole = "admin" | "member";
 
@@ -493,14 +489,4 @@ export async function searchMemoriesByUserFTS(
     content: row.content as string,
     created_at: row.created_at as Date,
   }));
-}
-
-/** Upsert demo users into `app_users`; `haewon` is admin, others member. */
-export async function seedAppUsers(): Promise<AppUser[]> {
-  const seeded: AppUser[] = [];
-  for (const id of SEED_USER_IDS) {
-    const role = id === "haewon" ? "admin" : "member";
-    seeded.push(await upsertUser({ id, api_key: apiKeyForSeedUser(id), role }));
-  }
-  return seeded;
 }
