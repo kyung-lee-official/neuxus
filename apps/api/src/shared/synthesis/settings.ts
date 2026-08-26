@@ -1,4 +1,4 @@
-import { db } from "../db.ts";
+import { getPrisma } from "../db.ts";
 import {
   type ResolvedSynthesisSettings,
   resolveSynthesisSettings,
@@ -33,37 +33,18 @@ function positiveIntOrNull(value: number | null | undefined): number | null {
     : null;
 }
 
-function intColumn(value: unknown): number | null {
-  if (typeof value === "number" && Number.isInteger(value)) return value;
-  if (typeof value === "string" && /^-?\d+$/.test(value)) {
-    return Number.parseInt(value, 10);
-  }
-  return null;
-}
-
 async function fetchSynthesisRow(): Promise<SynthesisSettingsRow | null> {
-  const rows = await db()`
-    SELECT
-      provider,
-      synthesis_model,
-      base_url,
-      api_key,
-      max_tokens,
-      context_window_tokens
-    FROM app_synthesis_settings
-    WHERE id = ${SETTINGS_ID}
-    LIMIT 1
-  `;
-  const row = rows[0];
+  const row = await getPrisma().appSynthesisSettings.findUnique({
+    where: { id: SETTINGS_ID },
+  });
   if (!row) return null;
   return {
-    provider: typeof row.provider === "string" ? row.provider : null,
-    synthesisModel:
-      typeof row.synthesis_model === "string" ? row.synthesis_model : null,
-    baseUrl: typeof row.base_url === "string" ? row.base_url : null,
-    apiKey: typeof row.api_key === "string" ? row.api_key : null,
-    maxTokens: intColumn(row.max_tokens),
-    contextWindowTokens: intColumn(row.context_window_tokens),
+    provider: row.provider,
+    synthesisModel: row.synthesisModel,
+    baseUrl: row.baseUrl,
+    apiKey: row.apiKey,
+    maxTokens: row.maxTokens,
+    contextWindowTokens: row.contextWindowTokens,
   };
 }
 
@@ -78,33 +59,26 @@ export async function saveSynthesisSettings(
   const maxTokens = positiveIntOrNull(row.maxTokens);
   const contextWindowTokens = positiveIntOrNull(row.contextWindowTokens);
 
-  await db()`
-    INSERT INTO app_synthesis_settings (
-      id,
+  await getPrisma().appSynthesisSettings.upsert({
+    where: { id: SETTINGS_ID },
+    create: {
+      id: SETTINGS_ID,
       provider,
-      synthesis_model,
-      base_url,
-      api_key,
-      max_tokens,
-      context_window_tokens
-    )
-    VALUES (
-      ${SETTINGS_ID},
-      ${provider},
-      ${synthesisModel},
-      ${baseUrl},
-      ${apiKey},
-      ${maxTokens},
-      ${contextWindowTokens}
-    )
-    ON CONFLICT (id) DO UPDATE SET
-      provider = EXCLUDED.provider,
-      synthesis_model = EXCLUDED.synthesis_model,
-      base_url = EXCLUDED.base_url,
-      api_key = EXCLUDED.api_key,
-      max_tokens = EXCLUDED.max_tokens,
-      context_window_tokens = EXCLUDED.context_window_tokens
-  `;
+      synthesisModel,
+      baseUrl,
+      apiKey,
+      maxTokens,
+      contextWindowTokens,
+    },
+    update: {
+      provider,
+      synthesisModel,
+      baseUrl,
+      apiKey,
+      maxTokens,
+      contextWindowTokens,
+    },
+  });
 
   return loadSynthesisSettings();
 }

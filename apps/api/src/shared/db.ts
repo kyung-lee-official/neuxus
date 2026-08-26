@@ -42,7 +42,8 @@ export type AppSession = {
 
 let prisma: PrismaClient | null = null;
 
-function getPrisma(): PrismaClient {
+/** Process-wide Prisma client. Lazy-initialized; safe to import without a DB. */
+export function getPrisma(): PrismaClient {
   if (!prisma) {
     const adapter = new PrismaPg(requireDatabaseUrl());
     prisma = new PrismaClient({ adapter });
