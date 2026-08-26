@@ -485,7 +485,7 @@ export async function searchMemoriesByUser(
   const q = query.trim();
   if (q) {
     // Postgres full-text search via `to_tsvector`/`plainto_tsquery`.
-    // Prisma does not model this index, so we keep the raw query.
+    // Stays as raw SQL — Prisma does not model this index.
     const matched = await db()`
       SELECT id, user_id, slug, content, created_at
       FROM app_memories
@@ -513,13 +513,12 @@ export async function searchMemoriesByUser(
   return recent.map(mapMemory);
 }
 
-/** Upsert demo users into `app_users`; `haewon` is admin, others member. Drop legacy `bob`. */
+/** Upsert demo users into `app_users`; `haewon` is admin, others member. */
 export async function seedAppUsers(): Promise<AppUser[]> {
   const seeded: AppUser[] = [];
   for (const id of SEED_USER_IDS) {
     const role = id === "haewon" ? "admin" : "member";
     seeded.push(await upsertUser({ id, api_key: apiKeyForSeedUser(id), role }));
   }
-  await deleteUser("bob");
   return seeded;
 }
