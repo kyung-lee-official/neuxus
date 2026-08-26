@@ -1,10 +1,5 @@
-import { sql } from "bun";
 import { chunkify } from "../chunkify/chunkify.ts";
-
-type PageRow = {
-  id: string;
-  body: string;
-};
+import { getPrisma } from "../db.ts";
 
 /**
  * Re-chunk every page in `kb_pages`. Replaces each page's `kb_parents` and
@@ -18,52 +13,50 @@ export async function rechunkAllPages(): Promise<{
   pagesProcessed: number;
   pagesSkipped: number;
 }> {
-  const rows = await sql<PageRow[]>`
-    SELECT id, body FROM kb_pages
-  `;
+  const prisma = getPrisma();
+  const pages = await prisma.knowledgePage.findMany({
+    select: { id: true, body: true },
+  });
 
   let pagesProcessed = 0;
   let pagesSkipped = 0;
 
-  for (const row of rows) {
-    const chunks = chunkify(row.body);
-    await sql.begin(async (tx) => {
-      await tx`DELETE FROM kb_parents WHERE page_id = ${row.id}`;
-      for (const parent of chunks.parents) {
-        const parentId = `${row.id}:p:${parent.index}`;
-        await tx`
-          INSERT INTO kb_parents (
-            id, page_id, parent_index, text, start_offset, end_offset
-          )
-          VALUES (
-            ${parentId},
-            ${row.id},
-            ${parent.index},
-            ${parent.text},
-            ${parent.start},
-            ${parent.end}
-          )
-        `;
+  for (const page of pages) {
+    const chunks = chunkify(page.body);
+    const parentRows = chunks.parents.map((parent) => {
+      const id = `${page.id}:p:${parent.index}`;
+      return {
+        id,
+        pageId: page.id,
+        parentIndex: parent.index,
+        text: parent.text,
+        startOffset: parent.start,
+        endOffset: parent.end,
+      };
+    });
+    const childRows = chunks.children.map((child) => {
+      const parentId = `${page.id}:p:${child.parentIndex}`;
+      return {
+        id: `${parentId}:c:${child.index}`,
+        parentId,
+        pageId: page.id,
+        childIndex: child.index,
+        text: child.text,
+        startOffset: child.start,
+        endOffset: child.end,
+      };
+    });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.knowledgeParent.deleteMany({ where: { pageId: page.id } });
+      if (parentRows.length > 0) {
+        await tx.knowledgeParent.createMany({ data: parentRows });
       }
-      for (const child of chunks.children) {
-        const parentId = `${row.id}:p:${child.parentIndex}`;
-        const childId = `${parentId}:c:${child.index}`;
-        await tx`
-          INSERT INTO kb_children (
-            id, parent_id, page_id, child_index, text, start_offset, end_offset
-          )
-          VALUES (
-            ${childId},
-            ${parentId},
-            ${row.id},
-            ${child.index},
-            ${child.text},
-            ${child.start},
-            ${child.end}
-          )
-        `;
+      if (childRows.length > 0) {
+        await tx.knowledgeChild.createMany({ data: childRows });
       }
     });
+
     pagesProcessed += 1;
     if (chunks.parents.length === 0) pagesSkipped += 1;
   }
