@@ -124,8 +124,15 @@ describe("createMinimaxSynthesizer", () => {
       "https://api.minimaxi.com/anthropic/v1/messages",
     );
     expect(calls[0]?.headers.get("x-api-key")).toBe("secret");
-    const body = calls[0]?.body as { model: string };
+    const body = calls[0]?.body as {
+      model: string;
+      system: string;
+      messages: Array<{ role: string; content: Array<{ text: string }> }>;
+    };
     expect(body.model).toBe("MiniMax-M3");
+    expect(body.system).toMatch(/Answer ONLY the user's current question/);
+    expect(body.system).toMatch(/do NOT continue or repeat prior topics/);
+    expect(body.messages[0]?.content[0]?.text).toBe("q");
   });
 
   test("throws on HTTP error without the response body", async () => {

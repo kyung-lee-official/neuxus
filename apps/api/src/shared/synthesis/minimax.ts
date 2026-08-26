@@ -50,7 +50,10 @@ export function createMinimaxSynthesizer(
           max_tokens: settings.maxTokens,
           temperature: 1,
           system:
-            "You answer using only the context in the user message. If the provided sources do not contain the answer, say so clearly.",
+            "Answer ONLY the user's current question (the last line of the user message). " +
+            "Use the knowledge-base parents, personal memory, and recent conversation provided. " +
+            "Recent conversation is for understanding the user — do NOT continue or repeat prior topics unless the current question explicitly references them. " +
+            "If the knowledge base does not contain the answer, say so clearly.",
           messages: [
             { role: "user", content: [{ type: "text", text: prompt }] },
           ],
