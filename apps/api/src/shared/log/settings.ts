@@ -18,7 +18,8 @@ import {
 const SETTINGS_ID = "default";
 
 export type AdminLogSettings = {
-  sinks: readonly string[] | null;
+  /** Resolved sinks. Empty/null stored value falls back to `defaults.sinks`. */
+  sinks: readonly LogSinkValue[];
   queueSize: number | null;
   drainTimeoutMs: number | null;
   pretty: boolean | null;
@@ -84,8 +85,13 @@ export async function loadLogSettings(): Promise<ResolvedLogSettings> {
 }
 
 export async function adminLogSettings(): Promise<AdminLogSettings> {
+  const stored = storedLogSettings(await fetchLogRow());
   return {
-    ...storedLogSettings(await fetchLogRow()),
+    sinks:
+      (stored.sinks as readonly LogSinkValue[] | null) ?? LOG_DEFAULTS.sinks,
+    queueSize: stored.queueSize,
+    drainTimeoutMs: stored.drainTimeoutMs,
+    pretty: stored.pretty,
     defaults: {
       sinks: LOG_DEFAULTS.sinks,
       queueSize: LOG_DEFAULTS.queueSize,
