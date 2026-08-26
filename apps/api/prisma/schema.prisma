@@ -208,15 +208,15 @@ model AppLog {
 model AppLogSettings {
     id String @id @default("default")
 
-    /// Comma-separated sinks: `console`, `postgres`, or `console,postgres`.
-    /// `null` falls back to the app default.
-    sink           String?  @map("sink")
+    /// Sinks: any combination of `console` and `postgres`. Empty array
+    /// (`@default([])`) means "use app defaults".
+    sinks           String[] @default([])
     /// Bounded queue capacity for the postgres sink. `null` falls back.
-    queueSize      Int?     @map("queue_size")
+    queueSize       Int?     @map("queue_size")
     /// Drain budget (ms) for the worker on shutdown / `flushLogs()`.
-    drainTimeoutMs Int?     @map("drain_timeout_ms")
+    drainTimeoutMs  Int?     @map("drain_timeout_ms")
     /// Pretty-print logixlysia's stdout via pino-pretty. `null` falls back.
-    pretty         Boolean?
+    pretty          Boolean?
 
     @@map("app_log_settings")
 }
