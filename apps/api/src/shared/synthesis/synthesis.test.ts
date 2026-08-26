@@ -1,4 +1,6 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { getLogTransport, setLogTransport } from "../log/index.ts";
+import { PostgresTransport } from "../log/sinks/postgres.ts";
 import { fitPromptToWindow, maxPromptCharacters } from "./budget.ts";
 import {
   assertSynthesisBudget,
@@ -90,8 +92,15 @@ describe("createSynthesizer", () => {
 describe("createMinimaxSynthesizer", () => {
   const originalFetch = globalThis.fetch;
 
+  beforeEach(() => {
+    setLogTransport(new PostgresTransport());
+    getLogTransport().drain(10_000);
+  });
+
   afterEach(() => {
     globalThis.fetch = originalFetch;
+    setLogTransport(new PostgresTransport());
+    getLogTransport().drain(10_000);
   });
 
   test("POSTs Messages API without echoing the key on error", async () => {
@@ -147,5 +156,73 @@ describe("createMinimaxSynthesizer", () => {
     await expect(synthesizer.synthesize("q")).rejects.toThrow(
       "MiniMax messages failed (401)",
     );
+  });
+});
+
+describe("createSynthesizer logging wrapper", () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    setLogTransport(new PostgresTransport());
+    getLogTransport().drain(10_000);
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    setLogTransport(new PostgresTransport());
+    getLogTransport().drain(10_000);
+  });
+
+  test("logs the raw prompt and response on success", async () => {
+    globalThis.fetch = (async () =>
+      new Response(
+        JSON.stringify({
+          content: [{ type: "text", text: "the answer" }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      )) as unknown as typeof fetch;
+
+    const synthesizer = createSynthesizer({
+      ...resolveSynthesisSettings({ apiKey: "k" }),
+    });
+    await expect(synthesizer.synthesize("the prompt")).resolves.toBe(
+      "the answer",
+    );
+
+    const drained = getLogTransport().drain(10);
+    expect(drained).toHaveLength(1);
+    const record = drained[0]!;
+    expect(record.level).toBe("info");
+    expect(record.msg).toBe("synthesis ok");
+    expect(record.name).toBe("synthesis");
+    expect(record.meta.provider).toBe("minimax");
+    expect(record.meta.model).toBe(SYNTHESIS_DEFAULTS.synthesisModel);
+    expect(record.meta.maxTokens).toBe(SYNTHESIS_DEFAULTS.maxTokens);
+    expect(record.meta.promptChars).toBe("the prompt".length);
+    expect(record.meta.prompt).toBe("the prompt");
+    expect(record.meta.response).toBe("the answer");
+    expect(record.meta.status).toBe("ok");
+    expect(typeof record.meta.latencyMs).toBe("number");
+  });
+
+  test("logs the raw prompt and error message on failure", async () => {
+    globalThis.fetch = (async () =>
+      new Response("nope", { status: 401 })) as unknown as typeof fetch;
+
+    const synthesizer = createSynthesizer({
+      ...resolveSynthesisSettings({ apiKey: "k" }),
+    });
+    await expect(synthesizer.synthesize("the prompt")).rejects.toThrow(/401/);
+
+    const drained = getLogTransport().drain(10);
+    expect(drained).toHaveLength(1);
+    const record = drained[0]!;
+    expect(record.level).toBe("error");
+    expect(record.msg).toBe("synthesis error");
+    expect(record.name).toBe("synthesis");
+    expect(record.meta.prompt).toBe("the prompt");
+    expect(record.meta.status).toBe("error");
+    expect(record.meta.error).toMatch(/401/);
+    expect(record.meta.response).toBeUndefined();
   });
 });
