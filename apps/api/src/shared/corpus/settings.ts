@@ -1,4 +1,4 @@
-import { sql } from "bun";
+import { getPrisma } from "../db.ts";
 import {
   type CorpusSettingsRow,
   normalizeDocsRoot,
@@ -7,13 +7,6 @@ import {
 } from "./defaults.ts";
 
 const SETTINGS_ID = "default";
-
-type CorpusSettingsRowRaw = {
-  repo_url: string | null;
-  branch: string | null;
-  docs_root: string | null;
-  last_synced_sha: string | null;
-};
 
 function blankToNull(value: string | null | undefined): string | null {
   if (value == null) return null;
@@ -29,26 +22,20 @@ export async function saveCorpusSettings(
   const branch = blankToNull(row.branch);
   const docsRoot = normalizeDocsRoot(row.docsRoot) ?? null;
 
-  await sql`
-    INSERT INTO kb_corpus_settings (
-      id,
-      repo_url,
+  await getPrisma().knowledgeCorpusSettings.upsert({
+    where: { id: SETTINGS_ID },
+    create: {
+      id: SETTINGS_ID,
+      repoUrl,
       branch,
-      docs_root,
-      last_synced_sha
-    )
-    VALUES (
-      ${SETTINGS_ID},
-      ${repoUrl},
-      ${branch},
-      ${docsRoot},
-      NULL
-    )
-    ON CONFLICT (id) DO UPDATE SET
-      repo_url = EXCLUDED.repo_url,
-      branch = EXCLUDED.branch,
-      docs_root = EXCLUDED.docs_root
-  `;
+      docsRoot,
+    },
+    update: {
+      repoUrl,
+      branch,
+      docsRoot,
+    },
+  });
 
   return loadCorpusSettings();
 }
@@ -57,29 +44,29 @@ export async function saveCorpusSettings(
 export async function saveCorpusLastSyncedSha(
   sha: string,
 ): Promise<StoredCorpusSettings> {
-  await sql`
-    INSERT INTO kb_corpus_settings (id, last_synced_sha)
-    VALUES (${SETTINGS_ID}, ${sha})
-    ON CONFLICT (id) DO UPDATE SET
-      last_synced_sha = EXCLUDED.last_synced_sha
-  `;
+  await getPrisma().knowledgeCorpusSettings.upsert({
+    where: { id: SETTINGS_ID },
+    create: {
+      id: SETTINGS_ID,
+      lastSyncedSha: sha,
+    },
+    update: {
+      lastSyncedSha: sha,
+    },
+  });
   return loadCorpusSettings();
 }
 
 /** Load `kb_corpus_settings` id `default`. Nulls stay null. */
 export async function loadCorpusSettings(): Promise<StoredCorpusSettings> {
-  const rows = await sql<CorpusSettingsRowRaw[]>`
-    SELECT repo_url, branch, docs_root, last_synced_sha
-    FROM kb_corpus_settings
-    WHERE id = ${SETTINGS_ID}
-    LIMIT 1
-  `;
-  const row = rows[0];
+  const row = await getPrisma().knowledgeCorpusSettings.findUnique({
+    where: { id: SETTINGS_ID },
+  });
   if (!row) return storedCorpusSettings(null);
   return storedCorpusSettings({
-    repoUrl: row.repo_url,
+    repoUrl: row.repoUrl,
     branch: row.branch,
-    docsRoot: row.docs_root,
-    lastSyncedSha: row.last_synced_sha,
+    docsRoot: row.docsRoot,
+    lastSyncedSha: row.lastSyncedSha,
   });
 }
