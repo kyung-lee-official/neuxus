@@ -20,6 +20,8 @@ All JSON responses use `Content-Type: application/json`. Corpus sync events are 
 | `POST /server-setting/embed/reset`                                      | Bearer **admin**                                    |
 | `GET /server-setting/synthesis`, `PUT /server-setting/synthesis`        | Bearer **admin**                                    |
 | `POST /server-setting/synthesis/reset`                                  | Bearer **admin**                                    |
+| `GET /server-setting/log`, `PUT /server-setting/log`                    | Bearer **admin**                                    |
+| `POST /server-setting/log/reset`                                        | Bearer **admin**                                    |
 | `GET /server-setting/corpus`, `PUT /server-setting/corpus`              | Bearer **admin**                                    |
 | `POST /server-setting/corpus/clone`, `POST /server-setting/corpus/pull` | Bearer **admin**                                    |
 | `POST /server-setting/corpus/sync`                                      | Bearer **admin**                                    |

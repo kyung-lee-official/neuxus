@@ -1,6 +1,17 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { childLogger, getLogTransport, getRootLogger } from "./logger.ts";
+import {
+  LOG_DEFAULTS,
+  type LogSettingsRow,
+  resolveLogSettings,
+} from "./defaults.ts";
+import {
+  childLogger,
+  getLogTransport,
+  getRootLogger,
+  setLogTransport,
+} from "./logger.ts";
 import { BoundedQueue } from "./queue.ts";
+import { PostgresTransport } from "./sinks/postgres.ts";
 
 describe("BoundedQueue", () => {
   test("enqueues and drains in FIFO order", () => {
@@ -45,8 +56,7 @@ describe("BoundedQueue", () => {
 
 describe("AppLogger", () => {
   beforeEach(() => {
-    // The transport is a module-level singleton; tests share it. Each
-    // test should drain so the next sees a clean queue.
+    setLogTransport(new PostgresTransport());
     getLogTransport().drain(10_000);
   });
 
@@ -87,5 +97,65 @@ describe("AppLogger", () => {
     expect(record.name).toBe("auth");
     expect(record.meta.module).toBe("auth");
     expect(record.meta.step).toBe("verify");
+  });
+});
+
+describe("resolveLogSettings", () => {
+  test("returns LOG_DEFAULTS when row is null/undefined", () => {
+    expect(resolveLogSettings(null)).toEqual(LOG_DEFAULTS);
+    expect(resolveLogSettings(undefined)).toEqual(LOG_DEFAULTS);
+  });
+
+  test("returns LOG_DEFAULTS when every column is null", () => {
+    const row: LogSettingsRow = {
+      sinks: null,
+      queueSize: null,
+      drainTimeoutMs: null,
+      pretty: null,
+    };
+    expect(resolveLogSettings(row)).toEqual(LOG_DEFAULTS);
+  });
+
+  test("DB row overrides defaults; missing columns fall back", () => {
+    const row: LogSettingsRow = {
+      sinks: ["postgres"],
+      queueSize: 500,
+    };
+    const resolved = resolveLogSettings(row);
+    expect(resolved.sinks).toEqual(["postgres"]);
+    expect(resolved.queueSize).toBe(500);
+    expect(resolved.drainTimeoutMs).toBe(LOG_DEFAULTS.drainTimeoutMs);
+    expect(resolved.pretty).toBe(LOG_DEFAULTS.pretty);
+  });
+
+  test("ignores unknown sink values and dedupes", () => {
+    const row: LogSettingsRow = {
+      sinks: ["postgres", "postgres", "invalid", "console", ""],
+    };
+    expect(resolveLogSettings(row).sinks).toEqual(["postgres", "console"]);
+  });
+
+  test("empty / blank sink array falls back to defaults", () => {
+    expect(resolveLogSettings({ sinks: [] }).sinks).toEqual([
+      ...LOG_DEFAULTS.sinks,
+    ]);
+  });
+
+  test("non-positive integers fall back to defaults", () => {
+    expect(resolveLogSettings({ queueSize: 0 }).queueSize).toBe(
+      LOG_DEFAULTS.queueSize,
+    );
+    expect(resolveLogSettings({ queueSize: -5 }).queueSize).toBe(
+      LOG_DEFAULTS.queueSize,
+    );
+    expect(resolveLogSettings({ drainTimeoutMs: 0 }).drainTimeoutMs).toBe(
+      LOG_DEFAULTS.drainTimeoutMs,
+    );
+  });
+
+  test("non-boolean pretty falls back to default", () => {
+    expect(
+      resolveLogSettings({ pretty: "yes" as unknown as boolean }).pretty,
+    ).toBe(LOG_DEFAULTS.pretty);
   });
 });

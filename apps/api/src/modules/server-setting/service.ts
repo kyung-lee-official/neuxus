@@ -23,6 +23,12 @@ import {
   saveEmbedSettings,
 } from "../../shared/embed/index.ts";
 import {
+  adminLogSettings,
+  type LogSettingsRow,
+  resetLogSettings,
+  saveLogSettings,
+} from "../../shared/log/index.ts";
+import {
   adminSynthesisSettings,
   resetSynthesisSettings,
   type SynthesisSettingsRow,
@@ -80,6 +86,25 @@ export abstract class ServerSetting {
 
   static async resetSynthesis() {
     return resetSynthesisSettings();
+  }
+
+  static async getLog() {
+    return adminLogSettings();
+  }
+
+  static async putLog(body: ServerSettingModel["logBody"]) {
+    const row: LogSettingsRow = {
+      sinks: body.sinks,
+      queueSize: body.queueSize,
+      drainTimeoutMs: body.drainTimeoutMs,
+      pretty: body.pretty,
+    };
+    await saveLogSettings(row);
+    return adminLogSettings();
+  }
+
+  static async resetLog() {
+    return resetLogSettings();
   }
 
   static async getCorpus() {

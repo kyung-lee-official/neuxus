@@ -25,6 +25,11 @@ export type AppLogger = {
 
 let transport: PostgresTransport | null = null;
 
+/** Install the process-wide transport. Must be called before `startLogWorker()`. */
+export function setLogTransport(t: PostgresTransport): void {
+  transport = t;
+}
+
 export function getLogTransport(): PostgresTransport {
   if (!transport) transport = new PostgresTransport();
   return transport;

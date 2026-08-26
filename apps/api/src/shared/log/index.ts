@@ -9,9 +9,30 @@
  * ```
  */
 
+export {
+  LOG_DEFAULTS,
+  LOG_SINK_VALUES,
+  type LogSettingsRow,
+  type LogSinkValue,
+  type ResolvedLogSettings,
+  resolveLogSettings,
+  type StoredLogSettings,
+  storedLogSettings,
+} from "./defaults.ts";
 export type { AppLogger } from "./logger.ts";
-export { childLogger, getLogTransport, getRootLogger } from "./logger.ts";
+export {
+  childLogger,
+  getLogTransport,
+  getRootLogger,
+  setLogTransport,
+} from "./logger.ts";
 export { BoundedQueue } from "./queue.ts";
+export {
+  adminLogSettings,
+  loadLogSettings,
+  resetLogSettings,
+  saveLogSettings,
+} from "./settings.ts";
 export {
   flushLogs,
   installShutdownHandlers,

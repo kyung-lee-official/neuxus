@@ -12,22 +12,17 @@ import {
   getLogTransport,
   getRootLogger,
   installShutdownHandlers,
+  loadLogSettings,
+  PostgresTransport,
+  setLogTransport,
   startLogWorker,
 } from "./shared/log/index.ts";
 
-function parseLogSinks(): Set<string> {
-  const raw = process.env.LOG_SINK ?? "console";
-  return new Set(
-    raw
-      .split(",")
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0),
-  );
+const logSettings = await loadLogSettings();
+const usePostgres = logSettings.sinks.includes("postgres");
+if (usePostgres) {
+  setLogTransport(new PostgresTransport({ capacity: logSettings.queueSize }));
 }
-
-const logSinks = parseLogSinks();
-const usePostgres = logSinks.has("postgres");
-const postgresTransport = usePostgres ? getLogTransport() : null;
 
 const app = new Elysia()
   .use(
@@ -41,7 +36,8 @@ const app = new Elysia()
         verySlowThreshold: 1000,
         timestamp: { translateTime: "yyyy-mm-dd HH:MM:ss.SSS" },
         ip: true,
-        transports: postgresTransport ? [postgresTransport] : [],
+        pino: logSettings.pretty ? { prettyPrint: true } : undefined,
+        transports: usePostgres ? [getLogTransport()] : [],
       },
     }),
   )
@@ -75,7 +71,7 @@ const app = new Elysia()
 
 if (usePostgres) {
   startLogWorker();
-  installShutdownHandlers();
+  installShutdownHandlers(logSettings.drainTimeoutMs);
 }
 
 const log = getRootLogger();
@@ -90,7 +86,7 @@ log.info(
 );
 log.info("Knowledge: GET /knowledge/pages, GET /knowledge/pages/*");
 log.info(
-  "Server setting: GET/PUT /server-setting/embed, /synthesis, /corpus; POST /embed/reset, /synthesis/reset, /corpus/clone, /corpus/pull, /corpus/chunkify, /corpus/embed, /corpus/sync; GET /corpus/events; POST /nuke",
+  "Server setting: GET/PUT /server-setting/embed, /synthesis, /corpus, /log; POST /embed/reset, /synthesis/reset, /log/reset, /corpus/clone, /corpus/pull, /corpus/chunkify, /corpus/embed, /corpus/sync; GET /corpus/events; POST /nuke",
 );
 
 export type App = typeof app;

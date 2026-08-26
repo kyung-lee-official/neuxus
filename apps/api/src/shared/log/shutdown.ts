@@ -6,22 +6,12 @@
 
 import { getLogTransport } from "./logger.ts";
 
-const DEFAULT_TIMEOUT_MS = 2000;
-
-function envTimeoutMs(): number {
-  const raw = process.env.LOG_DRAIN_TIMEOUT_MS;
-  if (!raw) return DEFAULT_TIMEOUT_MS;
-  const n = Number.parseInt(raw, 10);
-  if (!Number.isFinite(n) || n < 0) return DEFAULT_TIMEOUT_MS;
-  return n;
-}
-
 export function startLogWorker(): void {
   getLogTransport().start();
 }
 
-export function flushLogs(timeoutMs?: number): Promise<void> {
-  return getLogTransport().flush(timeoutMs ?? envTimeoutMs());
+export function flushLogs(timeoutMs: number): Promise<void> {
+  return getLogTransport().flush(timeoutMs);
 }
 
 export function logStats(): {
@@ -34,14 +24,14 @@ export function logStats(): {
 
 let installed = false;
 
-export function installShutdownHandlers(): void {
+export function installShutdownHandlers(timeoutMs: number): void {
   if (installed) return;
   installed = true;
 
   const onSignal = (_signal: NodeJS.Signals) => {
     void (async () => {
       try {
-        await getLogTransport().flush(envTimeoutMs());
+        await getLogTransport().flush(timeoutMs);
       } catch {
         // flush() never throws; defensive catch.
       }

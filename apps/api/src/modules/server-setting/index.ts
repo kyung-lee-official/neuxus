@@ -25,6 +25,16 @@ export const serverSetting = new Elysia({ prefix: "/server-setting" })
   .post("/synthesis/reset", () => ServerSetting.resetSynthesis(), {
     requireAdmin: true,
   })
+  .get("/log", () => ServerSetting.getLog(), {
+    requireAdmin: true,
+  })
+  .put("/log", ({ body }) => ServerSetting.putLog(body), {
+    requireAdmin: true,
+    body: ServerSettingModel.logBody,
+  })
+  .post("/log/reset", () => ServerSetting.resetLog(), {
+    requireAdmin: true,
+  })
   .get("/corpus", () => ServerSetting.getCorpus(), {
     requireAdmin: true,
   })

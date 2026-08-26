@@ -24,6 +24,15 @@ export const ServerSettingModel = {
     branch: t.Union([t.String(), t.Null()]),
     docsRoot: t.Union([t.String(), t.Null()]),
   }),
+  logBody: t.Object({
+    sinks: t.Union([
+      t.Array(t.Union([t.Literal("console"), t.Literal("postgres")])),
+      t.Null(),
+    ]),
+    queueSize: t.Union([t.Integer({ minimum: 1 }), t.Null()]),
+    drainTimeoutMs: t.Union([t.Integer({ minimum: 1 }), t.Null()]),
+    pretty: t.Union([t.Boolean(), t.Null()]),
+  }),
 } as const;
 
 export type ServerSettingModel = {
