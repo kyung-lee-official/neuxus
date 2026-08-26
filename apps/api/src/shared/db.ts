@@ -1,5 +1,5 @@
 import { PrismaPg } from "@prisma/adapter-pg";
-import postgres from "postgres";
+import { SQL, sql } from "bun";
 import { PrismaClient } from "../generated/prisma/client.ts";
 import { requireDatabaseUrl } from "./config.ts";
 
@@ -119,29 +119,28 @@ function mapMemory(row: {
   };
 }
 
-let sql: ReturnType<typeof postgres> | null = null;
+let sqlPool: SQL | null = null;
 
 /**
- * Raw `postgres` connection accessor. Kept for non-vector modules that
- * still use raw SQL (settings / corpus / knowledge CRUD). Vector and
- * tsvector paths also rely on this until they migrate. New code should
- * prefer the Prisma client via `import { prisma } from "shared/db.ts"`.
+ * Open (once) a dedicated Postgres pool used by `wipePublicSchema`.
+ * The rest of the codebase uses Bun's built-in `sql` singleton directly.
  */
-export function db(): ReturnType<typeof postgres> {
-  if (!sql) {
-    sql = postgres(requireDatabaseUrl(), { max: 10 });
+function wipePool(): SQL {
+  if (!sqlPool) {
+    sqlPool = new SQL({ url: requireDatabaseUrl(), max: 1 });
   }
-  return sql;
+  return sqlPool;
 }
 
+/** Close both Prisma and the wipe-only pool. Idempotent. */
 export async function closeDb(): Promise<void> {
-  if (sql) {
-    await sql.end({ timeout: 5 });
-    sql = null;
-  }
   if (prisma) {
     await prisma.$disconnect();
     prisma = null;
+  }
+  if (sqlPool) {
+    await sqlPool.close({ timeout: 5 });
+    sqlPool = null;
   }
 }
 
@@ -153,7 +152,7 @@ export type NukeTarget = "app";
  * schema-level operations.
  */
 async function wipePublicSchema(connectionString: string): Promise<void> {
-  const s = postgres(connectionString, { max: 1 });
+  const s = new SQL({ url: connectionString, max: 1 });
   try {
     // Drop non-core extensions first (e.g. vector), then the whole public schema.
     await s.unsafe(`
@@ -174,7 +173,7 @@ async function wipePublicSchema(connectionString: string): Promise<void> {
     await s.unsafe("GRANT ALL ON SCHEMA public TO CURRENT_USER");
     await s.unsafe("GRANT ALL ON SCHEMA public TO public");
   } finally {
-    await s.end({ timeout: 5 });
+    await s.close({ timeout: 5 });
   }
 }
 
@@ -461,6 +460,15 @@ export async function findMessagesForUser(
   return rows.map(mapMessage);
 }
 
+type MemoryRow = {
+  /** Postgres `bigint` is returned as string by default in Bun's `sql`. */
+  id: string;
+  user_id: string;
+  slug: string;
+  content: string;
+  created_at: Date;
+};
+
 /**
  * Postgres full-text search over a user's memories via
  * `to_tsvector`/`plainto_tsquery`. Returns up to `limit` matches,
@@ -474,7 +482,7 @@ export async function searchMemoriesByUserFTS(
   query: string,
   limit: number,
 ): Promise<AppMemory[]> {
-  const matched = await db()`
+  const matched = await sql<MemoryRow[]>`
     SELECT id, user_id, slug, content, created_at
     FROM app_memories
     WHERE user_id = ${userId}
@@ -484,9 +492,9 @@ export async function searchMemoriesByUserFTS(
   `;
   return matched.map((row) => ({
     id: Number(row.id),
-    user_id: row.user_id as string,
-    slug: row.slug as string,
-    content: row.content as string,
-    created_at: row.created_at as Date,
+    user_id: row.user_id,
+    slug: row.slug,
+    content: row.content,
+    created_at: row.created_at,
   }));
 }

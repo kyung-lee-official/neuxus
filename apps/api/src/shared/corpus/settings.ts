@@ -1,4 +1,4 @@
-import { db } from "../db.ts";
+import { sql } from "bun";
 import {
   type CorpusSettingsRow,
   normalizeDocsRoot,
@@ -7,6 +7,13 @@ import {
 } from "./defaults.ts";
 
 const SETTINGS_ID = "default";
+
+type CorpusSettingsRowRaw = {
+  repo_url: string | null;
+  branch: string | null;
+  docs_root: string | null;
+  last_synced_sha: string | null;
+};
 
 function blankToNull(value: string | null | undefined): string | null {
   if (value == null) return null;
@@ -22,7 +29,7 @@ export async function saveCorpusSettings(
   const branch = blankToNull(row.branch);
   const docsRoot = normalizeDocsRoot(row.docsRoot) ?? null;
 
-  await db()`
+  await sql`
     INSERT INTO kb_corpus_settings (
       id,
       repo_url,
@@ -50,7 +57,7 @@ export async function saveCorpusSettings(
 export async function saveCorpusLastSyncedSha(
   sha: string,
 ): Promise<StoredCorpusSettings> {
-  await db()`
+  await sql`
     INSERT INTO kb_corpus_settings (id, last_synced_sha)
     VALUES (${SETTINGS_ID}, ${sha})
     ON CONFLICT (id) DO UPDATE SET
@@ -61,7 +68,7 @@ export async function saveCorpusLastSyncedSha(
 
 /** Load `kb_corpus_settings` id `default`. Nulls stay null. */
 export async function loadCorpusSettings(): Promise<StoredCorpusSettings> {
-  const rows = await db()`
+  const rows = await sql<CorpusSettingsRowRaw[]>`
     SELECT repo_url, branch, docs_root, last_synced_sha
     FROM kb_corpus_settings
     WHERE id = ${SETTINGS_ID}
@@ -70,10 +77,9 @@ export async function loadCorpusSettings(): Promise<StoredCorpusSettings> {
   const row = rows[0];
   if (!row) return storedCorpusSettings(null);
   return storedCorpusSettings({
-    repoUrl: typeof row.repo_url === "string" ? row.repo_url : null,
-    branch: typeof row.branch === "string" ? row.branch : null,
-    docsRoot: typeof row.docs_root === "string" ? row.docs_root : null,
-    lastSyncedSha:
-      typeof row.last_synced_sha === "string" ? row.last_synced_sha : null,
+    repoUrl: row.repo_url,
+    branch: row.branch,
+    docsRoot: row.docs_root,
+    lastSyncedSha: row.last_synced_sha,
   });
 }

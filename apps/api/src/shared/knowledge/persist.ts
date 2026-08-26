@@ -1,5 +1,5 @@
+import { sql } from "bun";
 import type { ChunkifyResult } from "../chunkify/index.ts";
-import { db } from "../db.ts";
 import { pageContentHash } from "./hash.ts";
 
 export type PersistKnowledgePageInput = {
@@ -18,11 +18,15 @@ export type PersistKnowledgePageResult = {
   skipped: boolean;
 };
 
+type HashRow = {
+  content_hash: string | null;
+};
+
 /** Stored `kb_pages.content_hash`, or null if the page is missing. */
 export async function findPageContentHash(
   pageId: string,
 ): Promise<string | null> {
-  const rows = await db()`
+  const rows = await sql<HashRow[]>`
     SELECT content_hash FROM kb_pages WHERE id = ${pageId} LIMIT 1
   `;
   const hash = rows[0]?.content_hash;
@@ -30,7 +34,7 @@ export async function findPageContentHash(
 }
 
 /**
- * Upsert `kb_pages` and replace that page’s parent/child tree, unless
+ * Upsert `kb_pages` and replace that page's parent/child tree, unless
  * `content_hash` already matches (skip gate — no rewrite, no re-chunk needed).
  * Embeddings stay null until a later embed pass.
  * @see docs/modern-knowledge-base-design/02-ingest.md
@@ -51,7 +55,6 @@ export async function persistKnowledgePage(
     return { contentHash, skipped: true };
   }
 
-  const sql = db();
   await sql.begin(async (tx) => {
     await tx`
       INSERT INTO kb_pages (
@@ -128,7 +131,6 @@ export async function persistKnowledgePage(
 export async function deleteKnowledgePagesMissingSourcePaths(
   keepSourcePaths: string[],
 ): Promise<void> {
-  const sql = db();
   if (keepSourcePaths.length === 0) {
     await sql`DELETE FROM kb_pages WHERE source_path IS NOT NULL`;
     return;

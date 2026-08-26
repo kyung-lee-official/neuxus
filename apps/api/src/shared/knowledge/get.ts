@@ -1,6 +1,6 @@
-import { db } from "../db.ts";
+import { sql } from "bun";
 import { isoFromDate } from "../serialize.ts";
-import { intOrNull, tagsFromRow } from "./row.ts";
+import { tagsFromRow } from "./row.ts";
 
 export type KnowledgeChildInspect = {
   id: string;
@@ -35,14 +35,45 @@ export type KnowledgePageDetail = {
   parents: KnowledgeParentInspect[];
 };
 
+type PageRow = {
+  id: string;
+  slug: string;
+  title: string | null;
+  type: string | null;
+  tags: string[];
+  body: string | null;
+  source_path: string | null;
+  content_hash: string | null;
+  updated_at: Date | null;
+};
+
+type ParentRow = {
+  id: string;
+  parent_index: number;
+  text: string | null;
+  start_offset: number | null;
+  end_offset: number | null;
+};
+
+type ChildRow = {
+  id: string;
+  parent_id: string;
+  child_index: number;
+  text: string | null;
+  start_offset: number | null;
+  end_offset: number | null;
+  embedding_model: string | null;
+  embedded_at: Date | null;
+  embedded: boolean;
+};
+
 /**
  * One page plus parent/child tree for admin inspect. No embedding vectors.
  */
 export async function findKnowledgePageById(
   pageId: string,
 ): Promise<KnowledgePageDetail | null> {
-  const sql = db();
-  const pages = await sql`
+  const pages = await sql<PageRow[]>`
     SELECT
       id, slug, title, type, tags, body, source_path, content_hash, updated_at
     FROM kb_pages
@@ -52,14 +83,14 @@ export async function findKnowledgePageById(
   const page = pages[0];
   if (!page) return null;
 
-  const parentRows = await sql`
+  const parentRows = await sql<ParentRow[]>`
     SELECT id, parent_index, text, start_offset, end_offset
     FROM kb_parents
     WHERE page_id = ${pageId}
     ORDER BY parent_index
   `;
 
-  const childRows = await sql`
+  const childRows = await sql<ChildRow[]>`
     SELECT
       id,
       parent_id,
@@ -77,46 +108,43 @@ export async function findKnowledgePageById(
 
   const childrenByParentId = new Map<string, KnowledgeChildInspect[]>();
   for (const row of childRows) {
-    const parentId = String(row.parent_id);
-    const list = childrenByParentId.get(parentId) ?? [];
+    const list = childrenByParentId.get(row.parent_id) ?? [];
     list.push({
-      id: String(row.id),
-      childIndex: Number(row.child_index),
-      text: String(row.text ?? ""),
-      startOffset: intOrNull(row.start_offset),
-      endOffset: intOrNull(row.end_offset),
-      embeddingModel:
-        typeof row.embedding_model === "string" ? row.embedding_model : null,
-      embeddedAt: isoFromDate(row.embedded_at as Date | string | null),
-      embedded: Boolean(row.embedded),
+      id: row.id,
+      childIndex: row.child_index,
+      text: row.text ?? "",
+      startOffset: row.start_offset,
+      endOffset: row.end_offset,
+      embeddingModel: row.embedding_model,
+      embeddedAt: isoFromDate(row.embedded_at),
+      embedded: row.embedded,
     });
-    childrenByParentId.set(parentId, list);
+    childrenByParentId.set(row.parent_id, list);
   }
 
   const parents: KnowledgeParentInspect[] = parentRows.map((row) => {
-    const id = String(row.id);
-    const children = childrenByParentId.get(id) ?? [];
+    const children = (childrenByParentId.get(row.id) ?? []).slice();
     children.sort((a, b) => a.childIndex - b.childIndex);
     return {
-      id,
-      parentIndex: Number(row.parent_index),
-      text: String(row.text ?? ""),
-      startOffset: intOrNull(row.start_offset),
-      endOffset: intOrNull(row.end_offset),
+      id: row.id,
+      parentIndex: row.parent_index,
+      text: row.text ?? "",
+      startOffset: row.start_offset,
+      endOffset: row.end_offset,
       children,
     };
   });
 
   return {
-    id: String(page.id),
-    slug: String(page.slug),
-    title: String(page.title ?? ""),
-    type: typeof page.type === "string" ? page.type : null,
+    id: page.id,
+    slug: page.slug,
+    title: page.title ?? "",
+    type: page.type,
     tags: tagsFromRow(page.tags),
-    body: String(page.body ?? ""),
-    sourcePath: typeof page.source_path === "string" ? page.source_path : null,
-    contentHash: String(page.content_hash ?? ""),
-    updatedAt: isoFromDate(page.updated_at as Date | string | null),
+    body: page.body ?? "",
+    sourcePath: page.source_path,
+    contentHash: page.content_hash ?? "",
+    updatedAt: isoFromDate(page.updated_at),
     parents,
   };
 }

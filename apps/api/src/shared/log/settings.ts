@@ -4,7 +4,7 @@
  * columns, code defaults in `LOG_DEFAULTS` apply when a column is null.
  */
 
-import { db } from "../db.ts";
+import { sql } from "bun";
 import {
   LOG_DEFAULTS,
   LOG_SINK_VALUES,
@@ -63,8 +63,15 @@ function boolColumn(value: unknown): boolean | null {
   return null;
 }
 
+type LogSettingsRowRaw = {
+  sinks: string[];
+  queue_size: number;
+  drain_timeout_ms: number;
+  pretty: boolean;
+};
+
 async function fetchLogRow(): Promise<LogSettingsRow | null> {
-  const rows = await db()`
+  const rows = await sql<LogSettingsRowRaw[]>`
     SELECT sinks, queue_size, drain_timeout_ms, pretty
     FROM app_log_settings
     WHERE id = ${SETTINGS_ID}
@@ -139,7 +146,7 @@ export async function saveLogSettings(
 
   const sinksValue = sinks.length > 0 ? sinks : null;
 
-  await db()`
+  await sql`
     INSERT INTO app_log_settings (id, sinks, queue_size, drain_timeout_ms, pretty)
     VALUES (
       ${SETTINGS_ID},

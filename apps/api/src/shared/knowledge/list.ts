@@ -1,4 +1,4 @@
-import { db } from "../db.ts";
+import { sql } from "bun";
 import { isoFromDate } from "../serialize.ts";
 import { tagsFromRow } from "./row.ts";
 
@@ -15,9 +15,22 @@ export type KnowledgePageListItem = {
   childCount: number;
 };
 
+type PageRow = {
+  id: string;
+  slug: string;
+  title: string | null;
+  type: string | null;
+  tags: string[];
+  source_path: string | null;
+  content_hash: string | null;
+  updated_at: Date | null;
+  parent_count: number;
+  child_count: number;
+};
+
 /** All `kb_pages` for admin inspect. No `body`. */
 export async function listKnowledgePages(): Promise<KnowledgePageListItem[]> {
-  const rows = await db()`
+  const rows = await sql<PageRow[]>`
     SELECT
       p.id,
       p.slug,
@@ -38,15 +51,15 @@ export async function listKnowledgePages(): Promise<KnowledgePageListItem[]> {
   `;
 
   return rows.map((row) => ({
-    id: String(row.id),
-    slug: String(row.slug),
-    title: String(row.title ?? ""),
-    type: typeof row.type === "string" ? row.type : null,
+    id: row.id,
+    slug: row.slug,
+    title: row.title ?? "",
+    type: row.type,
     tags: tagsFromRow(row.tags),
-    sourcePath: typeof row.source_path === "string" ? row.source_path : null,
-    contentHash: String(row.content_hash ?? ""),
-    updatedAt: isoFromDate(row.updated_at as Date | string | null),
-    parentCount: Number(row.parent_count ?? 0),
-    childCount: Number(row.child_count ?? 0),
+    sourcePath: row.source_path,
+    contentHash: row.content_hash ?? "",
+    updatedAt: isoFromDate(row.updated_at),
+    parentCount: row.parent_count,
+    childCount: row.child_count,
   }));
 }

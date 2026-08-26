@@ -1,5 +1,5 @@
+import { sql } from "bun";
 import { chunkify } from "../chunkify/chunkify.ts";
-import { db } from "../db.ts";
 
 type PageRow = {
   id: string;
@@ -18,11 +18,10 @@ export async function rechunkAllPages(): Promise<{
   pagesProcessed: number;
   pagesSkipped: number;
 }> {
-  const rows = await db()<PageRow[]>`
+  const rows = await sql<PageRow[]>`
     SELECT id, body FROM kb_pages
   `;
 
-  const sql = db();
   let pagesProcessed = 0;
   let pagesSkipped = 0;
 

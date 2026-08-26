@@ -1,4 +1,5 @@
-import { db } from "../db.ts";
+import { sql } from "bun";
+import { getPrisma } from "../db.ts";
 import { createEmbedder } from "./provider.ts";
 import { loadEmbedSettings } from "./settings.ts";
 import type { Embedder } from "./types.ts";
@@ -82,30 +83,21 @@ export async function embedStaleChildren(
 ): Promise<EmbedStaleChildrenResult> {
   const settings = await loadEmbedSettings();
   const embedder = options?.embedder ?? createEmbedder(settings);
-  const sql = db();
   const currentModel = settings.embeddingModel;
 
-  const rows = options?.pageId
-    ? await sql`
-        SELECT id, text
-        FROM kb_children
-        WHERE page_id = ${options.pageId}
-          AND (
-            embedding IS NULL
-            OR embedding_model IS DISTINCT FROM ${currentModel}
-          )
-      `
-    : await sql`
-        SELECT id, text
-        FROM kb_children
-        WHERE
-          embedding IS NULL
-          OR embedding_model IS DISTINCT FROM ${currentModel}
-      `;
+  const rows = await getPrisma().knowledgeChild.findMany({
+    where: {
+      ...(options?.pageId ? { pageId: options.pageId } : {}),
+      // `embedding IS NULL` ⇒ `embeddingModel IS NULL` (always set together);
+      // otherwise pick up stale rows whose model differs.
+      OR: [{ embeddingModel: null }, { embeddingModel: { not: currentModel } }],
+    },
+    select: { id: true, text: true },
+  });
 
   const children: EmbedChildRow[] = rows.map((row) => ({
-    id: String(row.id),
-    text: String(row.text ?? ""),
+    id: row.id,
+    text: row.text ?? "",
   }));
 
   const result = await embedChildRows(children, {
@@ -113,6 +105,7 @@ export async function embedStaleChildren(
     failFast: options?.failFast,
     writeVector: async (id, vector) => {
       const literal = pgvectorLiteral(vector);
+      // Vector write stays raw — `kb_children.embedding` is pgvector.
       await sql`
         UPDATE kb_children
         SET

@@ -1,4 +1,4 @@
-import { db } from "../db.ts";
+import { sql } from "bun";
 import {
   createEmbedder,
   type Embedder,
@@ -21,6 +21,22 @@ export type RetrieveParentsByQuestionOptions = RetrieveOptions & {
 export type RetrieveParentsByQuestionResult = {
   currentModel: string;
   parents: RetrievedParent[];
+};
+
+type ChildHitRow = {
+  child_id: string;
+  parent_id: string;
+  page_id: string;
+  child_text: string | null;
+  score: number | string;
+};
+
+type ParentRow = {
+  id: string;
+  page_id: string;
+  text: string | null;
+  slug: string;
+  title: string | null;
 };
 
 function numberFromSql(value: unknown): number {
@@ -58,8 +74,7 @@ export async function retrieveParentsByQuestion(
   }
 
   const literal = pgvectorLiteral(vector);
-  const sql = db();
-  const childRows = await sql`
+  const childRows = await sql<ChildHitRow[]>`
     SELECT
       c.id AS child_id,
       c.parent_id,
@@ -74,10 +89,10 @@ export async function retrieveParentsByQuestion(
   `;
 
   const hits: ChildHit[] = childRows.map((row) => ({
-    childId: String(row.child_id),
-    parentId: String(row.parent_id),
-    pageId: String(row.page_id),
-    childText: String(row.child_text ?? ""),
+    childId: row.child_id,
+    parentId: row.parent_id,
+    pageId: row.page_id,
+    childText: row.child_text ?? "",
     score: numberFromSql(row.score),
   }));
 
@@ -87,7 +102,7 @@ export async function retrieveParentsByQuestion(
   }
 
   const scores = scoreByParentFromHits(hits);
-  const parentRows = await sql`
+  const parentRows = await sql<ParentRow[]>`
     SELECT p.id, p.page_id, p.text, pg.slug, pg.title
     FROM kb_parents p
     JOIN kb_pages pg ON pg.id = p.page_id
@@ -96,14 +111,14 @@ export async function retrieveParentsByQuestion(
 
   const byId = new Map(
     parentRows.map((row) => [
-      String(row.id),
+      row.id,
       {
-        parentId: String(row.id),
-        pageId: String(row.page_id),
-        slug: String(row.slug),
-        title: String(row.title),
-        text: String(row.text ?? ""),
-        score: scores.get(String(row.id)) ?? 0,
+        parentId: row.id,
+        pageId: row.page_id,
+        slug: row.slug,
+        title: row.title ?? "",
+        text: row.text ?? "",
+        score: scores.get(row.id) ?? 0,
       } satisfies RetrievedParent,
     ]),
   );

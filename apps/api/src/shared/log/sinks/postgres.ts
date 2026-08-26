@@ -10,8 +10,8 @@
  */
 
 import { hostname } from "node:os";
+import { sql } from "bun";
 import type { LogLevel, Transport } from "logixlysia";
-import { db } from "../../db.ts";
 import { BoundedQueue, type QueueStats } from "../queue.ts";
 
 const QUEUE_CAPACITY_DEFAULT = 1000;
@@ -163,7 +163,7 @@ export class PostgresTransport implements Transport {
     };
     const metaJson = JSON.stringify(meta);
     try {
-      await db()`
+      await sql`
         INSERT INTO app_log (level, msg, name, meta)
         VALUES (${record.level}, ${record.msg}, ${record.name}, ${metaJson}::jsonb)
       `;
