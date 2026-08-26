@@ -441,77 +441,58 @@ export async function listSessionsForUser(
   return rows.map(mapSession);
 }
 
-export type MessagePage = {
-  items: AppMessage[];
-  total: number;
-  page: number;
-  pageSize: number;
-};
-
-/** Chat messages for one user (newest first), paginated. */
-export async function listMessagesForUser(
-  userId: string,
-  options?: { page?: number; pageSize?: number },
-): Promise<MessagePage> {
-  const pageSize = Math.min(Math.max(options?.pageSize ?? 50, 1), 200);
-  const page = Math.max(options?.page ?? 1, 1);
-  const skip = (page - 1) * pageSize;
-
-  const [total, rows] = await Promise.all([
-    getPrisma().message.count({
-      where: { session: { userId } },
-    }),
-    getPrisma().message.findMany({
-      where: { session: { userId } },
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: pageSize,
-      skip,
-    }),
-  ]);
-
-  return {
-    items: rows.map(mapMessage),
-    total,
-    page,
-    pageSize,
-  };
+/** Count chat messages across all sessions for one user. */
+export async function countMessagesForUser(userId: string): Promise<number> {
+  return getPrisma().message.count({
+    where: { session: { userId } },
+  });
 }
 
-/** Retrieve memories for one user only (hard `user_id` filter). */
-export async function searchMemoriesByUser(
+/**
+ * Page of chat messages for one user (newest first). Pagination is
+ * the caller's concern — `skip`/`take` in. Order: `createdAt DESC, id DESC`.
+ */
+export async function findMessagesForUser(
+  userId: string,
+  options: { skip: number; take: number },
+): Promise<AppMessage[]> {
+  const rows = await getPrisma().message.findMany({
+    where: { session: { userId } },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: options.take,
+    skip: options.skip,
+  });
+  return rows.map(mapMessage);
+}
+
+/**
+ * Postgres full-text search over a user's memories via
+ * `to_tsvector`/`plainto_tsquery`. Returns up to `limit` matches,
+ * newest first. Stays raw — Prisma does not model this index.
+ *
+ * Search policy (trim input, try FTS first, fall back to recent)
+ * lives in the calling service.
+ */
+export async function searchMemoriesByUserFTS(
   userId: string,
   query: string,
-  limit = 8,
+  limit: number,
 ): Promise<AppMemory[]> {
-  const q = query.trim();
-  if (q) {
-    // Postgres full-text search via `to_tsvector`/`plainto_tsquery`.
-    // Stays as raw SQL — Prisma does not model this index.
-    const matched = await db()`
-      SELECT id, user_id, slug, content, created_at
-      FROM app_memories
-      WHERE user_id = ${userId}
-        AND to_tsvector('english', content) @@ plainto_tsquery('english', ${q})
-      ORDER BY created_at DESC
-      LIMIT ${limit}
-    `;
-    if (matched.length > 0) {
-      return matched.map((row) => ({
-        id: Number(row.id),
-        user_id: row.user_id as string,
-        slug: row.slug as string,
-        content: row.content as string,
-        created_at: row.created_at as Date,
-      }));
-    }
-  }
-
-  const recent = await getPrisma().memory.findMany({
-    where: { userId },
-    orderBy: { createdAt: "desc" },
-    take: limit,
-  });
-  return recent.map(mapMemory);
+  const matched = await db()`
+    SELECT id, user_id, slug, content, created_at
+    FROM app_memories
+    WHERE user_id = ${userId}
+      AND to_tsvector('english', content) @@ plainto_tsquery('english', ${query})
+    ORDER BY created_at DESC
+    LIMIT ${limit}
+  `;
+  return matched.map((row) => ({
+    id: Number(row.id),
+    user_id: row.user_id as string,
+    slug: row.slug as string,
+    content: row.content as string,
+    created_at: row.created_at as Date,
+  }));
 }
 
 /** Upsert demo users into `app_users`; `haewon` is admin, others member. */
