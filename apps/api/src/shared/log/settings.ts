@@ -131,13 +131,13 @@ export async function saveLogSettings(
   const drainTimeoutMs = normalizePositiveInt(row.drainTimeoutMs);
   const pretty = normalizeBool(row.pretty);
 
-  const sinksArray = sinks.length > 0 ? sinks : null;
+  const sinksValue = sinks.length > 0 ? sinks : null;
 
   await db()`
     INSERT INTO app_log_settings (id, sinks, queue_size, drain_timeout_ms, pretty)
     VALUES (
       ${SETTINGS_ID},
-      ${sinksArray}::text[],
+      ${sinksValue}::text[],
       ${queueSize},
       ${drainTimeoutMs},
       ${pretty}
