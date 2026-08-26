@@ -1,6 +1,5 @@
 import { cors } from "@elysiajs/cors";
 import { Elysia, status } from "elysia";
-import logixlysia from "logixlysia";
 import { health } from "./modules/health/index.ts";
 import { knowledge } from "./modules/knowledge/index.ts";
 import { query } from "./modules/query/index.ts";
@@ -9,7 +8,6 @@ import { sessions } from "./modules/sessions/index.ts";
 import { users } from "./modules/users/index.ts";
 import { serverPort } from "./shared/config.ts";
 import {
-  getLogTransport,
   installShutdownHandlers,
   loadLogSettings,
   PostgresTransport,
@@ -24,22 +22,6 @@ if (usePostgres) {
 }
 
 const app = new Elysia()
-  .use(
-    logixlysia({
-      config: {
-        service: "neuxus-api",
-        showStartupMessage: false,
-        showContextTree: false,
-        contextDepth: 0,
-        slowThreshold: 500,
-        verySlowThreshold: 1000,
-        timestamp: { translateTime: "yyyy-mm-dd HH:MM:ss.SSS" },
-        ip: true,
-        pino: logSettings.pretty ? { prettyPrint: true } : undefined,
-        transports: usePostgres ? [getLogTransport()] : [],
-      },
-    }),
-  )
   .use(
     cors({
       origin: true,
