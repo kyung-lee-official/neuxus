@@ -10,7 +10,6 @@ import { users } from "./modules/users/index.ts";
 import { serverPort } from "./shared/config.ts";
 import {
   getLogTransport,
-  getRootLogger,
   installShutdownHandlers,
   loadLogSettings,
   PostgresTransport,
@@ -74,18 +73,15 @@ if (usePostgres) {
   installShutdownHandlers(logSettings.drainTimeoutMs);
 }
 
-const log = getRootLogger();
-log.info(`neuxus API listening on http://localhost:${app.server?.port}`, {
-  port: app.server?.port,
-});
-log.info(
+console.log(`neuxus API listening on http://localhost:${app.server?.port}`);
+console.log(
   "User CRUD: GET/POST /users, GET/PATCH/DELETE /users/:id, GET /users/:id/data, DELETE /users/:id/memories/:memoryId",
 );
-log.info(
+console.log(
   "Sessions: GET/POST /sessions, PATCH /sessions/:id; POST /query accepts body.sessionId",
 );
-log.info("Knowledge: GET /knowledge/pages, GET /knowledge/pages/*");
-log.info(
+console.log("Knowledge: GET /knowledge/pages, GET /knowledge/pages/*");
+console.log(
   "Server setting: GET/PUT /server-setting/embed, /synthesis, /corpus, /log; POST /embed/reset, /synthesis/reset, /log/reset, /corpus/clone, /corpus/pull, /corpus/chunkify, /corpus/embed, /corpus/sync; GET /corpus/events; POST /nuke",
 );
 
