@@ -1,4 +1,4 @@
-import { db } from "../db.ts";
+import { getPrisma } from "../db.ts";
 import {
   EMBED_DEFAULTS,
   type EmbedSettingsRow,
@@ -33,21 +33,16 @@ function portOrNull(value: number | null | undefined): number | null {
 }
 
 async function fetchEmbedRow(): Promise<EmbedSettingsRow | null> {
-  const rows = await db()`
-    SELECT embedding_model, provider, host, port, api_key
-    FROM kb_embed_settings
-    WHERE id = ${SETTINGS_ID}
-    LIMIT 1
-  `;
-  const row = rows[0];
+  const row = await getPrisma().knowledgeEmbedSettings.findUnique({
+    where: { id: SETTINGS_ID },
+  });
   if (!row) return null;
   return {
-    embeddingModel:
-      typeof row.embedding_model === "string" ? row.embedding_model : null,
-    provider: typeof row.provider === "string" ? row.provider : null,
-    host: typeof row.host === "string" ? row.host : null,
-    port: typeof row.port === "number" ? row.port : null,
-    apiKey: typeof row.api_key === "string" ? row.api_key : null,
+    embeddingModel: row.embeddingModel,
+    provider: row.provider,
+    host: row.host,
+    port: row.port,
+    apiKey: row.apiKey,
   };
 }
 
@@ -61,25 +56,24 @@ export async function saveEmbedSettings(
   const port = portOrNull(row.port);
   const apiKey = blankToNull(row.apiKey);
 
-  await db()`
-    INSERT INTO kb_embed_settings (
-      id, embedding_model, provider, host, port, api_key
-    )
-    VALUES (
-      ${SETTINGS_ID},
-      ${embeddingModel},
-      ${provider},
-      ${host},
-      ${port},
-      ${apiKey}
-    )
-    ON CONFLICT (id) DO UPDATE SET
-      embedding_model = EXCLUDED.embedding_model,
-      provider = EXCLUDED.provider,
-      host = EXCLUDED.host,
-      port = EXCLUDED.port,
-      api_key = EXCLUDED.api_key
-  `;
+  await getPrisma().knowledgeEmbedSettings.upsert({
+    where: { id: SETTINGS_ID },
+    create: {
+      id: SETTINGS_ID,
+      embeddingModel,
+      provider,
+      host,
+      port,
+      apiKey,
+    },
+    update: {
+      embeddingModel,
+      provider,
+      host,
+      port,
+      apiKey,
+    },
+  });
 
   return loadEmbedSettings();
 }
