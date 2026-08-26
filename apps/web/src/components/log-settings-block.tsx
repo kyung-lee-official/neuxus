@@ -49,6 +49,9 @@ function sinksFromForm(values: LogValues): readonly LogSink[] | null {
 export function LogSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
   const queryClient = useQueryClient();
   const [purgeConfirmOpen, setPurgeConfirmOpen] = useState(false);
+  const [purgeResult, setPurgeResult] = useState<{
+    deleted: number;
+  } | null>(null);
   const settingsQuery = useQuery({
     queryKey: UserQueryKey.LogSettings,
     queryFn: () => getLogSettings(actorApiKey),
@@ -109,9 +112,7 @@ export function LogSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
     mutationFn: () => purgeLogSettings(actorApiKey),
     onSuccess: (result) => {
       setPurgeConfirmOpen(false);
-      window.alert(
-        `Deleted ${result.deleted} log ${result.deleted === 1 ? "row" : "rows"}.`,
-      );
+      setPurgeResult({ deleted: result.deleted });
     },
   });
 
@@ -309,6 +310,32 @@ export function LogSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
             onClick={() => purgeMutation.mutate()}
           >
             {purgeMutation.isPending ? "Deleting…" : "Delete all logs"}
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={purgeResult !== null}
+        title="Logs deleted"
+        titleId="purge-logs-result-dialog-title"
+        onClose={() => setPurgeResult(null)}
+      >
+        <p className="m-0 text-ink text-sm">
+          Deleted <strong>{purgeResult?.deleted ?? 0}</strong> log{" "}
+          {purgeResult?.deleted === 1 ? "row" : "rows"} from{" "}
+          <code className="font-mono text-xs">app_log</code>.
+        </p>
+        <p className="mt-2 mb-0 text-muted text-sm">
+          Log configuration is unchanged. New records will be written according
+          to the active sinks.
+        </p>
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            className="rounded border border-accent bg-accent px-3.5 py-2 text-sm text-white"
+            onClick={() => setPurgeResult(null)}
+          >
+            Close
           </button>
         </div>
       </Modal>
