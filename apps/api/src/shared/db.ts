@@ -1,4 +1,6 @@
+import { PrismaPg } from "@prisma/adapter-pg";
 import postgres from "postgres";
+import { PrismaClient } from "../generated/prisma/client.ts";
 import {
   apiKeyForSeedUser,
   requireDatabaseUrl,
@@ -38,18 +40,96 @@ export type AppSession = {
   updated_at: Date;
 };
 
-function mapSessionRow(row: Record<string, unknown>): AppSession {
+let prisma: PrismaClient | null = null;
+
+function getPrisma(): PrismaClient {
+  if (!prisma) {
+    const adapter = new PrismaPg(requireDatabaseUrl());
+    prisma = new PrismaClient({ adapter });
+  }
+  return prisma;
+}
+
+/** Convert Prisma's `bigint` id back to the `number` shape callers expect. */
+function bigIntToNumber(value: bigint): number {
+  return Number(value);
+}
+
+/** Normalize a raw role string from the DB to the `"admin" | "member"` union. */
+function normalizeRole(role: string): AppUserRole {
+  return role === "admin" ? "admin" : "member";
+}
+
+function mapUser(row: {
+  id: string;
+  apiKey: string;
+  role: string;
+  createdAt: Date | null;
+}): AppUser {
   return {
-    id: row.id as string,
-    user_id: row.user_id as string,
-    title: (row.title as string | null) ?? null,
-    created_at: row.created_at as Date,
-    updated_at: row.updated_at as Date,
+    id: row.id,
+    api_key: row.apiKey,
+    role: normalizeRole(row.role),
+    created_at: row.createdAt ?? undefined,
+  };
+}
+
+function mapSession(row: {
+  id: string;
+  userId: string;
+  title: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}): AppSession {
+  return {
+    id: row.id,
+    user_id: row.userId,
+    title: row.title,
+    created_at: row.createdAt,
+    updated_at: row.updatedAt,
+  };
+}
+
+function mapMessage(row: {
+  id: bigint;
+  sessionId: string;
+  role: string;
+  content: string;
+  createdAt: Date;
+}): AppMessage {
+  return {
+    id: bigIntToNumber(row.id),
+    session_id: row.sessionId,
+    role: row.role === "assistant" ? "assistant" : "user",
+    content: row.content,
+    created_at: row.createdAt,
+  };
+}
+
+function mapMemory(row: {
+  id: bigint;
+  userId: string;
+  slug: string;
+  content: string;
+  createdAt: Date;
+}): AppMemory {
+  return {
+    id: bigIntToNumber(row.id),
+    user_id: row.userId,
+    slug: row.slug,
+    content: row.content,
+    created_at: row.createdAt,
   };
 }
 
 let sql: ReturnType<typeof postgres> | null = null;
 
+/**
+ * Raw `postgres` connection accessor. Kept for non-vector modules that
+ * still use raw SQL (settings / corpus / knowledge CRUD). Vector and
+ * tsvector paths also rely on this until they migrate. New code should
+ * prefer the Prisma client via `import { prisma } from "shared/db.ts"`.
+ */
 export function db(): ReturnType<typeof postgres> {
   if (!sql) {
     sql = postgres(requireDatabaseUrl(), { max: 10 });
@@ -62,11 +142,19 @@ export async function closeDb(): Promise<void> {
     await sql.end({ timeout: 5 });
     sql = null;
   }
+  if (prisma) {
+    await prisma.$disconnect();
+    prisma = null;
+  }
 }
 
 export type NukeTarget = "app";
 
-/** Hard-wipe `public` (tables, types, extensions). No remigrate. */
+/**
+ * Hard-wipe `public` (tables, types, extensions). No remigrate. Runs
+ * DDL outside Prisma — Prisma does not model extension drops or
+ * schema-level operations.
+ */
 async function wipePublicSchema(connectionString: string): Promise<void> {
   const s = postgres(connectionString, { max: 1 });
   try {
@@ -102,43 +190,30 @@ export async function nukeDatabases(target: NukeTarget): Promise<void> {
   await wipePublicSchema(requireDatabaseUrl());
 }
 
-function mapUserRow(row: Record<string, unknown>): AppUser {
-  const role = row.role === "admin" ? "admin" : "member";
-  return {
-    id: row.id as string,
-    api_key: row.api_key as string,
-    role,
-    created_at: row.created_at as Date | undefined,
-  };
-}
-
 export async function upsertUser(user: AppUser): Promise<AppUser> {
-  const rows = await db()`
-    INSERT INTO app_users (id, api_key, role)
-    VALUES (${user.id}, ${user.api_key}, ${user.role})
-    ON CONFLICT (id) DO UPDATE SET
-      api_key = EXCLUDED.api_key,
-      role = EXCLUDED.role
-    RETURNING id, api_key, role, created_at
-  `;
-  const row = rows[0];
-  if (!row) throw new Error("upsertUser returned no row");
-  return mapUserRow(row as Record<string, unknown>);
+  const row = await getPrisma().user.upsert({
+    where: { id: user.id },
+    create: {
+      id: user.id,
+      apiKey: user.api_key,
+      role: user.role,
+    },
+    update: {
+      apiKey: user.api_key,
+      role: user.role,
+    },
+  });
+  return mapUser(row);
 }
 
 export async function listUsers(): Promise<AppUser[]> {
-  const rows = await db()`
-    SELECT id, api_key, role, created_at FROM app_users ORDER BY id ASC
-  `;
-  return rows.map((row) => mapUserRow(row as Record<string, unknown>));
+  const rows = await getPrisma().user.findMany({ orderBy: { id: "asc" } });
+  return rows.map(mapUser);
 }
 
 export async function getUserById(id: string): Promise<AppUser | null> {
-  const rows = await db()`
-    SELECT id, api_key, role, created_at FROM app_users WHERE id = ${id} LIMIT 1
-  `;
-  if (rows.length === 0) return null;
-  return mapUserRow(rows[0]! as Record<string, unknown>);
+  const row = await getPrisma().user.findUnique({ where: { id } });
+  return row ? mapUser(row) : null;
 }
 
 export async function createUser(
@@ -146,56 +221,68 @@ export async function createUser(
   apiKey: string,
   role: AppUserRole = "member",
 ): Promise<AppUser> {
-  const rows = await db()`
-    INSERT INTO app_users (id, api_key, role)
-    VALUES (${id}, ${apiKey}, ${role})
-    RETURNING id, api_key, role, created_at
-  `;
-  const row = rows[0];
-  if (!row) throw new Error("createUser returned no row");
-  return mapUserRow(row as Record<string, unknown>);
+  const row = await getPrisma().user.create({
+    data: { id, apiKey, role },
+  });
+  return mapUser(row);
 }
 
 export async function updateUserApiKey(
   id: string,
   apiKey: string,
 ): Promise<AppUser | null> {
-  const rows = await db()`
-    UPDATE app_users SET api_key = ${apiKey}
-    WHERE id = ${id}
-    RETURNING id, api_key, role, created_at
-  `;
-  if (rows.length === 0) return null;
-  return mapUserRow(rows[0]! as Record<string, unknown>);
+  try {
+    const row = await getPrisma().user.update({
+      where: { id },
+      data: { apiKey },
+    });
+    return mapUser(row);
+  } catch (err) {
+    if (
+      err &&
+      typeof err === "object" &&
+      "code" in err &&
+      (err as { code?: string }).code === "P2025"
+    ) {
+      return null;
+    }
+    throw err;
+  }
 }
 
 export async function deleteUser(id: string): Promise<boolean> {
-  const rows = await db()`
-    DELETE FROM app_users WHERE id = ${id} RETURNING id
-  `;
-  return rows.length > 0;
+  try {
+    await getPrisma().user.delete({ where: { id } });
+    return true;
+  } catch (err) {
+    if (
+      err &&
+      typeof err === "object" &&
+      "code" in err &&
+      (err as { code?: string }).code === "P2025"
+    ) {
+      return false;
+    }
+    throw err;
+  }
 }
 
 export async function countUsers(): Promise<number> {
-  const rows = await db()`SELECT COUNT(*)::int AS n FROM app_users`;
-  return (rows[0]?.n as number) ?? 0;
+  return getPrisma().user.count();
 }
 
 export async function getUserByApiKey(apiKey: string): Promise<AppUser | null> {
-  const rows = await db()`
-    SELECT id, api_key, role, created_at FROM app_users WHERE api_key = ${apiKey} LIMIT 1
-  `;
-  if (rows.length === 0) return null;
-  return mapUserRow(rows[0]! as Record<string, unknown>);
+  const row = await getPrisma().user.findUnique({ where: { apiKey } });
+  return row ? mapUser(row) : null;
 }
 
 export async function getOrCreateSession(userId: string): Promise<string> {
-  const s = db();
-  const existing = await s`
-    SELECT id FROM app_sessions WHERE user_id = ${userId} ORDER BY updated_at DESC LIMIT 1
-  `;
-  if (existing.length > 0) return existing[0]!.id as string;
-
+  const existing = await getPrisma().session.findFirst({
+    where: { userId },
+    orderBy: { updatedAt: "desc" },
+    select: { id: true },
+  });
+  if (existing) return existing.id;
   const created = await createSession(userId);
   return created.id;
 }
@@ -203,14 +290,10 @@ export async function getOrCreateSession(userId: string): Promise<string> {
 /** Create a new empty chat session for a user. */
 export async function createSession(userId: string): Promise<AppSession> {
   const newId = crypto.randomUUID();
-  const rows = await db()`
-    INSERT INTO app_sessions (id, user_id)
-    VALUES (${newId}::uuid, ${userId})
-    RETURNING id, user_id, title, created_at, updated_at
-  `;
-  const row = rows[0];
-  if (!row) throw new Error("createSession returned no row");
-  return mapSessionRow(row as Record<string, unknown>);
+  const row = await getPrisma().session.create({
+    data: { id: newId, userId },
+  });
+  return mapSession(row);
 }
 
 /** Session owned by `userId`, or null. */
@@ -218,14 +301,10 @@ export async function getSessionOwnedByUser(
   sessionId: string,
   userId: string,
 ): Promise<AppSession | null> {
-  const rows = await db()`
-    SELECT id, user_id, title, created_at, updated_at
-    FROM app_sessions
-    WHERE id = ${sessionId}::uuid AND user_id = ${userId}
-    LIMIT 1
-  `;
-  if (rows.length === 0) return null;
-  return mapSessionRow(rows[0]! as Record<string, unknown>);
+  const row = await getPrisma().session.findFirst({
+    where: { id: sessionId, userId },
+  });
+  return row ? mapSession(row) : null;
 }
 
 /** Update title for a session owned by `userId`. Empty title clears to null. */
@@ -234,14 +313,28 @@ export async function updateSessionTitle(
   userId: string,
   title: string | null,
 ): Promise<AppSession | null> {
-  const rows = await db()`
-    UPDATE app_sessions
-    SET title = ${title}, updated_at = NOW()
-    WHERE id = ${sessionId}::uuid AND user_id = ${userId}
-    RETURNING id, user_id, title, created_at, updated_at
-  `;
-  if (rows.length === 0) return null;
-  return mapSessionRow(rows[0]! as Record<string, unknown>);
+  const owned = await getPrisma().session.findFirst({
+    where: { id: sessionId, userId },
+    select: { id: true },
+  });
+  if (!owned) return null;
+  try {
+    const row = await getPrisma().session.update({
+      where: { id: sessionId },
+      data: { title, updatedAt: new Date() },
+    });
+    return mapSession(row);
+  } catch (err) {
+    if (
+      err &&
+      typeof err === "object" &&
+      "code" in err &&
+      (err as { code?: string }).code === "P2025"
+    ) {
+      return null;
+    }
+    throw err;
+  }
 }
 
 /**
@@ -253,38 +346,41 @@ export async function deleteSessionForUser(
   sessionId: string,
   userId: string,
 ): Promise<boolean> {
-  const rows = await db()`
-    DELETE FROM app_sessions
-    WHERE id = ${sessionId}::uuid AND user_id = ${userId}
-    RETURNING id
-  `;
-  return rows.length > 0;
+  const result = await getPrisma().session.deleteMany({
+    where: { id: sessionId, userId },
+  });
+  return result.count > 0;
 }
 
 export async function touchSession(sessionId: string): Promise<void> {
-  await db()`UPDATE app_sessions SET updated_at = NOW() WHERE id = ${sessionId}::uuid`;
+  try {
+    await getPrisma().session.update({
+      where: { id: sessionId },
+      data: { updatedAt: new Date() },
+    });
+  } catch (err) {
+    if (
+      err &&
+      typeof err === "object" &&
+      "code" in err &&
+      (err as { code?: string }).code === "P2025"
+    ) {
+      return;
+    }
+    throw err;
+  }
 }
 
 export async function listRecentMessages(
   sessionId: string,
   limit = 12,
 ): Promise<AppMessage[]> {
-  const rows = await db()`
-    SELECT id, session_id, role, content, created_at
-    FROM app_messages
-    WHERE session_id = ${sessionId}::uuid
-    ORDER BY created_at DESC
-    LIMIT ${limit}
-  `;
-  return rows
-    .map((row) => ({
-      id: Number(row.id),
-      session_id: row.session_id as string,
-      role: row.role as "user" | "assistant",
-      content: row.content as string,
-      created_at: row.created_at as Date,
-    }))
-    .reverse();
+  const rows = await getPrisma().message.findMany({
+    where: { sessionId },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+  return rows.map(mapMessage).reverse();
 }
 
 export async function insertMessage(
@@ -292,10 +388,9 @@ export async function insertMessage(
   role: "user" | "assistant",
   content: string,
 ): Promise<void> {
-  await db()`
-    INSERT INTO app_messages (session_id, role, content)
-    VALUES (${sessionId}::uuid, ${role}, ${content})
-  `;
+  await getPrisma().message.create({
+    data: { sessionId, role, content },
+  });
   await touchSession(sessionId);
 }
 
@@ -304,40 +399,23 @@ export async function insertMemory(
   slug: string,
   content: string,
 ): Promise<AppMemory> {
-  const rows = await db()`
-    INSERT INTO app_memories (user_id, slug, content)
-    VALUES (${userId}, ${slug}, ${content})
-    ON CONFLICT (user_id, slug) DO UPDATE SET content = EXCLUDED.content
-    RETURNING id, user_id, slug, content, created_at
-  `;
-  const row = rows[0];
-  if (!row) throw new Error("insertMemory returned no row");
-  return {
-    id: Number(row.id),
-    user_id: row.user_id as string,
-    slug: row.slug as string,
-    content: row.content as string,
-    created_at: row.created_at as Date,
-  };
+  const row = await getPrisma().memory.upsert({
+    where: { userId_slug: { userId, slug } },
+    create: { userId, slug, content },
+    update: { content },
+  });
+  return mapMemory(row);
 }
 
 /** All personal memories for one user (hard `user_id` filter). */
 export async function listMemoriesForUser(
   userId: string,
 ): Promise<AppMemory[]> {
-  const rows = await db()`
-    SELECT id, user_id, slug, content, created_at
-    FROM app_memories
-    WHERE user_id = ${userId}
-    ORDER BY created_at DESC
-  `;
-  return rows.map((row) => ({
-    id: Number(row.id),
-    user_id: row.user_id as string,
-    slug: row.slug as string,
-    content: row.content as string,
-    created_at: row.created_at as Date,
-  }));
+  const rows = await getPrisma().memory.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+  });
+  return rows.map(mapMemory);
 }
 
 /** Delete one memory owned by `userId`. Returns false if missing. */
@@ -345,25 +423,21 @@ export async function deleteMemoryForUser(
   userId: string,
   memoryId: number,
 ): Promise<boolean> {
-  const rows = await db()`
-    DELETE FROM app_memories
-    WHERE id = ${memoryId} AND user_id = ${userId}
-    RETURNING id
-  `;
-  return rows.length > 0;
+  const result = await getPrisma().memory.deleteMany({
+    where: { id: BigInt(memoryId), userId },
+  });
+  return result.count > 0;
 }
 
 /** All chat sessions for one user. */
 export async function listSessionsForUser(
   userId: string,
 ): Promise<AppSession[]> {
-  const rows = await db()`
-    SELECT id, user_id, title, created_at, updated_at
-    FROM app_sessions
-    WHERE user_id = ${userId}
-    ORDER BY updated_at DESC
-  `;
-  return rows.map((row) => mapSessionRow(row as Record<string, unknown>));
+  const rows = await getPrisma().session.findMany({
+    where: { userId },
+    orderBy: { updatedAt: "desc" },
+  });
+  return rows.map(mapSession);
 }
 
 export type MessagePage = {
@@ -380,34 +454,22 @@ export async function listMessagesForUser(
 ): Promise<MessagePage> {
   const pageSize = Math.min(Math.max(options?.pageSize ?? 50, 1), 200);
   const page = Math.max(options?.page ?? 1, 1);
-  const offset = (page - 1) * pageSize;
+  const skip = (page - 1) * pageSize;
 
-  const countRows = await db()`
-    SELECT COUNT(*)::int AS count
-    FROM app_messages m
-    INNER JOIN app_sessions s ON s.id = m.session_id
-    WHERE s.user_id = ${userId}
-  `;
-  const total = Number(countRows[0]?.count ?? 0);
-
-  const rows = await db()`
-    SELECT m.id, m.session_id, m.role, m.content, m.created_at
-    FROM app_messages m
-    INNER JOIN app_sessions s ON s.id = m.session_id
-    WHERE s.user_id = ${userId}
-    ORDER BY m.created_at DESC, m.id DESC
-    LIMIT ${pageSize}
-    OFFSET ${offset}
-  `;
+  const [total, rows] = await Promise.all([
+    getPrisma().message.count({
+      where: { session: { userId } },
+    }),
+    getPrisma().message.findMany({
+      where: { session: { userId } },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: pageSize,
+      skip,
+    }),
+  ]);
 
   return {
-    items: rows.map((row) => ({
-      id: Number(row.id),
-      session_id: row.session_id as string,
-      role: row.role as "user" | "assistant",
-      content: row.content as string,
-      created_at: row.created_at as Date,
-    })),
+    items: rows.map(mapMessage),
     total,
     page,
     pageSize,
@@ -422,6 +484,8 @@ export async function searchMemoriesByUser(
 ): Promise<AppMemory[]> {
   const q = query.trim();
   if (q) {
+    // Postgres full-text search via `to_tsvector`/`plainto_tsquery`.
+    // Prisma does not model this index, so we keep the raw query.
     const matched = await db()`
       SELECT id, user_id, slug, content, created_at
       FROM app_memories
@@ -441,20 +505,12 @@ export async function searchMemoriesByUser(
     }
   }
 
-  const recent = await db()`
-    SELECT id, user_id, slug, content, created_at
-    FROM app_memories
-    WHERE user_id = ${userId}
-    ORDER BY created_at DESC
-    LIMIT ${limit}
-  `;
-  return recent.map((row) => ({
-    id: Number(row.id),
-    user_id: row.user_id as string,
-    slug: row.slug as string,
-    content: row.content as string,
-    created_at: row.created_at as Date,
-  }));
+  const recent = await getPrisma().memory.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+  return recent.map(mapMemory);
 }
 
 /** Upsert demo users into `app_users`; `haewon` is admin, others member. Drop legacy `bob`. */
