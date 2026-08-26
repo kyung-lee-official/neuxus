@@ -4,7 +4,7 @@
  * columns, code defaults in `LOG_DEFAULTS` apply when a column is null.
  */
 
-import { sql } from "bun";
+import { getPrisma } from "../db.ts";
 import {
   LOG_DEFAULTS,
   LOG_SINK_VALUES,
@@ -63,26 +63,15 @@ function boolColumn(value: unknown): boolean | null {
   return null;
 }
 
-type LogSettingsRowRaw = {
-  sinks: string[];
-  queue_size: number;
-  drain_timeout_ms: number;
-  pretty: boolean;
-};
-
 async function fetchLogRow(): Promise<LogSettingsRow | null> {
-  const rows = await sql<LogSettingsRowRaw[]>`
-    SELECT sinks, queue_size, drain_timeout_ms, pretty
-    FROM app_log_settings
-    WHERE id = ${SETTINGS_ID}
-    LIMIT 1
-  `;
-  const row = rows[0];
+  const row = await getPrisma().appLogSettings.findUnique({
+    where: { id: SETTINGS_ID },
+  });
   if (!row) return null;
   return {
     sinks: parseSinkArray(row.sinks),
-    queueSize: intColumn(row.queue_size),
-    drainTimeoutMs: intColumn(row.drain_timeout_ms),
+    queueSize: intColumn(row.queueSize),
+    drainTimeoutMs: intColumn(row.drainTimeoutMs),
     pretty: boolColumn(row.pretty),
   };
 }
@@ -144,23 +133,24 @@ export async function saveLogSettings(
   const drainTimeoutMs = normalizePositiveInt(row.drainTimeoutMs);
   const pretty = normalizeBool(row.pretty);
 
-  const sinksValue = sinks.length > 0 ? sinks : null;
+  const sinksValue = sinks.length > 0 ? (sinks as LogSinkValue[]) : null;
 
-  await sql`
-    INSERT INTO app_log_settings (id, sinks, queue_size, drain_timeout_ms, pretty)
-    VALUES (
-      ${SETTINGS_ID},
-      ${sinksValue}::text[],
-      ${queueSize},
-      ${drainTimeoutMs},
-      ${pretty}
-    )
-    ON CONFLICT (id) DO UPDATE SET
-      sinks = EXCLUDED.sinks,
-      queue_size = EXCLUDED.queue_size,
-      drain_timeout_ms = EXCLUDED.drain_timeout_ms,
-      pretty = EXCLUDED.pretty
-  `;
+  await getPrisma().appLogSettings.upsert({
+    where: { id: SETTINGS_ID },
+    create: {
+      id: SETTINGS_ID,
+      sinks: sinksValue ?? [],
+      queueSize,
+      drainTimeoutMs,
+      pretty,
+    },
+    update: {
+      sinks: sinksValue ?? [],
+      queueSize,
+      drainTimeoutMs,
+      pretty,
+    },
+  });
 
   return loadLogSettings();
 }

@@ -10,8 +10,8 @@
  */
 
 import { hostname } from "node:os";
-import { sql } from "bun";
 import type { LogLevel, Transport } from "logixlysia";
+import { getPrisma } from "../../db.ts";
 import { BoundedQueue, type QueueStats } from "../queue.ts";
 
 const QUEUE_CAPACITY_DEFAULT = 1000;
@@ -161,12 +161,15 @@ export class PostgresTransport implements Transport {
       pid: process.pid,
       hostname: hostname(),
     };
-    const metaJson = JSON.stringify(meta);
     try {
-      await sql`
-        INSERT INTO app_log (level, msg, name, meta)
-        VALUES (${record.level}, ${record.msg}, ${record.name}, ${metaJson}::jsonb)
-      `;
+      await getPrisma().appLog.create({
+        data: {
+          level: record.level,
+          msg: record.msg,
+          name: record.name,
+          meta,
+        },
+      });
       return true;
     } catch {
       return false;
