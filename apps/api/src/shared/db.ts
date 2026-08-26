@@ -5,7 +5,6 @@ import {
   SEED_USER_IDS,
 } from "./config.ts";
 
-
 export type AppUserRole = "admin" | "member";
 
 export type AppUser = {
@@ -243,6 +242,23 @@ export async function updateSessionTitle(
   `;
   if (rows.length === 0) return null;
   return mapSessionRow(rows[0]! as Record<string, unknown>);
+}
+
+/**
+ * Delete a session owned by `userId`. Returns true on success, false
+ * when the session does not exist or is owned by another user.
+ * Messages cascade-delete via FK (`onDelete: Cascade` on `Message`).
+ */
+export async function deleteSessionForUser(
+  sessionId: string,
+  userId: string,
+): Promise<boolean> {
+  const rows = await db()`
+    DELETE FROM app_sessions
+    WHERE id = ${sessionId}::uuid AND user_id = ${userId}
+    RETURNING id
+  `;
+  return rows.length > 0;
 }
 
 export async function touchSession(sessionId: string): Promise<void> {

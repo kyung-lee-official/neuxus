@@ -15,4 +15,12 @@ export const sessions = new Elysia({ prefix: "/sessions" })
       params: SessionsModel.sessionParams,
       body: SessionsModel.patchBody,
     },
+  )
+  .delete(
+    "/:sessionId",
+    ({ user, params }) => Sessions.delete(user, params.sessionId),
+    {
+      requireUser: true,
+      params: SessionsModel.sessionParams,
+    },
   );

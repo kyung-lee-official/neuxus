@@ -8,6 +8,7 @@ import {
   ApiError,
   type ApiUser,
   createSession,
+  deleteSession,
   listSessions,
   listUsers,
   patchSessionTitle,
@@ -74,11 +75,37 @@ function PencilIcon({ className }: { className?: string }) {
   );
 }
 
+function TrashIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M3 6h18" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+    </svg>
+  );
+}
+
 export function ActiveUserPanel({ active }: { active: ApiUser | null }) {
   const queryClient = useQueryClient();
   const activeSessionId = useActiveUserStore((s) => s.activeSessionId);
   const setActiveSessionId = useActiveUserStore((s) => s.setActiveSessionId);
   const [editingSession, setEditingSession] = useState<UserSessionRow | null>(
+    null,
+  );
+  const [deletingSession, setDeletingSession] = useState<UserSessionRow | null>(
     null,
   );
   const [titleDraft, setTitleDraft] = useState("");
@@ -158,6 +185,27 @@ export function ActiveUserPanel({ active }: { active: ApiUser | null }) {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (input: { sessionId: string }) => {
+      if (!active) throw new Error("Not signed in.");
+      return deleteSession({
+        apiKey: active.apiKey,
+        sessionId: input.sessionId,
+      });
+    },
+    onSuccess: async (_result, input) => {
+      if (!active) return;
+      if (activeSessionId === input.sessionId) setActiveSessionId(null);
+      await queryClient.invalidateQueries({
+        queryKey: UserQueryKey.Sessions(active.id),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: UserQueryKey.Data(active.id, 1),
+      });
+      setDeletingSession(null);
+    },
+  });
+
   const live =
     active && usersQuery.data
       ? (usersQuery.data.find((u) => u.id === active.id) ?? active)
@@ -168,7 +216,8 @@ export function ActiveUserPanel({ active }: { active: ApiUser | null }) {
       ? errorMessage(createSessionMutation.error)
       : null) ||
     (sessionsQuery.isError ? errorMessage(sessionsQuery.error) : null) ||
-    (renameMutation.isError ? errorMessage(renameMutation.error) : null);
+    (renameMutation.isError ? errorMessage(renameMutation.error) : null) ||
+    (deleteMutation.isError ? errorMessage(deleteMutation.error) : null);
 
   function openEditTitle(session: UserSessionRow) {
     setEditingSession(session);
@@ -278,6 +327,19 @@ export function ActiveUserPanel({ active }: { active: ApiUser | null }) {
                         >
                           <PencilIcon />
                         </button>
+                        <button
+                          type="button"
+                          className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded border border-transparent text-muted hover:border-danger hover:text-danger"
+                          aria-label={`Delete chat ${sessionLabel(session)}`}
+                          title="Delete chat"
+                          disabled={deleteMutation.isPending}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeletingSession(session);
+                          }}
+                        >
+                          <TrashIcon />
+                        </button>
                       </div>
                     </li>
                   );
@@ -360,6 +422,57 @@ export function ActiveUserPanel({ active }: { active: ApiUser | null }) {
             onClick={saveTitle}
           >
             {renameMutation.isPending ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={deletingSession !== null}
+        title="Delete chat?"
+        titleId="delete-session-dialog"
+        onClose={() => {
+          if (!deleteMutation.isPending) setDeletingSession(null);
+        }}
+        closeDisabled={deleteMutation.isPending}
+      >
+        <p className="m-0 mb-2 text-ink text-sm">
+          Delete{" "}
+          <span className="font-display">
+            {deletingSession ? sessionLabel(deletingSession) : ""}
+          </span>
+          ?
+        </p>
+        <p className="m-0 mb-1 font-mono text-muted text-xs">
+          {deletingSession ? shortSessionId(deletingSession.id) : ""}
+        </p>
+        <p className="m-0 mt-3 text-muted text-sm">
+          All messages in this chat are removed along with it. This cannot be
+          undone.
+        </p>
+        {deleteMutation.isError ? (
+          <p className="mt-3 mb-0 text-danger text-sm">
+            {errorMessage(deleteMutation.error)}
+          </p>
+        ) : null}
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            className="rounded border border-line bg-transparent px-3.5 py-2 text-ink text-sm disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={deleteMutation.isPending}
+            onClick={() => setDeletingSession(null)}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="rounded border border-danger bg-danger px-3.5 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={deleteMutation.isPending}
+            onClick={() => {
+              if (!deletingSession) return;
+              deleteMutation.mutate({ sessionId: deletingSession.id });
+            }}
+          >
+            {deleteMutation.isPending ? "Deleting…" : "Delete chat"}
           </button>
         </div>
       </Modal>

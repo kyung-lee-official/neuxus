@@ -94,6 +94,7 @@ export const UserQueryKey = {
   EmbedSettings: ["server-setting", "embed"] as const,
   SynthesisSettings: ["server-setting", "synthesis"] as const,
   CorpusSettings: ["server-setting", "corpus"] as const,
+  LogSettings: ["server-setting", "log"] as const,
   KnowledgePages: ["knowledge", "pages"] as const,
   KnowledgePage: (id: string) => ["knowledge", "pages", id] as const,
 } as const;
@@ -229,6 +230,19 @@ export async function patchSessionTitle(input: {
   );
 }
 
+export async function deleteSession(input: {
+  apiKey: string;
+  sessionId: string;
+}): Promise<{ deleted: boolean; id: string }> {
+  return apiFetch<{ deleted: boolean; id: string }>(
+    `/sessions/${encodeURIComponent(input.sessionId)}`,
+    {
+      method: "DELETE",
+      apiKey: input.apiKey,
+    },
+  );
+}
+
 export async function postQuery(input: {
   apiKey: string;
   message: string;
@@ -347,6 +361,49 @@ export async function resetSynthesisSettings(
   apiKey: string,
 ): Promise<SynthesisSettings> {
   return apiFetch<SynthesisSettings>("/server-setting/synthesis/reset", {
+    method: "POST",
+    apiKey,
+  });
+}
+
+export type LogSink = "console" | "postgres";
+
+export type LogSettings = {
+  sinks: readonly LogSink[];
+  queueSize: number | null;
+  drainTimeoutMs: number | null;
+  pretty: boolean | null;
+  defaults: {
+    sinks: readonly LogSink[];
+    queueSize: number;
+    drainTimeoutMs: number;
+    pretty: boolean;
+  };
+  availableSinks: readonly LogSink[];
+};
+
+export async function getLogSettings(apiKey: string): Promise<LogSettings> {
+  return apiFetch<LogSettings>("/server-setting/log", { apiKey });
+}
+
+export async function putLogSettings(input: {
+  apiKey: string;
+  settings: {
+    sinks: readonly LogSink[] | null;
+    queueSize: number | null;
+    drainTimeoutMs: number | null;
+    pretty: boolean | null;
+  };
+}): Promise<LogSettings> {
+  return apiFetch<LogSettings>("/server-setting/log", {
+    method: "PUT",
+    apiKey: input.apiKey,
+    body: JSON.stringify(input.settings),
+  });
+}
+
+export async function resetLogSettings(apiKey: string): Promise<LogSettings> {
+  return apiFetch<LogSettings>("/server-setting/log/reset", {
     method: "POST",
     apiKey,
   });

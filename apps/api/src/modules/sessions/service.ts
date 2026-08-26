@@ -2,6 +2,7 @@ import { status } from "elysia";
 import type { AppUser } from "../../shared/db.ts";
 import {
   createSession,
+  deleteSessionForUser,
   listSessionsForUser,
   updateSessionTitle,
 } from "../../shared/db.ts";
@@ -38,5 +39,13 @@ export abstract class Sessions {
     const session = await updateSessionTitle(sessionId, user.id, title);
     if (!session) throw status(404, { error: "Session not found" });
     return sessionJson(session);
+  }
+
+  static async delete(user: AppUser, sessionIdParam: string) {
+    const sessionId = sessionIdParam.trim();
+    if (!sessionId) throw status(400, { error: "Invalid session id" });
+    const ok = await deleteSessionForUser(sessionId, user.id);
+    if (!ok) throw status(404, { error: "Session not found" });
+    return { deleted: true as const, id: sessionId };
   }
 }

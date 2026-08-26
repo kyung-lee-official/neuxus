@@ -13,6 +13,7 @@ All JSON responses use `Content-Type: application/json`. Corpus sync events are 
 | `GET /users/:id/data`                                                   | `Authorization: Bearer <api-key>`                   |
 | `DELETE /users/:id/memories/:memoryId`                                  | `Authorization: Bearer <api-key>`                   |
 | `GET /sessions`, `POST /sessions`, `PATCH /sessions/:id`                | `Authorization: Bearer <api-key>`                   |
+| `DELETE /sessions/:id`                                                 | `Authorization: Bearer <api-key>`                   |
 | `POST /users`                                                           | Bearer if any users exist; open when table is empty |
 | `PATCH /users/:id`, `DELETE /users/:id`                                 | `Authorization: Bearer <api-key>`                   |
 | `POST /query`, `POST /remember`                                         | `Authorization: Bearer <api-key>`                   |
