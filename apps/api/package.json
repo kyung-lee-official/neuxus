@@ -16,6 +16,7 @@
     "@prisma/client": "^7.9.0",
     "ai-tokenizer": "^1.0.6",
     "elysia": "^1.4.29",
+    "logixlysia": "^6.8.0",
     "pg": "^8.22.0",
     "postgres": "^3.4.7"
   },

@@ -1,5 +1,6 @@
 import { cors } from "@elysiajs/cors";
 import { Elysia, status } from "elysia";
+import logixlysia from "logixlysia";
 import { health } from "./modules/health/index.ts";
 import { knowledge } from "./modules/knowledge/index.ts";
 import { query } from "./modules/query/index.ts";
@@ -7,8 +8,42 @@ import { serverSetting } from "./modules/server-setting/index.ts";
 import { sessions } from "./modules/sessions/index.ts";
 import { users } from "./modules/users/index.ts";
 import { serverPort } from "./shared/config.ts";
+import {
+  getLogTransport,
+  installShutdownHandlers,
+  startLogWorker,
+} from "./shared/log/index.ts";
+
+function parseLogSinks(): Set<string> {
+  const raw = process.env.LOG_SINK ?? "console";
+  return new Set(
+    raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0),
+  );
+}
+
+const logSinks = parseLogSinks();
+const usePostgres = logSinks.has("postgres");
+const postgresTransport = usePostgres ? getLogTransport() : null;
 
 const app = new Elysia()
+  .use(
+    logixlysia({
+      config: {
+        service: "neuxus-api",
+        showStartupMessage: false,
+        showContextTree: false,
+        contextDepth: 0,
+        slowThreshold: 500,
+        verySlowThreshold: 1000,
+        timestamp: { translateTime: "yyyy-mm-dd HH:MM:ss.SSS" },
+        ip: true,
+        transports: postgresTransport ? [postgresTransport] : [],
+      },
+    }),
+  )
   .use(
     cors({
       origin: true,
@@ -36,6 +71,11 @@ const app = new Elysia()
   .use(sessions)
   .use(users)
   .listen(serverPort());
+
+if (usePostgres) {
+  startLogWorker();
+  installShutdownHandlers();
+}
 
 console.log(`neuxus API listening on http://localhost:${app.server?.port}`);
 console.log(
