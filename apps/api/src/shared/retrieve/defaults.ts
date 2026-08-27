@@ -19,14 +19,23 @@ export type ResolvedRetrieveOptions = {
   maxCharacters: number;
 };
 
-function positiveInt(value: number | undefined, fallback: number): number {
+function positiveInt(
+  value: number | null | undefined,
+  fallback: number,
+): number {
   return typeof value === "number" && Number.isInteger(value) && value > 0
     ? value
     : fallback;
 }
 
+type PartialRetrieveFields = {
+  childLimit?: number | null;
+  maxParents?: number | null;
+  maxCharacters?: number | null;
+};
+
 export function resolveRetrieveOptions(
-  options?: RetrieveOptions,
+  options?: PartialRetrieveFields | null,
 ): ResolvedRetrieveOptions {
   return {
     childLimit: positiveInt(options?.childLimit, RETRIEVE_DEFAULTS.childLimit),

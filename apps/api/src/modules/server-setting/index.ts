@@ -38,6 +38,16 @@ export const serverSetting = new Elysia({ prefix: "/server-setting" })
   .post("/log/purge", () => ServerSetting.purgeLogs(), {
     requireAdmin: true,
   })
+  .get("/retrieve", () => ServerSetting.getRetrieve(), {
+    requireAdmin: true,
+  })
+  .put("/retrieve", ({ body }) => ServerSetting.putRetrieve(body), {
+    requireAdmin: true,
+    body: ServerSettingModel.retrieveBody,
+  })
+  .post("/retrieve/reset", () => ServerSetting.resetRetrieve(), {
+    requireAdmin: true,
+  })
   .get("/corpus", () => ServerSetting.getCorpus(), {
     requireAdmin: true,
   })

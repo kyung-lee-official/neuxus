@@ -19,6 +19,8 @@ All JSON responses use `Content-Type: application/json`. Corpus sync events are 
 | `POST /query`, `POST /remember`                                         | `Authorization: Bearer <api-key>`                   |
 | `GET /server-setting/embed`, `PUT /server-setting/embed`                | Bearer **admin**                                    |
 | `POST /server-setting/embed/reset`                                      | Bearer **admin**                                    |
+| `GET /server-setting/retrieve`, `PUT /server-setting/retrieve`            | Bearer **admin**                                    |
+| `POST /server-setting/retrieve/reset`                                   | Bearer **admin**                                    |
 | `GET /server-setting/synthesis`, `PUT /server-setting/synthesis`        | Bearer **admin**                                    |
 | `POST /server-setting/synthesis/reset`                                  | Bearer **admin**                                    |
 | `GET /server-setting/log`, `PUT /server-setting/log`                    | Bearer **admin**                                    |

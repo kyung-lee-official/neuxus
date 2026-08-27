@@ -11,7 +11,10 @@ import {
   searchMemoriesByUserFTS,
 } from "../../shared/db.ts";
 import { isHttpStatus } from "../../shared/http.ts";
-import { retrieveParentsByQuestion } from "../../shared/retrieve/index.ts";
+import {
+  loadRetrieveSettings,
+  retrieveParentsByQuestion,
+} from "../../shared/retrieve/index.ts";
 import { answerFromContext } from "./answer.ts";
 import { slugForMemoryNote } from "./context.ts";
 import type { QueryModel } from "./model.ts";
@@ -67,7 +70,11 @@ export abstract class Query {
       }
       const recent = await listRecentMessages(sessionId);
       const personalMemories = await searchPersonalMemories(user.id, message);
-      const { parents } = await retrieveParentsByQuestion(message);
+      const retrieveSettings = await loadRetrieveSettings();
+      const { parents } = await retrieveParentsByQuestion(
+        message,
+        retrieveSettings,
+      );
       const answer = await answerFromContext(
         recent,
         message,

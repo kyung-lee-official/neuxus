@@ -33,6 +33,11 @@ export const ServerSettingModel = {
     drainTimeoutMs: t.Union([t.Integer({ minimum: 1 }), t.Null()]),
     pretty: t.Union([t.Boolean(), t.Null()]),
   }),
+  retrieveBody: t.Object({
+    childLimit: t.Union([t.Integer({ minimum: 1 }), t.Null()]),
+    maxParents: t.Union([t.Integer({ minimum: 1 }), t.Null()]),
+    maxCharacters: t.Union([t.Integer({ minimum: 1 }), t.Null()]),
+  }),
 } as const;
 
 export type ServerSettingModel = {

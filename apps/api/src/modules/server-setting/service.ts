@@ -30,6 +30,12 @@ import {
   saveLogSettings,
 } from "../../shared/log/index.ts";
 import {
+  adminRetrieveSettings,
+  type RetrieveSettingsRow,
+  resetRetrieveSettings,
+  saveRetrieveSettings,
+} from "../../shared/retrieve/index.ts";
+import {
   adminSynthesisSettings,
   resetSynthesisSettings,
   type SynthesisSettingsRow,
@@ -110,6 +116,24 @@ export abstract class ServerSetting {
 
   static async purgeLogs() {
     return purgeLogs();
+  }
+
+  static async getRetrieve() {
+    return adminRetrieveSettings();
+  }
+
+  static async putRetrieve(body: ServerSettingModel["retrieveBody"]) {
+    const row: RetrieveSettingsRow = {
+      childLimit: body.childLimit,
+      maxParents: body.maxParents,
+      maxCharacters: body.maxCharacters,
+    };
+    await saveRetrieveSettings(row);
+    return adminRetrieveSettings();
+  }
+
+  static async resetRetrieve() {
+    return resetRetrieveSettings();
   }
 
   static async getCorpus() {
