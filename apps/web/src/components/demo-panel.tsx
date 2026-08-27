@@ -182,8 +182,20 @@ export function DemoPanel() {
                 <textarea
                   className="w-full resize-none border-0 bg-transparent py-2 pr-20 pl-2.5 text-ink outline-none disabled:opacity-60"
                   rows={3}
-                  placeholder="Ask using your personal memory and this chat…"
+                  placeholder="Enter to send · Shift+Enter for newline"
                   disabled={pending}
+                  onKeyDown={(e) => {
+                    if (
+                      e.key === "Enter" &&
+                      !e.shiftKey &&
+                      !e.ctrlKey &&
+                      !e.metaKey &&
+                      !pending
+                    ) {
+                      e.preventDefault();
+                      e.currentTarget.form?.requestSubmit();
+                    }
+                  }}
                   {...askForm.register("message")}
                 />
                 <button
