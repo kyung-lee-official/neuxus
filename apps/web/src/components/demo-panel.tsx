@@ -185,16 +185,30 @@ export function DemoPanel() {
                   placeholder="Enter to send · Shift+Enter for newline"
                   disabled={pending}
                   onKeyDown={(e) => {
-                    if (
-                      e.key === "Enter" &&
-                      !e.shiftKey &&
-                      !e.ctrlKey &&
-                      !e.metaKey &&
-                      !pending
-                    ) {
+                    if (e.key !== "Enter") return;
+
+                    // Plain Enter → submit
+                    if (!e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                      if (pending) return;
                       e.preventDefault();
                       e.currentTarget.form?.requestSubmit();
+                      return;
                     }
+
+                    // Shift/Ctrl/Meta/Alt + Enter → insert newline.
+                    // Textarea has no native Ctrl/Alt+Enter action, so we
+                    // splice `\n` at the cursor (or around the selection)
+                    // and fire `input` so react-hook-form picks it up.
+                    e.preventDefault();
+                    const ta = e.currentTarget;
+                    const start = ta.selectionStart ?? 0;
+                    const end = ta.selectionEnd ?? 0;
+                    ta.value =
+                      ta.value.slice(0, start) + "\n" + ta.value.slice(end);
+                    const newPos = start + 1;
+                    ta.selectionStart = newPos;
+                    ta.selectionEnd = newPos;
+                    ta.dispatchEvent(new Event("input", { bubbles: true }));
                   }}
                   {...askForm.register("message")}
                 />
