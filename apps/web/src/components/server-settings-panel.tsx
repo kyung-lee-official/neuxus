@@ -9,6 +9,7 @@ import { useAdminUser } from "./admin-shell";
 import { EmbedSettingsBlock } from "./embed-settings-block";
 import { LogSettingsBlock } from "./log-settings-block";
 import { Modal } from "./modal";
+import { RetrieveSettingsBlock } from "./retrieve-settings-block";
 import { SynthesisSettingsBlock } from "./synthesis-settings-block";
 
 function errorMessage(err: unknown): string {
@@ -33,6 +34,7 @@ export function ServerSettingsPanel() {
         </p>
       </section>
       <EmbedSettingsBlock actorApiKey={user.apiKey} />
+      <RetrieveSettingsBlock actorApiKey={user.apiKey} />
       <SynthesisSettingsBlock actorApiKey={user.apiKey} />
       <LogSettingsBlock actorApiKey={user.apiKey} />
       <NukeDbBlock

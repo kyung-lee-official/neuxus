@@ -95,6 +95,7 @@ export const UserQueryKey = {
   SynthesisSettings: ["server-setting", "synthesis"] as const,
   CorpusSettings: ["server-setting", "corpus"] as const,
   LogSettings: ["server-setting", "log"] as const,
+  RetrieveSettings: ["server-setting", "retrieve"] as const,
   KnowledgePages: ["knowledge", "pages"] as const,
   KnowledgePage: (id: string) => ["knowledge", "pages", id] as const,
 } as const;
@@ -361,6 +362,47 @@ export async function resetSynthesisSettings(
   apiKey: string,
 ): Promise<SynthesisSettings> {
   return apiFetch<SynthesisSettings>("/server-setting/synthesis/reset", {
+    method: "POST",
+    apiKey,
+  });
+}
+
+export type RetrieveSettings = {
+  childLimit: number | null;
+  maxParents: number | null;
+  maxCharacters: number | null;
+  defaults: {
+    childLimit: number;
+    maxParents: number;
+    maxCharacters: number;
+  };
+};
+
+export async function getRetrieveSettings(
+  apiKey: string,
+): Promise<RetrieveSettings> {
+  return apiFetch<RetrieveSettings>("/server-setting/retrieve", { apiKey });
+}
+
+export async function putRetrieveSettings(input: {
+  apiKey: string;
+  settings: {
+    childLimit: number | null;
+    maxParents: number | null;
+    maxCharacters: number | null;
+  };
+}): Promise<RetrieveSettings> {
+  return apiFetch<RetrieveSettings>("/server-setting/retrieve", {
+    method: "PUT",
+    apiKey: input.apiKey,
+    body: JSON.stringify(input.settings),
+  });
+}
+
+export async function resetRetrieveSettings(
+  apiKey: string,
+): Promise<RetrieveSettings> {
+  return apiFetch<RetrieveSettings>("/server-setting/retrieve/reset", {
     method: "POST",
     apiKey,
   });
