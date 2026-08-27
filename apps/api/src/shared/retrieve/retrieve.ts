@@ -5,6 +5,7 @@ import {
   loadEmbedSettings,
   pgvectorLiteral,
 } from "../embed/index.ts";
+import { childLogger } from "../log/index.ts";
 import { type RetrieveOptions, resolveRetrieveOptions } from "./defaults.ts";
 import {
   type ChildHit,
@@ -13,6 +14,20 @@ import {
   scoreByParentFromHits,
   uniqueParentIdsByBestScore,
 } from "./rank.ts";
+
+const retrieveLog = childLogger({ module: "retrieve" }, "retrieve");
+
+/** One row of the raw top-K result from the vector scan. */
+type TopKHit = {
+  childId: string;
+  parentId: string;
+  pageId: string;
+  score: number;
+  /** First 200 chars of the child text — enough to eyeball relevance, not a full row. */
+  snippet: string;
+};
+
+const SNIPPET_CHARS = 200;
 
 export type RetrieveParentsByQuestionOptions = RetrieveOptions & {
   embedder?: Embedder;
@@ -51,6 +66,13 @@ function numberFromSql(value: unknown): number {
 /**
  * Embed the question and return ranked unique parents for the LLM.
  * Empty question → no parents. Does not call the synthesizer.
+ *
+ * Logs:
+ *  - `retrieve skipped` (status: "empty_question") when question is blank
+ *  - `retrieve ok`       (status: "ok" | "no_hits") after the vector scan,
+ *                          with the raw top-K child hits + scores
+ *  - `retrieve error`    (status: "error") on any throw; rethrown after logging
+ *
  * @see docs/modern-knowledge-base-design/05-query.md
  */
 export async function retrieveParentsByQuestion(
@@ -61,76 +83,117 @@ export async function retrieveParentsByQuestion(
   const knobs = resolveRetrieveOptions(options);
   const settings = await loadEmbedSettings();
   const currentModel = settings.embeddingModel;
+  const start = performance.now();
 
   if (trimmed === "") {
+    retrieveLog.info("retrieve skipped", {
+      status: "empty_question",
+      embeddingModel: currentModel,
+      childLimit: knobs.childLimit,
+      latencyMs: 0,
+    });
     return { currentModel, parents: [] };
   }
 
-  const embedder = options?.embedder ?? createEmbedder(settings);
-  const vectors = await embedder.embed([trimmed]);
-  const vector = vectors[0];
-  if (!vector) {
-    throw new Error("Question embed returned no vector");
+  try {
+    const embedder = options?.embedder ?? createEmbedder(settings);
+    const vectors = await embedder.embed([trimmed]);
+    const vector = vectors[0];
+    if (!vector) {
+      throw new Error("Question embed returned no vector");
+    }
+
+    const literal = pgvectorLiteral(vector);
+    const childRows = await sql<ChildHitRow[]>`
+      SELECT
+        c.id AS child_id,
+        c.parent_id,
+        c.page_id,
+        c.text AS child_text,
+        1 - (c.embedding <=> ${literal}::vector) AS score
+      FROM kb_children c
+      WHERE c.embedding IS NOT NULL
+        AND c.embedding_model IS NOT DISTINCT FROM ${currentModel}
+      ORDER BY c.embedding <=> ${literal}::vector
+      LIMIT ${knobs.childLimit}
+    `;
+
+    const topK: TopKHit[] = childRows.map((row) => ({
+      childId: row.child_id,
+      parentId: row.parent_id,
+      pageId: row.page_id,
+      score: numberFromSql(row.score),
+      snippet: (row.child_text ?? "").slice(0, SNIPPET_CHARS),
+    }));
+
+    retrieveLog.info(topK.length === 0 ? "retrieve no_hits" : "retrieve ok", {
+      status: topK.length === 0 ? "no_hits" : "ok",
+      question: trimmed,
+      embeddingModel: currentModel,
+      childLimit: knobs.childLimit,
+      topK,
+      latencyMs: Math.round(performance.now() - start),
+    });
+
+    if (topK.length === 0) {
+      return { currentModel, parents: [] };
+    }
+
+    const hits: ChildHit[] = childRows.map((row) => ({
+      childId: row.child_id,
+      parentId: row.parent_id,
+      pageId: row.page_id,
+      childText: row.child_text ?? "",
+      score: numberFromSql(row.score),
+    }));
+
+    const parentIds = uniqueParentIdsByBestScore(hits);
+    if (parentIds.length === 0) {
+      return { currentModel, parents: [] };
+    }
+
+    const scores = scoreByParentFromHits(hits);
+    const parentRows = await sql<ParentRow[]>`
+      SELECT p.id, p.page_id, p.text, pg.slug, pg.title
+      FROM kb_parents p
+      JOIN kb_pages pg ON pg.id = p.page_id
+      WHERE p.id = ANY(${sql.array(parentIds)}::text[])
+    `;
+
+    const byId = new Map(
+      parentRows.map((row) => [
+        row.id,
+        {
+          parentId: row.id,
+          pageId: row.page_id,
+          slug: row.slug,
+          title: row.title ?? "",
+          text: row.text ?? "",
+          score: scores.get(row.id) ?? 0,
+        } satisfies RetrievedParent,
+      ]),
+    );
+
+    const ordered: RetrievedParent[] = [];
+    for (const id of parentIds) {
+      const parent = byId.get(id);
+      if (parent) ordered.push(parent);
+    }
+
+    return {
+      currentModel,
+      parents: capParents(ordered, knobs.maxParents, knobs.maxCharacters),
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    retrieveLog.error("retrieve error", {
+      status: "error",
+      question: trimmed,
+      embeddingModel: currentModel,
+      childLimit: knobs.childLimit,
+      error: message,
+      latencyMs: Math.round(performance.now() - start),
+    });
+    throw err;
   }
-
-  const literal = pgvectorLiteral(vector);
-  const childRows = await sql<ChildHitRow[]>`
-    SELECT
-      c.id AS child_id,
-      c.parent_id,
-      c.page_id,
-      c.text AS child_text,
-      1 - (c.embedding <=> ${literal}::vector) AS score
-    FROM kb_children c
-    WHERE c.embedding IS NOT NULL
-      AND c.embedding_model IS NOT DISTINCT FROM ${currentModel}
-    ORDER BY c.embedding <=> ${literal}::vector
-    LIMIT ${knobs.childLimit}
-  `;
-
-  const hits: ChildHit[] = childRows.map((row) => ({
-    childId: row.child_id,
-    parentId: row.parent_id,
-    pageId: row.page_id,
-    childText: row.child_text ?? "",
-    score: numberFromSql(row.score),
-  }));
-
-  const parentIds = uniqueParentIdsByBestScore(hits);
-  if (parentIds.length === 0) {
-    return { currentModel, parents: [] };
-  }
-
-  const scores = scoreByParentFromHits(hits);
-  const parentRows = await sql<ParentRow[]>`
-    SELECT p.id, p.page_id, p.text, pg.slug, pg.title
-    FROM kb_parents p
-    JOIN kb_pages pg ON pg.id = p.page_id
-    WHERE p.id = ANY(${sql.array(parentIds)}::text[])
-  `;
-
-  const byId = new Map(
-    parentRows.map((row) => [
-      row.id,
-      {
-        parentId: row.id,
-        pageId: row.page_id,
-        slug: row.slug,
-        title: row.title ?? "",
-        text: row.text ?? "",
-        score: scores.get(row.id) ?? 0,
-      } satisfies RetrievedParent,
-    ]),
-  );
-
-  const ordered: RetrievedParent[] = [];
-  for (const id of parentIds) {
-    const parent = byId.get(id);
-    if (parent) ordered.push(parent);
-  }
-
-  return {
-    currentModel,
-    parents: capParents(ordered, knobs.maxParents, knobs.maxCharacters),
-  };
 }

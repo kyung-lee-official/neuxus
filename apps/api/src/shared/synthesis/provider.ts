@@ -3,15 +3,21 @@ import {
   assertSynthesisBudget,
   type ResolvedSynthesisSettings,
 } from "./defaults.ts";
-import { createMinimaxSynthesizer } from "./minimax.ts";
+import {
+  buildMinimaxRequestBody,
+  createMinimaxSynthesizer,
+  MINIMAX_SYSTEM_PROMPT,
+  MINIMAX_TEMPERATURE,
+} from "./minimax.ts";
 import type { Synthesizer } from "./types.ts";
 
 const synthesisLog = childLogger({ module: "synthesis" }, "synthesis");
 
 /**
- * Wrap a `Synthesizer` so every call logs the raw prompt sent to the
- * LLM, the response, latency, model, and outcome to the app logger.
- * Errors are rethrown after logging.
+ * Wrap a `Synthesizer` so every call logs the **complete content sent to
+ * the LLM** (system prompt + temperature + full request body + user
+ * message + response + latency + outcome) to the app logger. Errors
+ * are rethrown after logging.
  */
 function withSynthesisLogging(
   inner: Synthesizer,
@@ -22,6 +28,7 @@ function withSynthesisLogging(
 ): Synthesizer {
   return {
     async synthesize(prompt: string): Promise<string> {
+      const request = buildMinimaxRequestBody(settings, prompt);
       const start = performance.now();
       try {
         const response = await inner.synthesize(prompt);
@@ -29,8 +36,11 @@ function withSynthesisLogging(
           provider: settings.provider,
           model: settings.synthesisModel,
           maxTokens: settings.maxTokens,
+          system: MINIMAX_SYSTEM_PROMPT,
+          temperature: MINIMAX_TEMPERATURE,
           promptChars: prompt.length,
           prompt,
+          request,
           response,
           latencyMs: Math.round(performance.now() - start),
           status: "ok",
@@ -42,8 +52,11 @@ function withSynthesisLogging(
           provider: settings.provider,
           model: settings.synthesisModel,
           maxTokens: settings.maxTokens,
+          system: MINIMAX_SYSTEM_PROMPT,
+          temperature: MINIMAX_TEMPERATURE,
           promptChars: prompt.length,
           prompt,
+          request,
           error: message,
           latencyMs: Math.round(performance.now() - start),
           status: "error",
