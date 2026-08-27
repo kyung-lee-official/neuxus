@@ -165,7 +165,7 @@ export function DemoPanel() {
           </div>
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-canvas to-transparent"
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-linear-to-t from-canvas to-transparent"
           />
         </div>
 
@@ -203,8 +203,7 @@ export function DemoPanel() {
                     const ta = e.currentTarget;
                     const start = ta.selectionStart ?? 0;
                     const end = ta.selectionEnd ?? 0;
-                    ta.value =
-                      ta.value.slice(0, start) + "\n" + ta.value.slice(end);
+                    ta.value = `${ta.value.slice(0, start)}\n${ta.value.slice(end)}`;
                     const newPos = start + 1;
                     ta.selectionStart = newPos;
                     ta.selectionEnd = newPos;
