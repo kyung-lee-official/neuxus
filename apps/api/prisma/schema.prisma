@@ -112,6 +112,22 @@ model KnowledgeChunkSettings {
     @@map("kb_chunk_settings")
 }
 
+/// Retrieval knobs (`kb_retrieve_settings`). Nullable columns — app defaults
+/// live in code (`RETRIEVE_DEFAULTS`), not SQL DEFAULT. Single row: id =
+/// `"default"`. Mirrors `kb_embed_settings` / `kb_chunk_settings` shape.
+model KnowledgeRetrieveSettings {
+    id String @id @default("default")
+
+    /// Top-K child hits from the vector distance scan.
+    childLimit     Int? @map("child_limit")
+    /// Max unique parent ids returned after dedup.
+    maxParents     Int? @map("max_parents")
+    /// Cap on total parent-text characters.
+    maxCharacters  Int? @map("max_characters")
+
+    @@map("kb_retrieve_settings")
+}
+
 /// Embed runtime config (`kb_embed_settings`). Nullable columns — app defaults
 /// live in code (`EMBED_DEFAULTS`), not SQL DEFAULT. Single row: id = `"default"`.
 model KnowledgeEmbedSettings {
