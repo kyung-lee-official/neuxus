@@ -157,7 +157,7 @@ export async function retrieveParentsByQuestion(
       SELECT p.id, p.page_id, p.text, pg.slug, pg.title
       FROM kb_parents p
       JOIN kb_pages pg ON pg.id = p.page_id
-      WHERE p.id = ANY(${sql.array(parentIds)}::text[])
+      WHERE p.id = ANY(${sql.array(parentIds, "text[]")})
     `;
 
     const byId = new Map(
