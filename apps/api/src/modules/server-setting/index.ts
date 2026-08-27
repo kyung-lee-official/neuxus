@@ -15,6 +15,14 @@ export const serverSetting = new Elysia({ prefix: "/server-setting" })
   .post("/embed/reset", () => ServerSetting.resetEmbed(), {
     requireAdmin: true,
   })
+  .post(
+    "/embed/test-search",
+    ({ body }) => ServerSetting.testEmbedSearch(body),
+    {
+      requireAdmin: true,
+      body: ServerSettingModel.embedTestSearchBody,
+    },
+  )
   .get("/synthesis", () => ServerSetting.getSynthesis(), {
     requireAdmin: true,
   })

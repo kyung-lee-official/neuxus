@@ -41,6 +41,7 @@ import {
   type SynthesisSettingsRow,
   saveSynthesisSettings,
 } from "../../shared/synthesis/index.ts";
+import { runTestEmbedSearch } from "./embed-search.ts";
 import type { ServerSettingModel } from "./model.ts";
 
 const LOCKED_MESSAGE = "A corpus operation is already running.";
@@ -72,6 +73,17 @@ export abstract class ServerSetting {
 
   static async resetEmbed() {
     return resetEmbedSettings();
+  }
+
+  static async testEmbedSearch(
+    body: ServerSettingModel["embedTestSearchBody"],
+  ) {
+    try {
+      return await runTestEmbedSearch(body.query, body.limit ?? 10);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw status(500, { error: msg });
+    }
   }
 
   static async getSynthesis() {

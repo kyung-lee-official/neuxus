@@ -2,15 +2,16 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
   ApiError,
+  type EmbedTestSearchHit,
   getEmbedSettings,
-  listKnowledgePages,
   putEmbedSettings,
   resetEmbedSettings,
+  testEmbedSearch,
   UserQueryKey,
 } from "@/lib/api";
 
@@ -72,23 +73,21 @@ export function EmbedSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
     });
   }, [settingsQuery.data, form]);
 
-  const pagesQuery = useQuery({
-    queryKey: UserQueryKey.KnowledgePages,
-    queryFn: () => listKnowledgePages(actorApiKey),
-  });
-  const allPages = pagesQuery.data?.pages ?? [];
   const [searchInput, setSearchInput] = useState("");
-  const [searchSubmitted, setSearchSubmitted] = useState("");
-  const searchMatches = useMemo(() => {
-    const q = searchSubmitted.trim().toLowerCase();
-    if (q === "") return [];
-    return allPages.filter((p) =>
-      [p.title, p.slug, p.type ?? "", ...(p.tags ?? [])]
-        .join(" ")
-        .toLowerCase()
-        .includes(q),
-    );
-  }, [allPages, searchSubmitted]);
+  const [searchResults, setSearchResults] = useState<
+    EmbedTestSearchHit[] | null
+  >(null);
+  const searchMutation = useMutation({
+    mutationFn: (query: string) => testEmbedSearch(actorApiKey, { query }),
+    onSuccess: (data) => {
+      setSearchResults(data.results);
+    },
+  });
+  function runSearch() {
+    const q = searchInput.trim();
+    if (q === "") return;
+    searchMutation.mutate(q);
+  }
 
   const saveMutation = useMutation({
     mutationFn: (values: EmbedValues) =>
@@ -224,68 +223,80 @@ export function EmbedSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
           </form>
           <details className="rounded border border-line">
             <summary className="cursor-pointer list-none px-3 py-2 font-display text-ink text-sm">
-              Test search
+              Test search (top-K)
             </summary>
             <form
               className="flex flex-col gap-2 border-line border-t p-3"
               onSubmit={(e) => {
                 e.preventDefault();
-                setSearchSubmitted(searchInput);
+                runSearch();
               }}
             >
               <div className="flex gap-2">
                 <input
                   type="search"
                   className="flex-1 rounded border border-line bg-canvas px-2.5 py-2 text-ink text-sm disabled:opacity-60"
-                  placeholder="Filter by slug, title, type, or tag"
+                  placeholder="Search the knowledge base by vector cosine similarity"
                   value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
+                  onChange={(e) => {
+                    setSearchInput(e.target.value);
+                    if (searchResults !== null) setSearchResults(null);
+                  }}
                 />
                 <button
                   type="submit"
                   className="rounded border border-accent bg-accent px-3.5 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={searchInput.trim() === "" || pagesQuery.isFetching}
+                  disabled={
+                    searchInput.trim() === "" || searchMutation.isPending
+                  }
                 >
-                  Search
+                  {searchMutation.isPending ? "Searching…" : "Search"}
                 </button>
               </div>
-              <p className="m-0 text-muted text-xs">
-                {pagesQuery.isLoading
-                  ? "Loading pages…"
-                  : pagesQuery.isError
-                    ? `Error: ${errorMessage(pagesQuery.error)}`
-                    : searchSubmitted.trim() === ""
-                      ? `${allPages.length} pages available. Type and click Search.`
-                      : `${searchMatches.length} of ${allPages.length} match.`}
-              </p>
-              {searchSubmitted.trim() !== "" ? (
-                <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-                  {searchMatches.slice(0, 20).map((p) => (
-                    <li
-                      key={p.id}
-                      className="rounded border border-line bg-canvas p-2 text-sm"
-                    >
-                      <div className="font-display text-ink">{p.title}</div>
-                      <div className="break-all font-mono text-muted text-xs">
-                        {p.slug}
-                      </div>
-                      <div className="text-muted text-xs">
-                        type={p.type ?? "—"} · parents={p.parentCount} ·
-                        children={p.childCount}
-                      </div>
-                    </li>
-                  ))}
-                  {searchMatches.length === 0 ? (
-                    <li className="text-muted text-xs">
-                      No pages match “{searchSubmitted}”.
-                    </li>
+              {searchMutation.isError ? (
+                <p className="m-0 text-danger text-sm">
+                  {errorMessage(searchMutation.error)}
+                </p>
+              ) : null}
+              {!searchMutation.isError && searchMutation.isPending ? (
+                <p className="m-0 text-muted text-sm">Searching…</p>
+              ) : null}
+              {!searchMutation.isPending &&
+              !searchMutation.isError &&
+              searchResults !== null ? (
+                <>
+                  <p className="m-0 text-muted text-xs">
+                    {searchResults.length === 0
+                      ? "No pages match this query."
+                      : `${searchResults.length} result${searchResults.length === 1 ? "" : "s"}.`}
+                  </p>
+                  {searchResults.length > 0 ? (
+                    <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+                      {searchResults.map((p) => (
+                        <li
+                          key={p.id}
+                          className="rounded border border-line bg-canvas p-2 text-sm"
+                        >
+                          <div className="flex items-baseline justify-between gap-2">
+                            <div className="font-display text-ink">
+                              {p.title}
+                            </div>
+                            <div className="shrink-0 font-mono text-muted text-xs">
+                              Cosine similarity: {p.score.toFixed(4)}
+                            </div>
+                          </div>
+                          <div className="break-all font-mono text-muted text-xs">
+                            {p.slug}
+                          </div>
+                          <div className="text-muted text-xs">
+                            type={p.type ?? "—"} · parents={p.parentCount} ·
+                            children={p.childCount}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
                   ) : null}
-                  {searchMatches.length > 20 ? (
-                    <li className="text-muted text-xs">
-                      Showing first 20 of {searchMatches.length}.
-                    </li>
-                  ) : null}
-                </ul>
+                </>
               ) : null}
             </form>
           </details>

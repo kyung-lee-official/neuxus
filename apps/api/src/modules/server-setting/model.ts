@@ -38,6 +38,10 @@ export const ServerSettingModel = {
     maxParents: t.Union([t.Integer({ minimum: 1 }), t.Null()]),
     maxCharacters: t.Union([t.Integer({ minimum: 1 }), t.Null()]),
   }),
+  embedTestSearchBody: t.Object({
+    query: t.String({ minLength: 1 }),
+    limit: t.Optional(t.Integer({ minimum: 1, maximum: 50 })),
+  }),
 } as const;
 
 export type ServerSettingModel = {

@@ -121,7 +121,7 @@ export function RetrieveSettingsBlock({
           onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}
         >
           <label className="flex flex-col gap-1.5 text-sm">
-            <span>Child limit</span>
+            <span>Child limit (top-K)</span>
             <input
               className="w-full rounded border border-line bg-canvas px-2.5 py-2 text-ink disabled:opacity-60"
               inputMode="numeric"

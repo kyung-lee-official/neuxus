@@ -291,6 +291,31 @@ export async function getEmbedSettings(apiKey: string): Promise<EmbedSettings> {
   return apiFetch<EmbedSettings>("/server-setting/embed", { apiKey });
 }
 
+export type EmbedTestSearchHit = {
+  id: string;
+  slug: string;
+  title: string;
+  type: string | null;
+  tags: string[];
+  sourcePath: string | null;
+  contentHash: string;
+  updatedAt: string | null;
+  parentCount: number;
+  childCount: number;
+  /** Cosine similarity in [0, 1]; 1 - distance. */
+  score: number;
+};
+
+export async function testEmbedSearch(
+  apiKey: string,
+  input: { query: string; limit?: number },
+): Promise<{ results: EmbedTestSearchHit[] }> {
+  return apiFetch<{ results: EmbedTestSearchHit[] }>(
+    "/server-setting/embed/test-search",
+    { method: "POST", apiKey, body: JSON.stringify(input) },
+  );
+}
+
 export async function putEmbedSettings(input: {
   apiKey: string;
   settings: {
