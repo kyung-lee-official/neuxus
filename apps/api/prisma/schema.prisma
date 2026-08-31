@@ -209,11 +209,16 @@ model AppLog {
     name      String?
     /// Full logixlysia record minus the columns above (time, pid, hostname, bindings, …).
     meta      Json
+    /// Optional owner. Set only by the retrieve and synthesis domains; other
+    /// loggers leave it null. No FK — the logger must never block a request
+    /// on referential checks.
+    userId    String?  @map("user_id")
     createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
     @@index([createdAt(sort: Desc)], map: "app_log_created_at_idx")
     @@index([level, createdAt(sort: Desc)], map: "app_log_level_created_at_idx")
     @@index([name, createdAt(sort: Desc)], map: "app_log_name_created_at_idx")
+    @@index([userId, createdAt(sort: Desc)], map: "app_log_user_id_created_at_idx")
     @@map("app_log")
 }
 
