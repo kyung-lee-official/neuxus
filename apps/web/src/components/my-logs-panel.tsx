@@ -80,10 +80,51 @@ function extractTopK(item: MyLogItem): TopKHit[] | null {
   return hits;
 }
 
+type SynthesisContent = {
+  system: string | null;
+  prompt: string | null;
+  response: string | null;
+  error: string | null;
+};
+
+function extractSynthesisContent(item: MyLogItem): SynthesisContent | null {
+  if (item.name !== "synthesis") return null;
+  const meta = item.meta;
+  if (!meta || typeof meta !== "object") return null;
+  const m = meta as {
+    system?: unknown;
+    prompt?: unknown;
+    response?: unknown;
+    error?: unknown;
+  };
+  const system = typeof m.system === "string" ? m.system : null;
+  const prompt = typeof m.prompt === "string" ? m.prompt : null;
+  const response = typeof m.response === "string" ? m.response : null;
+  const error = typeof m.error === "string" ? m.error : null;
+  if (!system && !prompt && !response && !error) return null;
+  return { system, prompt, response, error };
+}
+
+type PreviewKind = "topk" | "synthesis";
+
+function previewKind(item: MyLogItem): PreviewKind | null {
+  if (extractTopK(item) !== null) return "topk";
+  if (extractSynthesisContent(item) !== null) return "synthesis";
+  return null;
+}
+
+function previewButtonLabel(kind: PreviewKind): string {
+  return kind === "topk" ? "Preview top-k" : "Preview content";
+}
+
+function previewModalTitle(kind: PreviewKind): string {
+  return kind === "topk" ? "Top-K hits" : "Synthesis content";
+}
+
 export function MyLogsPanel() {
   const activeUserId = useActiveUserStore((s) => s.activeUserId);
   const [selected, setSelected] = useState<MyLogItem | null>(null);
-  const [previewTopK, setPreviewTopK] = useState<MyLogItem | null>(null);
+  const [previewItem, setPreviewItem] = useState<MyLogItem | null>(null);
 
   const [storeReady, setStoreReady] = useState(false);
   useEffect(() => {
@@ -151,7 +192,7 @@ export function MyLogsPanel() {
         <List
           apiKey={active.apiKey}
           onSelect={setSelected}
-          onPreviewTopK={setPreviewTopK}
+          onPreview={setPreviewItem}
         />
       </div>
 
@@ -166,13 +207,22 @@ export function MyLogsPanel() {
       </Modal>
 
       <Modal
-        open={previewTopK !== null}
-        title="Top-K hits"
-        titleId="log-topk-title"
-        onClose={() => setPreviewTopK(null)}
+        open={previewItem !== null}
+        title={
+          previewItem
+            ? previewModalTitle(previewKind(previewItem) ?? "synthesis")
+            : ""
+        }
+        titleId="log-preview-title"
+        onClose={() => setPreviewItem(null)}
         widthClass="max-w-3xl"
       >
-        {previewTopK ? <TopKPreview item={previewTopK} /> : null}
+        {previewItem && previewKind(previewItem) === "topk" ? (
+          <TopKPreview item={previewItem} />
+        ) : null}
+        {previewItem && previewKind(previewItem) === "synthesis" ? (
+          <SynthesisPreview item={previewItem} />
+        ) : null}
       </Modal>
     </main>
   );
@@ -181,11 +231,11 @@ export function MyLogsPanel() {
 function List({
   apiKey,
   onSelect,
-  onPreviewTopK,
+  onPreview,
 }: {
   apiKey: string;
   onSelect: (item: MyLogItem) => void;
-  onPreviewTopK: (item: MyLogItem) => void;
+  onPreview: (item: MyLogItem) => void;
 }) {
   const query = useInfiniteQuery({
     queryKey: UserQueryKey.MyLogs(null),
@@ -228,7 +278,7 @@ function List({
       <section className="overflow-hidden rounded-md border border-line bg-surface">
         <ul className="m-0 flex list-none flex-col divide-y divide-line p-0">
           {items.map((it) => {
-            const hasTopK = extractTopK(it) !== null;
+            const kind = previewKind(it);
             return (
               <li key={it.id} className="flex items-stretch">
                 <button
@@ -247,16 +297,16 @@ function List({
                     {it.msg}
                   </span>
                 </button>
-                {hasTopK ? (
+                {kind ? (
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onPreviewTopK(it);
+                      onPreview(it);
                     }}
-                    className="shrink-0 self-stretch border-line border-l bg-surface px-3 text-accent text-xs hover:bg-canvas"
+                    className="w-36 shrink-0 self-stretch border-line border-r border-l bg-surface px-3 text-accent text-xs hover:bg-canvas"
                   >
-                    Preview top-k
+                    {previewButtonLabel(kind)}
                   </button>
                 ) : null}
                 <span className="shrink-0 self-center px-3 font-mono text-muted text-xs">
@@ -334,5 +384,56 @@ function TopKPreview({ item }: { item: MyLogItem }) {
         </section>
       ))}
     </div>
+  );
+}
+
+function SynthesisPreview({ item }: { item: MyLogItem }) {
+  const content = extractSynthesisContent(item);
+  if (!content) {
+    return (
+      <p className="m-0 text-muted text-sm">No synthesis content logged.</p>
+    );
+  }
+  return (
+    <div className="flex max-h-[70vh] flex-col gap-4 overflow-y-auto">
+      <p className="m-0 text-muted text-xs">
+        Raw text from the synthesis call. Newlines preserved; no JSON escaping.
+      </p>
+      {content.system ? (
+        <PreviewSection title="System prompt" body={content.system} />
+      ) : null}
+      {content.prompt ? (
+        <PreviewSection title="Prompt" body={content.prompt} />
+      ) : null}
+      {content.response ? (
+        <PreviewSection title="Response" body={content.response} />
+      ) : null}
+      {content.error ? (
+        <PreviewSection title="Error" body={content.error} tone="danger" />
+      ) : null}
+    </div>
+  );
+}
+
+function PreviewSection({
+  title,
+  body,
+  tone = "default",
+}: {
+  title: string;
+  body: string;
+  tone?: "default" | "danger";
+}) {
+  return (
+    <section className="flex flex-col gap-1.5">
+      <h3
+        className={`m-0 font-display text-sm ${tone === "danger" ? "text-danger" : "text-ink"}`}
+      >
+        {title}
+      </h3>
+      <pre className="m-0 whitespace-pre-wrap rounded border border-line bg-canvas p-2 font-mono text-ink text-xs">
+        {body}
+      </pre>
+    </section>
   );
 }
