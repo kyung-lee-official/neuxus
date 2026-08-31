@@ -13,7 +13,6 @@ import {
 } from "@/lib/api";
 import { formatDateTime } from "@/lib/date-time";
 import { displayName } from "@/lib/display-name";
-import { ActiveUserPanel } from "./active-user-panel";
 import { Modal } from "./modal";
 
 function errorMessage(err: unknown): string {
@@ -85,28 +84,33 @@ export function MyLogsPanel() {
   }
 
   return (
-    <div className="flex h-dvh overflow-hidden">
-      <ActiveUserPanel active={active} />
-      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-5 pt-8 pb-16">
-        <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
-          <header className="flex flex-col gap-1 rounded-md border border-line bg-surface p-6 shadow-sm">
+    <main className="flex min-h-dvh flex-col items-center px-5 py-10 pb-16">
+      <div className="flex w-full max-w-4xl flex-col gap-4">
+        <header className="flex flex-col gap-2 rounded-md border border-line bg-surface p-6 shadow-sm">
+          <div className="flex items-center justify-between gap-2">
             <h1 className="m-0 font-display text-2xl text-ink">My logs</h1>
-            <p className="m-0 text-muted text-sm">
-              Retrieve and synthesis activity for {displayName(active.id)}.
-              Newest first.
+            <Link
+              href="/ask"
+              className="rounded border border-line bg-transparent px-2 py-0.5 text-muted text-xs no-underline hover:border-ink hover:text-ink"
+            >
+              Back to chat
+            </Link>
+          </div>
+          <p className="m-0 text-muted text-sm">
+            Retrieve and synthesis activity for {displayName(active.id)}. Newest
+            first.
+          </p>
+        </header>
+
+        {usersQuery.isError ? (
+          <section className="rounded-md border border-danger bg-surface p-5">
+            <p className="m-0 text-danger text-sm">
+              {errorMessage(usersQuery.error)}
             </p>
-          </header>
+          </section>
+        ) : null}
 
-          {usersQuery.isError ? (
-            <section className="rounded-md border border-danger bg-surface p-5">
-              <p className="m-0 text-danger text-sm">
-                {errorMessage(usersQuery.error)}
-              </p>
-            </section>
-          ) : null}
-
-          <List apiKey={active.apiKey} onSelect={setSelected} />
-        </div>
+        <List apiKey={active.apiKey} onSelect={setSelected} />
       </div>
 
       <Modal
@@ -117,7 +121,7 @@ export function MyLogsPanel() {
       >
         {selected ? <LogDetail item={selected} /> : null}
       </Modal>
-    </div>
+    </main>
   );
 }
 
