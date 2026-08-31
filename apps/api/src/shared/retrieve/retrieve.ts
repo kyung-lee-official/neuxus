@@ -23,11 +23,9 @@ type TopKHit = {
   parentId: string;
   pageId: string;
   score: number;
-  /** First 200 chars of the child text — enough to eyeball relevance, not a full row. */
-  snippet: string;
+  /** Full child text. The log is the source of truth, so we keep the whole row. */
+  text: string;
 };
-
-const SNIPPET_CHARS = 200;
 
 export type RetrieveParentsByQuestionOptions = RetrieveOptions & {
   embedder?: Embedder;
@@ -129,7 +127,7 @@ export async function retrieveParentsByQuestion(
       parentId: row.parent_id,
       pageId: row.page_id,
       score: numberFromSql(row.score),
-      snippet: (row.child_text ?? "").slice(0, SNIPPET_CHARS),
+      text: row.child_text ?? "",
     }));
 
     retrieveLog.info(topK.length === 0 ? "retrieve no_hits" : "retrieve ok", {

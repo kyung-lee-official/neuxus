@@ -1,7 +1,7 @@
 /**
  * Pretty-print one `app_log` row by id. Newlines in strings are
  * preserved, sections are labeled, the full request body is dumped
- * as indented JSON, and top-K hits are listed with score + snippet.
+ * as indented JSON, and top-K hits are listed with score + full text.
  *
  * Usage:
  *   bun --env-file=../../.env run scripts/format-log.ts <log-id>
@@ -118,9 +118,9 @@ if (Array.isArray(m.topK) && m.topK.length > 0) {
     const childId = String(hit.childId ?? "?");
     console.log(`#  score=${score}  childId=${childId}  parentId=${parentId}`);
     console.log(`#  pageId=${pageId}`);
-    if (typeof hit.snippet === "string" && hit.snippet.length > 0) {
-      console.log("#  snippet:");
-      for (const line of hit.snippet.split("\n")) {
+    if (typeof hit.text === "string" && hit.text.length > 0) {
+      console.log("#  text:");
+      for (const line of hit.text.split("\n")) {
         console.log(`     ${line}`);
       }
     }

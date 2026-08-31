@@ -10,6 +10,8 @@ type ModalProps = {
   onClose: () => void;
   /** When true, backdrop / Escape / × do not close. */
   closeDisabled?: boolean;
+  /** Tailwind `max-w-*` class for the dialog width. Defaults to `max-w-md`. */
+  widthClass?: string;
   children: ReactNode;
 };
 
@@ -19,6 +21,7 @@ export function Modal({
   titleId,
   onClose,
   closeDisabled = false,
+  widthClass = "max-w-md",
   children,
 }: ModalProps) {
   const [mounted, setMounted] = useState(false);
@@ -49,7 +52,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative w-full max-w-md rounded-md border border-line bg-surface p-5 shadow-lg"
+        className={`relative w-full ${widthClass} rounded-md border border-line bg-surface p-5 shadow-lg`}
         onClick={(e) => e.stopPropagation()}
       >
         <button

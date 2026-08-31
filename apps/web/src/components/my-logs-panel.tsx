@@ -43,9 +43,47 @@ function formatMeta(value: unknown): string {
   }
 }
 
+type TopKHit = {
+  childId: string;
+  parentId: string;
+  pageId: string;
+  score: number;
+  text: string;
+};
+
+function extractTopK(item: MyLogItem): TopKHit[] | null {
+  if (item.name !== "retrieve") return null;
+  const meta = item.meta;
+  if (!meta || typeof meta !== "object") return null;
+  const topK = (meta as { topK?: unknown }).topK;
+  if (!Array.isArray(topK)) return null;
+  const hits: TopKHit[] = [];
+  for (const raw of topK) {
+    if (!raw || typeof raw !== "object") continue;
+    const h = raw as Partial<TopKHit>;
+    if (
+      typeof h.childId === "string" &&
+      typeof h.parentId === "string" &&
+      typeof h.pageId === "string" &&
+      typeof h.score === "number" &&
+      typeof h.text === "string"
+    ) {
+      hits.push({
+        childId: h.childId,
+        parentId: h.parentId,
+        pageId: h.pageId,
+        score: h.score,
+        text: h.text,
+      });
+    }
+  }
+  return hits;
+}
+
 export function MyLogsPanel() {
   const activeUserId = useActiveUserStore((s) => s.activeUserId);
   const [selected, setSelected] = useState<MyLogItem | null>(null);
+  const [previewTopK, setPreviewTopK] = useState<MyLogItem | null>(null);
 
   const [storeReady, setStoreReady] = useState(false);
   useEffect(() => {
@@ -110,7 +148,11 @@ export function MyLogsPanel() {
           </section>
         ) : null}
 
-        <List apiKey={active.apiKey} onSelect={setSelected} />
+        <List
+          apiKey={active.apiKey}
+          onSelect={setSelected}
+          onPreviewTopK={setPreviewTopK}
+        />
       </div>
 
       <Modal
@@ -118,8 +160,19 @@ export function MyLogsPanel() {
         title={selected ? `${selected.name ?? "log"} — ${selected.msg}` : ""}
         titleId="log-detail-title"
         onClose={() => setSelected(null)}
+        widthClass="max-w-3xl"
       >
         {selected ? <LogDetail item={selected} /> : null}
+      </Modal>
+
+      <Modal
+        open={previewTopK !== null}
+        title="Top-K hits"
+        titleId="log-topk-title"
+        onClose={() => setPreviewTopK(null)}
+        widthClass="max-w-3xl"
+      >
+        {previewTopK ? <TopKPreview item={previewTopK} /> : null}
       </Modal>
     </main>
   );
@@ -128,9 +181,11 @@ export function MyLogsPanel() {
 function List({
   apiKey,
   onSelect,
+  onPreviewTopK,
 }: {
   apiKey: string;
   onSelect: (item: MyLogItem) => void;
+  onPreviewTopK: (item: MyLogItem) => void;
 }) {
   const query = useInfiniteQuery({
     queryKey: UserQueryKey.MyLogs(null),
@@ -172,29 +227,44 @@ function List({
     <>
       <section className="overflow-hidden rounded-md border border-line bg-surface">
         <ul className="m-0 flex list-none flex-col divide-y divide-line p-0">
-          {items.map((it) => (
-            <li key={it.id}>
-              <button
-                type="button"
-                onClick={() => onSelect(it)}
-                className="flex w-full items-start gap-3 px-4 py-2.5 text-left hover:bg-canvas"
-              >
-                <span className="w-44 shrink-0 font-mono text-muted text-xs">
-                  {formatDateTime(it.createdAt)}
-                </span>
-                <span className={levelClass(it.level)}>{it.level}</span>
-                <span className="w-20 shrink-0 font-mono text-ink text-xs">
-                  {it.name ?? "—"}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-ink text-sm">
-                  {it.msg}
-                </span>
-                <span className="shrink-0 font-mono text-muted text-xs">
+          {items.map((it) => {
+            const hasTopK = extractTopK(it) !== null;
+            return (
+              <li key={it.id} className="flex items-stretch">
+                <button
+                  type="button"
+                  onClick={() => onSelect(it)}
+                  className="flex min-w-0 flex-1 items-start gap-3 px-4 py-2.5 text-left hover:bg-canvas"
+                >
+                  <span className="w-44 shrink-0 font-mono text-muted text-xs">
+                    {formatDateTime(it.createdAt)}
+                  </span>
+                  <span className={levelClass(it.level)}>{it.level}</span>
+                  <span className="w-20 shrink-0 font-mono text-ink text-xs">
+                    {it.name ?? "—"}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-ink text-sm">
+                    {it.msg}
+                  </span>
+                </button>
+                {hasTopK ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onPreviewTopK(it);
+                    }}
+                    className="shrink-0 self-stretch border-line border-l bg-surface px-3 text-accent text-xs hover:bg-canvas"
+                  >
+                    Preview top-k
+                  </button>
+                ) : null}
+                <span className="shrink-0 self-center px-3 font-mono text-muted text-xs">
                   #{shortId(it.id)}
                 </span>
-              </button>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       </section>
 
@@ -237,6 +307,32 @@ function LogDetail({ item }: { item: MyLogItem }) {
           {formatMeta(item.meta)}
         </pre>
       </div>
+    </div>
+  );
+}
+
+function TopKPreview({ item }: { item: MyLogItem }) {
+  const hits = extractTopK(item);
+  if (!hits || hits.length === 0) {
+    return <p className="m-0 text-muted text-sm">No top-K hits logged.</p>;
+  }
+  return (
+    <div className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto">
+      <p className="m-0 text-muted text-xs">
+        {hits.length} {hits.length === 1 ? "hit" : "hits"} from the cosine scan,
+        newest-first. Plain text, no JSON escaping.
+      </p>
+      {hits.map((hit, i) => (
+        <section key={hit.childId} className="flex flex-col gap-1.5">
+          <div className="font-mono text-muted text-xs">
+            # {i + 1} score={hit.score.toFixed(4)} childId={hit.childId}{" "}
+            parentId={hit.parentId} pageId={hit.pageId}
+          </div>
+          <pre className="m-0 whitespace-pre-wrap rounded border border-line bg-canvas p-2 font-mono text-ink text-xs">
+            {hit.text}
+          </pre>
+        </section>
+      ))}
     </div>
   );
 }
