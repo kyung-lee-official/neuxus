@@ -98,10 +98,43 @@ export const UserQueryKey = {
   RetrieveSettings: ["server-setting", "retrieve"] as const,
   KnowledgePages: ["knowledge", "pages"] as const,
   KnowledgePage: (id: string) => ["knowledge", "pages", id] as const,
+  /** Page of the current user's own retrieve/synthesis logs. */
+  MyLogs: (cursor: string | null) => ["logs", "mine", cursor] as const,
 } as const;
 
 export async function getHealth(): Promise<{ ok: boolean }> {
   return apiFetch<{ ok: boolean }>("/health");
+}
+
+export type MyLogItem = {
+  id: string;
+  level: string;
+  msg: string;
+  name: string | null;
+  userId: string | null;
+  meta: unknown;
+  createdAt: string;
+};
+
+export type MyLogsPage = {
+  items: MyLogItem[];
+  nextCursor: string | null;
+};
+
+export async function getMyLogs(input: {
+  apiKey: string;
+  cursor?: string | null;
+  limit?: number;
+}): Promise<MyLogsPage> {
+  const params = new URLSearchParams();
+  if (input.cursor) params.set("cursor", input.cursor);
+  if (typeof input.limit === "number") {
+    params.set("limit", String(input.limit));
+  }
+  const qs = params.toString();
+  return apiFetch<MyLogsPage>(`/logs${qs ? `?${qs}` : ""}`, {
+    apiKey: input.apiKey,
+  });
 }
 
 export type NukeTarget = "app";

@@ -332,6 +332,20 @@ export function SettingsPanel({ userId }: { userId: string }) {
           </ul>
         )}
       </section>
+
+      <section className="flex flex-col gap-3 rounded-md border border-line bg-surface p-6">
+        <h2 className="m-0 font-display text-ink text-lg">Activity</h2>
+        <p className="m-0 text-muted text-sm">
+          Review the retrieve and synthesis activity the app has logged for your
+          account.
+        </p>
+        <Link
+          href="/settings/logs"
+          className="self-start rounded border border-line bg-transparent px-3 py-1.5 text-ink text-sm no-underline hover:border-ink"
+        >
+          View my logs →
+        </Link>
+      </section>
     </div>
   );
 }

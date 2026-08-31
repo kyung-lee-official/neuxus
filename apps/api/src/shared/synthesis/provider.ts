@@ -25,6 +25,7 @@ function withSynthesisLogging(
     ResolvedSynthesisSettings,
     "provider" | "synthesisModel" | "maxTokens"
   >,
+  userId: string | null,
 ): Synthesizer {
   return {
     async synthesize(prompt: string): Promise<string> {
@@ -33,6 +34,7 @@ function withSynthesisLogging(
       try {
         const response = await inner.synthesize(prompt);
         synthesisLog.info("synthesis ok", {
+          userId,
           provider: settings.provider,
           model: settings.synthesisModel,
           maxTokens: settings.maxTokens,
@@ -49,6 +51,7 @@ function withSynthesisLogging(
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         synthesisLog.error("synthesis error", {
+          userId,
           provider: settings.provider,
           model: settings.synthesisModel,
           maxTokens: settings.maxTokens,
@@ -67,12 +70,29 @@ function withSynthesisLogging(
   };
 }
 
+export type CreateSynthesizerOptions = {
+  /**
+   * Owner of the request. Stamped on every `app_log` row this synthesizer
+   * emits so the user-facing "My logs" page can filter by it.
+   */
+  userId?: string;
+};
+
 export function createSynthesizer(
   settings: ResolvedSynthesisSettings,
+  options?: CreateSynthesizerOptions,
 ): Synthesizer {
   assertSynthesisBudget(settings);
   if (settings.provider !== "minimax") {
     throw new Error(`Unsupported synthesis provider: ${settings.provider}`);
   }
-  return withSynthesisLogging(createMinimaxSynthesizer(settings), settings);
+  const userId =
+    typeof options?.userId === "string" && options.userId.trim() !== ""
+      ? options.userId
+      : null;
+  return withSynthesisLogging(
+    createMinimaxSynthesizer(settings),
+    settings,
+    userId,
+  );
 }

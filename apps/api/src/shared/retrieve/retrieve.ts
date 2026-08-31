@@ -31,6 +31,11 @@ const SNIPPET_CHARS = 200;
 
 export type RetrieveParentsByQuestionOptions = RetrieveOptions & {
   embedder?: Embedder;
+  /**
+   * Owner of the request. Stamped on every `app_log` row this call emits so
+   * the user-facing "My logs" page can filter by it.
+   */
+  userId?: string;
 };
 
 export type RetrieveParentsByQuestionResult = {
@@ -87,6 +92,7 @@ export async function retrieveParentsByQuestion(
 
   if (trimmed === "") {
     retrieveLog.info("retrieve skipped", {
+      userId: options?.userId,
       status: "empty_question",
       embeddingModel: currentModel,
       childLimit: knobs.childLimit,
@@ -127,6 +133,7 @@ export async function retrieveParentsByQuestion(
     }));
 
     retrieveLog.info(topK.length === 0 ? "retrieve no_hits" : "retrieve ok", {
+      userId: options?.userId,
       status: topK.length === 0 ? "no_hits" : "ok",
       question: trimmed,
       embeddingModel: currentModel,
@@ -187,6 +194,7 @@ export async function retrieveParentsByQuestion(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     retrieveLog.error("retrieve error", {
+      userId: options?.userId,
       status: "error",
       question: trimmed,
       embeddingModel: currentModel,

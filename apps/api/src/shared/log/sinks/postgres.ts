@@ -28,6 +28,8 @@ export type LogRecord = {
   level: string;
   msg: string;
   name: string | null;
+  /** Optional owner. Set by the retrieve and synthesis domains only. */
+  userId: string | null;
   meta: Record<string, unknown>;
   /** Stamped at enqueue time (sync path). */
   time: string;
@@ -71,6 +73,7 @@ export class PostgresTransport implements Transport {
       level: normalizeLevel(level),
       msg: message,
       name: null,
+      userId: null,
       meta: meta ?? {},
       time: new Date().toISOString(),
     };
@@ -167,6 +170,7 @@ export class PostgresTransport implements Transport {
           level: record.level,
           msg: record.msg,
           name: record.name,
+          userId: record.userId,
           meta,
         },
       });

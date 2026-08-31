@@ -71,15 +71,16 @@ export abstract class Query {
       const recent = await listRecentMessages(sessionId);
       const personalMemories = await searchPersonalMemories(user.id, message);
       const retrieveSettings = await loadRetrieveSettings();
-      const { parents } = await retrieveParentsByQuestion(
-        message,
-        retrieveSettings,
-      );
+      const { parents } = await retrieveParentsByQuestion(message, {
+        ...retrieveSettings,
+        userId: user.id,
+      });
       const answer = await answerFromContext(
         recent,
         message,
         personalMemories,
         parents,
+        { userId: user.id },
       );
       await insertMessage(sessionId, "user", message);
       await insertMessage(sessionId, "assistant", answer);

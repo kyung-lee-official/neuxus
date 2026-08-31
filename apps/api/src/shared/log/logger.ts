@@ -54,11 +54,18 @@ function emit(
   name: string | null,
   meta: Record<string, unknown>,
 ): void {
+  // Hoist `userId` out of `meta` so it lands in the dedicated `user_id`
+  // column instead of being buried in the JSON blob. Set by the retrieve
+  // and synthesis domains; all other loggers leave it null.
+  const { userId: rawUserId, ...rest } = meta;
+  const userId =
+    typeof rawUserId === "string" && rawUserId.trim() !== "" ? rawUserId : null;
   const record: LogRecord = {
     level: normalizeLevel(level),
     msg: message,
     name,
-    meta,
+    userId,
+    meta: rest,
     time: new Date().toISOString(),
   };
   try {
