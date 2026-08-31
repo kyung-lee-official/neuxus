@@ -280,22 +280,23 @@ function List({
           {items.map((it) => {
             const kind = previewKind(it);
             return (
-              <li key={it.id} className="flex items-stretch">
+              <li
+                key={it.id}
+                className="grid grid-cols-[11rem_auto_5rem_minmax(0,1fr)_9rem_auto] items-center gap-3 px-4 py-2.5 hover:bg-canvas"
+              >
                 <button
                   type="button"
                   onClick={() => onSelect(it)}
-                  className="flex min-w-0 flex-1 items-start gap-3 px-4 py-2.5 text-left hover:bg-canvas"
+                  className="col-span-4 grid grid-cols-subgrid items-center gap-3 bg-transparent text-left"
                 >
-                  <span className="w-44 shrink-0 font-mono text-muted text-xs">
+                  <span className="font-mono text-muted text-xs">
                     {formatDateTime(it.createdAt)}
                   </span>
                   <span className={levelClass(it.level)}>{it.level}</span>
-                  <span className="w-20 shrink-0 font-mono text-ink text-xs">
+                  <span className="font-mono text-ink text-xs">
                     {it.name ?? "—"}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-ink text-sm">
-                    {it.msg}
-                  </span>
+                  <span className="truncate text-ink text-sm">{it.msg}</span>
                 </button>
                 {kind ? (
                   <button
@@ -304,12 +305,12 @@ function List({
                       e.stopPropagation();
                       onPreview(it);
                     }}
-                    className="w-36 shrink-0 self-stretch border-line border-r border-l bg-surface px-3 text-accent text-xs hover:bg-canvas"
+                    className="h-full w-36 border-line border-r border-l bg-surface px-3 text-accent text-xs hover:bg-canvas"
                   >
                     {previewButtonLabel(kind)}
                   </button>
                 ) : null}
-                <span className="shrink-0 self-center px-3 font-mono text-muted text-xs">
+                <span className="px-3 font-mono text-muted text-xs">
                   #{shortId(it.id)}
                 </span>
               </li>
