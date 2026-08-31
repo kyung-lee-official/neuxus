@@ -1,10 +1,15 @@
 import { status } from "elysia";
 import type { AppUser } from "../../shared/db.ts";
 import { getPrisma } from "../../shared/db.ts";
-import { clampLogLimit, type LogsModel, resolveLogNames } from "./model.ts";
+import {
+  clampLogLimit,
+  type LogItem,
+  type LogsModel,
+  resolveLogNames,
+} from "./model.ts";
 
 export type LogListResult = {
-  items: LogsModel["logItem"][];
+  items: LogItem[];
   nextCursor: string | null;
 };
 
@@ -18,7 +23,7 @@ type AppLogRow = {
   createdAt: Date;
 };
 
-function rowToItem(row: AppLogRow): LogsModel["logItem"] {
+function rowToItem(row: AppLogRow): LogItem {
   return {
     id: row.id.toString(),
     level: row.level,

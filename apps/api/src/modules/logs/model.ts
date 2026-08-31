@@ -2,6 +2,16 @@ import { type Static, t } from "elysia";
 
 const NAME_PATTERN = /^[a-z][a-z0-9_-]{0,63}$/;
 
+const logItemSchema = t.Object({
+  id: t.String(),
+  level: t.String(),
+  msg: t.String(),
+  name: t.Union([t.String(), t.Null()]),
+  userId: t.Union([t.String(), t.Null()]),
+  meta: t.Any(),
+  createdAt: t.String(),
+});
+
 export const LogsModel = {
   listQuery: t.Object({
     /** Comma-separated list of child-logger names. Defaults to `synthesis,retrieve`. */
@@ -11,20 +21,13 @@ export const LogsModel = {
     /** Page size, clamped to [1, 200]. Defaults to 50. */
     limit: t.Optional(t.Integer({ minimum: 1, maximum: 200 })),
   }),
-  logItem: t.Object({
-    id: t.String(),
-    level: t.String(),
-    msg: t.String(),
-    name: t.Union([t.String(), t.Null()]),
-    userId: t.Union([t.String(), t.Null()]),
-    meta: t.Any(),
-    createdAt: t.String(),
-  }),
   listResponse: t.Object({
-    items: t.Array(t.Ref("logItem")),
+    items: t.Array(logItemSchema),
     nextCursor: t.Union([t.String(), t.Null()]),
   }),
 } as const;
+
+export type LogItem = Static<typeof logItemSchema>;
 
 export type LogsModel = {
   [K in keyof typeof LogsModel]: Static<(typeof LogsModel)[K]>;
