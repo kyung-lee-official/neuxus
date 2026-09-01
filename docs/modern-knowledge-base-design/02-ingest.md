@@ -52,7 +52,7 @@ Runs once per page that survives the body-hash skip gate (i.e. inserts between `
 title: Image-description enrichment (per page, runs after body-hash mismatch)
 ---
 flowchart TD
-  Trigger([Body hash differs from stored]) -->   Extract[Extract image refs<br/>scan markdown for !\[alt\]\(path\)]
+  Trigger([Body hash differs from stored]) -->   Extract["Extract image refs<br/>(markdown inline images)"]
   Extract --> Loop{For each image?}
   Loop -- no --> Done([no images changed])
   Loop -- yes --> Read[Read image bytes from disk]
