@@ -41,6 +41,51 @@ DELETE FROM kb_pages WHERE source_path IS NOT NULL
   AND NOT (source_path = ANY(<walker source_paths>));
 ```
 
+## Image description enrichment (planned)
+
+Between the body-hash gate and `chunkify`, the enricher walks the markdown body once and makes sure every image link has an LLM-generated description sitting in the body. Each image is hashed on its bytes; descriptions are stored in a side table so re-ingesting a page whose images haven't changed is a no-op for the per-image LLM call.
+
+Runs once per page that survives the body-hash skip gate (i.e. inserts between `Match=no` and `Chunk` in the flowchart above). The body that comes out is the same one `chunkify` then sees — descriptions are part of `kb_pages.body` and the new hash.
+
+```mermaid
+---
+title: Image-description enrichment (per page, runs after body-hash mismatch)
+---
+flowchart TD
+  Trigger([Body hash differs from stored]) -->   Extract[Extract image refs<br/>scan markdown for !\[alt\]\(path\)]
+  Extract --> Loop{For each image?}
+  Loop -- no --> Done([no images changed])
+  Loop -- yes --> Read[Read image bytes from disk]
+  Read --> Hash["contentHash = sha256(image bytes)"]
+  Hash --> Lookup[Lookup stored hash<br/>from kb_image_descriptions]
+  Lookup --> Match{stored == contentHash?}
+  Match -- yes --> Skip([image unchanged: skip])
+  Match -- no --> Vision[POST image to vision LLM<br/>→ description text]
+  Vision --> Upsert[UPSERT kb_image_descriptions<br/>content_hash + description]
+  Upsert --> Inject[Inject `<!-- image-desc: ... -->`<br/>right after image line in body]
+  Inject --> NextImg[Next image]
+  Skip --> NextImg
+  NextImg --> Loop
+```
+
+New table tracks (pageId, imagePath) → (bytes hash, description):
+
+```text
+kb_image_descriptions (
+  page_id      text,         -- e.g. "src/app/en-US/faq/latest/chitu-manager-faq"
+  image_path   text,         -- the path used inside the markdown body
+  content_hash text,         -- sha256 hex of the image bytes
+  description  text,         -- LLM-generated text
+  created_at   timestamptz default now(),
+  updated_at   timestamptz,
+  primary key (page_id, image_path)
+);
+```
+
+**Idempotency:** if a `<!-- image-desc: ... -->` line already sits right after the image, the injector replaces it instead of appending a duplicate. Re-running the enricher on a body that already has descriptions is a no-op.
+
+**Hash unit:** image bytes (the file on disk), not the markdown line that references it. So changing the surrounding markdown text without swapping the image still re-describes that image (good — the description text gets the new context).
+
 ## Frontmatter
 
 Strip only if the file **begins** with `---\n` … closing `---\n` (optional newline after the closer). A later `---` in the body is a thematic break or content. Unclosed opening `---` is not frontmatter.
