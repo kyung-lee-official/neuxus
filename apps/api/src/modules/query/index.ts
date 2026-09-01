@@ -9,6 +9,7 @@ export const query = new Elysia()
   .post("/query", ({ user, body }) => Query.ask(user, body), {
     requireUser: true,
     body: QueryModel.queryBody,
+    response: QueryModel.queryResponse,
     detail: {
       tags: [API_TAGS.query],
       summary: "Ask the assistant",
@@ -20,6 +21,7 @@ export const query = new Elysia()
   .post("/remember", ({ user, body }) => Query.remember(user, body), {
     requireUser: true,
     body: QueryModel.rememberBody,
+    response: QueryModel.rememberResponse,
     detail: {
       tags: [API_TAGS.query],
       summary: "Store a personal memory note",

@@ -11,6 +11,11 @@ export const ServerSettingModel = {
   nukeBody: t.Object({
     target: t.Literal("app"),
   }),
+  nukeResponse: t.Object({
+    ok: t.Literal(true),
+    nuked: t.Literal(true),
+    target: t.Literal("app"),
+  }),
   synthesisBody: t.Object({
     provider: t.Union([t.String(), t.Null()]),
     synthesisModel: t.Union([t.String(), t.Null()]),
@@ -20,9 +25,12 @@ export const ServerSettingModel = {
     contextWindowTokens: t.Union([t.Integer({ minimum: 1 }), t.Null()]),
   }),
   corpusBody: t.Object({
-    repoUrl: t.Union([t.String(), t.Null()]),
-    branch: t.Union([t.String(), t.Null()]),
-    docsRoot: t.Union([t.String(), t.Null()]),
+    repoUrl: t.Union([
+      t.String({ examples: ["https://github.com/org/kb.git"] }),
+      t.Null(),
+    ]),
+    branch: t.Union([t.String({ examples: ["main"] }), t.Null()]),
+    docsRoot: t.Union([t.String({ examples: ["docs"] }), t.Null()]),
   }),
   logBody: t.Object({
     sinks: t.Union([

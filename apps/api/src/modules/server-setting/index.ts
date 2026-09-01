@@ -191,6 +191,7 @@ export const serverSetting = new Elysia({ prefix: "/server-setting" })
   .post("/nuke", ({ body }) => ServerSetting.nuke(body), {
     requireAdmin: true,
     body: ServerSettingModel.nukeBody,
+    response: ServerSettingModel.nukeResponse,
     detail: {
       ...adminDetail,
       summary: "Hard-wipe app tables",

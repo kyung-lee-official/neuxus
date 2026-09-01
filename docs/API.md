@@ -67,19 +67,7 @@ Liveness check. No auth.
 
 ### `POST /server-setting/nuke`
 
-Admin Bearer. Hard-wipe `public` on **`DATABASE_URL`** (including extensions). Does **not** remigrate or seed.
-
-**Request**
-
-```json
-{ "target": "app" }
-```
-
-**200**
-
-```json
-{ "ok": true, "nuked": true, "target": "app" }
-```
+Admin Bearer. Hard-wipe `public` on **`DATABASE_URL`** (including extensions). Does **not** remigrate or seed. Body and response shapes are documented in `/openapi`.
 
 **400** — missing/invalid `target` (only `"app"` is accepted). Non-admin → `403`.
 
@@ -87,7 +75,7 @@ Admin Bearer. Hard-wipe `public` on **`DATABASE_URL`** (including extensions). D
 
 `GET /users` → `{ "users": [ { "id", "apiKey", "role", "createdAt" } ] }`
 
-`POST /users` body `{ "id", "apiKey?" }` — first user in an empty DB is `admin`, later users are `member`.
+`POST /users` body `{ "id", "apiKey?" }`.
 
 `GET|PATCH|DELETE /users/:id` — PATCH regenerates or sets `apiKey`.
 
@@ -101,28 +89,11 @@ Admin Bearer. Hard-wipe `public` on **`DATABASE_URL`** (including extensions). D
 
 ### `POST /query`
 
-Bearer. Body:
-
-```json
-{ "message": "…", "mode": "ask", "sessionId": "optional-uuid" }
-```
-
-`mode` is optional and must be `"ask"` when set. Uses personal memory + recent chat, then MiniMax synthesis. Writes user/assistant messages to the session.
-
-**200**
-
-```json
-{
-  "userId": "lily",
-  "sessionId": "…",
-  "mode": "ask",
-  "answer": "…"
-}
-```
+Bearer. `mode` is optional and must be `"ask"` when set. Uses personal memory + recent chat, then MiniMax synthesis. Writes user/assistant messages to the session. Body and response shapes are documented in `/openapi`.
 
 ### `POST /remember`
 
-Bearer. Body `{ "content": "…" }` — inserts a personal memory note.
+Bearer. Inserts a personal memory note. Body shape is documented in `/openapi`.
 
 ### Embed settings (admin)
 
@@ -144,17 +115,7 @@ Bearer. Body `{ "content": "…" }` — inserts a personal memory note.
 
 `GET /server-setting/corpus` — stored `kb_corpus_settings` (`null` stays `null`). Bearer admin.
 
-`PUT /server-setting/corpus` body:
-
-```json
-{
-  "repoUrl": "https://github.com/org/kb.git",
-  "branch": "main",
-  "docsRoot": "docs"
-}
-```
-
-Empty / `null` fields store as null. Null `repoUrl` means do not clone. `lastSyncedSha` is read-only (clone, pull, and a finished Sync write it). Non-admin → `403`.
+`PUT /server-setting/corpus` body shape is documented in `/openapi`. Empty / `null` fields store as null. Null `repoUrl` means do not clone. `lastSyncedSha` is read-only (clone, pull, and a finished Sync write it). Non-admin → `403`.
 
 `POST /server-setting/corpus/clone` — `git clone` saved `repoUrl` into `apps/api/data/corpus`. Optional saved `branch`. 409 if already cloned.
 
@@ -176,9 +137,4 @@ Inspect stored `kb_pages` / `kb_parents` / `kb_children`. Read-only. Does not re
 
 ## Env
 
-| Variable       | Purpose                               |
-| -------------- | ------------------------------------- |
-| `DATABASE_URL` | Postgres URL (database name `neuxus`) |
-| `PORT`         | API port (default 3001)               |
-
-Ask synthesis (MiniMax key, model, base URL, window) is `app_synthesis_settings`, not env. Corpus git remote is `kb_corpus_settings`, not env.
+See [`README.md`](../README.md) **Setup** for `DATABASE_URL` and the listen URL (port). Synthesis (MiniMax key, model, base URL, window) lives in `app_synthesis_settings`; corpus remote lives in `kb_corpus_settings` — both are admin-only PUTs under `/server-setting/...`, not env vars.
