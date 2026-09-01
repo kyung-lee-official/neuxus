@@ -1,3 +1,4 @@
+import { openapi } from "@elysia/openapi";
 import { cors } from "@elysiajs/cors";
 import { Elysia, status } from "elysia";
 import { health } from "./modules/health/index.ts";
@@ -15,6 +16,7 @@ import {
   setLogTransport,
   startLogWorker,
 } from "./shared/log/index.ts";
+import { apiTagList, bearerSecurityScheme } from "./shared/openapi.ts";
 
 const logSettings = await loadLogSettings();
 const usePostgres = logSettings.sinks.includes("postgres");
@@ -23,6 +25,24 @@ if (usePostgres) {
 }
 
 const app = new Elysia()
+  .use(
+    openapi({
+      documentation: {
+        info: {
+          title: "neuxus API",
+          version: "0.0.1",
+          description:
+            "Bun + Elysia HTTP API for neuxus: users, sessions, ask-mode chat, knowledge base, and admin server settings.",
+        },
+        tags: apiTagList,
+        components: {
+          securitySchemes: {
+            Bearer: bearerSecurityScheme,
+          },
+        },
+      },
+    }),
+  )
   .use(
     cors({
       origin: true,
@@ -58,6 +78,8 @@ if (usePostgres) {
 }
 
 console.log(`neuxus API listening on http://localhost:${app.server?.port}`);
+console.log(`OpenAPI docs: http://localhost:${app.server?.port}/openapi`);
+console.log(`OpenAPI spec: http://localhost:${app.server?.port}/openapi/json`);
 console.log(
   "User CRUD: GET/POST /users, GET/PATCH/DELETE /users/:id, GET /users/:id/data, DELETE /users/:id/memories/:memoryId",
 );

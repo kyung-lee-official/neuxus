@@ -4,6 +4,18 @@ Base URL: `http://localhost:3001` (override with `PORT`).
 
 All JSON responses use `Content-Type: application/json`. Corpus sync events are SSE (`text/event-stream`).
 
+## OpenAPI
+
+The API exposes an interactive OpenAPI document generated from each route's
+TypeBox schemas via [`@elysia/openapi`](https://github.com/elysiajs/elysia-openapi):
+
+- Scalar UI: `http://localhost:3001/openapi`
+- JSON spec: `http://localhost:3001/openapi/json`
+
+Auth uses a Bearer scheme — paste `demo-key-<user>` into the **Authorize** button.
+Routes are grouped by tag: `health`, `users`, `sessions`, `query`, `knowledge`,
+`logs`, `server-setting`.
+
 ## Auth
 
 | Endpoint                                                                | Auth                                                |
@@ -33,16 +45,7 @@ All JSON responses use `Content-Type: application/json`. Corpus sync events are 
 | `GET /knowledge/pages`, `GET /knowledge/pages/*`                        | Bearer **admin**                                    |
 | `POST /server-setting/nuke`                                             | Bearer **admin**                                    |
 
-Seed users (after `bun run seed`; stored in `app_users`):
-
-| User id    | Role   | Default API key     |
-| ---------- | ------ | ------------------- |
-| `haewon`   | admin  | `demo-key-haewon`   |
-| `lily`     | member | `demo-key-lily`     |
-| `sullyoon` | member | `demo-key-sullyoon` |
-| `bae`      | member | `demo-key-bae`      |
-| `jiwoo`    | member | `demo-key-jiwoo`    |
-| `kyujin`   | member | `demo-key-kyujin`   |
+Seed users (after `bun run seed`; stored in `app_users`): see the **Seed users** table in [`README.md`](../README.md#seed-users).
 
 Missing or unknown key → `401`:
 

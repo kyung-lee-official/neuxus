@@ -57,6 +57,8 @@ bun run dev
 
 - API: http://localhost:3001
 - Web: http://localhost:3000
+- OpenAPI docs (Scalar): http://localhost:3001/openapi
+- OpenAPI spec (JSON): http://localhost:3001/openapi/json
 
 ## Seed users
 
