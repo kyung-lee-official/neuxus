@@ -10,7 +10,7 @@ file.md → strip leading YAML frontmatter → normalize → kb_pages.body → c
 
 ## Flow
 
-One `.md` file per walker iteration. The hash gate is the **whole-page** skip — there is no per-section or per-parent hash today.
+One `.md` file per walker iteration. The hash gate is the **whole-page** skip — there is no per-section or per-parent hash today. Image-description enrichment is a planned sub-step that runs between the body-hash mismatch and `chunkify`; its detail is in the next section.
 
 ```mermaid
 ---
@@ -19,11 +19,12 @@ title: Ingest flow (one .md file per iteration)
 flowchart TD
   Walker([Walker iterates .md files]) --> Read[Read file bytes]
   Read --> Parse["ingestMarkdown:<br/>strip YAML frontmatter, normalize body"]
-  Parse --> Hash["pageContentHash:<br/>title, type, tags, body"]
-  Hash --> Lookup["findPageContentHash:<br/>read stored hash from kb_pages"]
+  Parse --> HashBody["pageContentHash:<br/>title, type, tags, body"]
+  HashBody --> Lookup["findPageContentHash:<br/>read stored hash from kb_pages"]
   Lookup --> Match{stored<br/>== computed?}
   Match -- yes --> Skip([skip: continue to next file])
-  Match -- no --> Chunk["chunkify body<br/>→ parents + children"]
+  Match -- no --> Enrich["Enrich images<br/>(per-image hash check, detail below)"]
+  Enrich --> Chunk["chunkify body<br/>→ parents + children"]
   Chunk --> Tx[sql.begin]
   Tx --> Upsert["UPSERT kb_pages<br/>with new content_hash + updated_at"]
   Upsert --> Del["DELETE FROM kb_parents<br/>WHERE page_id"]
@@ -43,9 +44,9 @@ DELETE FROM kb_pages WHERE source_path IS NOT NULL
 
 ## Image description enrichment (planned)
 
-Between the body-hash gate and `chunkify`, the enricher walks the markdown body once and makes sure every image link has an LLM-generated description sitting in the body. Each image is hashed on its bytes; descriptions are stored in a side table so re-ingesting a page whose images haven't changed is a no-op for the per-image LLM call.
+This is the detail of the **`Enrich`** node in the main flowchart above — runs once per page where the body hash differs from stored (right before `chunkify`). The enricher walks the markdown body once and makes sure every image link has an LLM-generated description sitting in the body. Each image is hashed on its bytes; descriptions are stored in a side table so re-ingesting a page whose images haven't changed is a no-op for the per-image LLM call.
 
-Runs once per page that survives the body-hash skip gate (i.e. inserts between `Match=no` and `Chunk` in the flowchart above). The body that comes out is the same one `chunkify` then sees — descriptions are part of `kb_pages.body` and the new hash.
+The body that comes out is the same one `chunkify` then sees — descriptions are part of `kb_pages.body` and the new hash.
 
 ```mermaid
 ---
