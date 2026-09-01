@@ -71,5 +71,5 @@ Without seed, the **first** created account becomes `admin`; later accounts are 
 
 ## Docs
 
-- [`docs/API.md`](docs/API.md) — HTTP API
+- [OpenAPI (Scalar)](http://localhost:3001/openapi) — interactive HTTP API reference, generated from each route's TypeBox schema
 - [`docs/modern-knowledge-base-design/`](docs/modern-knowledge-base-design/) — KB pipeline (corpus → ingest → chunkify → embed; query → synthesis)
