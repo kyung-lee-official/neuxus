@@ -8,6 +8,39 @@ file.md → strip leading YAML frontmatter → normalize → kb_pages.body → c
 
 `title` / `tags` / `type` come from frontmatter (columns). **`body`** is the remaining markdown after ingest. `chunkify` never strips frontmatter.
 
+## Flow
+
+One `.md` file per walker iteration. The hash gate is the **whole-page** skip — there is no per-section or per-parent hash today.
+
+```mermaid
+---
+title: Ingest flow (one .md file per iteration)
+---
+flowchart TD
+  Walker([Walker iterates .md files]) --> Read[Read file bytes]
+  Read --> Parse["ingestMarkdown:<br/>strip YAML frontmatter, normalize body"]
+  Parse --> Hash["pageContentHash:<br/>title, type, tags, body"]
+  Hash --> Lookup["findPageContentHash:<br/>read stored hash from kb_pages"]
+  Lookup --> Match{stored<br/>== computed?}
+  Match -- yes --> Skip([skip: continue to next file])
+  Match -- no --> Chunk["chunkify body<br/>→ parents + children"]
+  Chunk --> Tx[sql.begin]
+  Tx --> Upsert["UPSERT kb_pages<br/>with new content_hash + updated_at"]
+  Upsert --> Del["DELETE FROM kb_parents<br/>WHERE page_id"]
+  Del --> InsP[INSERT new parents]
+  InsP --> InsC[INSERT new children]
+  InsC --> Next[Next file]
+  Skip --> Next
+  Next --> Walker
+```
+
+After the loop, **prune rows that disappeared from the walker** (e.g. files deleted between syncs):
+
+```text
+DELETE FROM kb_pages WHERE source_path IS NOT NULL
+  AND NOT (source_path = ANY(<walker source_paths>));
+```
+
 ## Frontmatter
 
 Strip only if the file **begins** with `---\n` … closing `---\n` (optional newline after the closer). A later `---` in the body is a thematic break or content. Unclosed opening `---` is not frontmatter.
