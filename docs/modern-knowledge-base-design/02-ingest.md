@@ -63,7 +63,7 @@ flowchart TD
   Match -- yes --> Skip([image unchanged: skip])
   Match -- no --> Vision[POST image to vision LLM<br/>→ description text]
   Vision --> Upsert[UPSERT kb_image_descriptions<br/>content_hash + description]
-  Upsert --> Inject[Inject `<!-- image-desc: ... -->`<br/>right after image line in body]
+  Upsert --> Inject["Inject &lt;!-- image-desc: ... --&gt;<br/>right after image line in body"]
   Inject --> NextImg[Next image]
   Skip --> NextImg
   NextImg --> Loop
