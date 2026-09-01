@@ -3,13 +3,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ApiUser } from "@/lib/api";
+import { apiBaseUrl } from "@/lib/api-client";
 import { displayName } from "@/lib/display-name";
 import { AdminBadge } from "./admin-badge";
 
-const NAV_ITEMS = [
+type NavItem =
+  | { href: string; label: string; external?: false }
+  | { href: string; label: string; external: true };
+
+const NAV_ITEMS: readonly NavItem[] = [
   { href: "/server-settings", label: "Server settings" },
   { href: "/knowledge-base", label: "Knowledge base" },
-] as const;
+  { href: `${apiBaseUrl()}/openapi`, label: "OpenAPI", external: true },
+];
 
 function navItemClass(selected: boolean): string {
   return selected
@@ -40,12 +46,25 @@ export function AdminNavPanel({ user }: { user: ApiUser }) {
         <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
           {NAV_ITEMS.map((item) => {
             const selected =
-              pathname === item.href || pathname.startsWith(`${item.href}/`);
+              !item.external &&
+              (pathname === item.href || pathname.startsWith(`${item.href}/`));
+            const className = navItemClass(selected);
             return (
               <li key={item.href}>
-                <Link href={item.href} className={navItemClass(selected)}>
-                  {item.label}
-                </Link>
+                {item.external ? (
+                  <a
+                    href={item.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={className}
+                  >
+                    {item.label}
+                  </a>
+                ) : (
+                  <Link href={item.href} className={className}>
+                    {item.label}
+                  </Link>
+                )}
               </li>
             );
           })}
