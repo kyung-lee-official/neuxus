@@ -170,19 +170,17 @@ describe("chunkify fixtures", () => {
 
   test("image-desc-glue.md → image and desc same child", async () => {
     const { children } = await runFixture("image-desc-glue.md");
-    const hit = children.find((c) => c.text.includes("image-desc"));
+    const hit = children.find((c) => c.text.includes("A diagram of the flow."));
     expect(hit).toBeDefined();
     expect(hit!.text).toContain("![Alt](./a.png)");
     expect(hit!.text).toContain("A diagram of the flow.");
   });
 
-  test("image-desc without image is an HTML block", () => {
+  test("image_desc without image is an HTML block", () => {
     const body = [
       "## Fig",
       "",
-      "<!-- image-desc -->",
-      "Orphan description.",
-      "<!-- /image-desc -->",
+      "<!-- image_desc: Orphan description. -->",
       "",
     ].join("\n");
     const kinds = lexBlocks(body)
@@ -192,16 +190,37 @@ describe("chunkify fixtures", () => {
     expect(kinds).not.toContain("image_desc");
   });
 
-  test("image-desc markers match only after trim, not inner spaces", () => {
-    const exact = lexBlocks(
-      "![Alt](./a.png)\n\n  <!-- image-desc -->  \nDesc.\n<!-- /image-desc -->\n",
+  test("image_desc prefix match — valid forms are recognized", () => {
+    const basic = lexBlocks(
+      "![Alt](./a.png)\n\n<!-- image_desc: A diagram. -->\n",
     );
-    expect(exact.some((b) => b.kind === "image_desc")).toBe(true);
+    expect(basic.some((b) => b.kind === "image_desc")).toBe(true);
 
-    const loose = lexBlocks(
-      "![Alt](./a.png)\n\n<!--  image-desc  -->\nDesc.\n<!-- /image-desc -->\n",
+    const multi = lexBlocks(
+      "![Alt](./a.png)\n\n<!-- image_desc: a multi word description -->\n",
     );
-    expect(loose.some((b) => b.kind === "image_desc")).toBe(false);
+    expect(multi.some((b) => b.kind === "image_desc")).toBe(true);
+
+    const empty = lexBlocks("![Alt](./a.png)\n\n<!-- image_desc:  -->\n");
+    expect(empty.some((b) => b.kind === "image_desc")).toBe(true);
+
+    const leading = lexBlocks(
+      "![Alt](./a.png)\n\n<!--  image_desc: A diagram. -->\n",
+    );
+    expect(leading.some((b) => b.kind === "image_desc")).toBe(true);
+  });
+
+  test("image_desc dash variant is illegal (image-desc ≠ image_desc)", () => {
+    const dash = lexBlocks(
+      "![Alt](./a.png)\n\n<!-- image-desc: A diagram. -->\n",
+    );
+    expect(dash.some((b) => b.kind === "image_desc")).toBe(false);
+    expect(dash.some((b) => b.kind === "html")).toBe(true);
+  });
+
+  test("image_desc missing space after colon is illegal", () => {
+    const noSpace = lexBlocks("![Alt](./a.png)\n\n<!-- image_desc:foo -->\n");
+    expect(noSpace.some((b) => b.kind === "image_desc")).toBe(false);
   });
 
   test("blank-lines-preserved.md → blank line kept in slice", async () => {
@@ -334,4 +353,3 @@ describe("force-split snap indices", () => {
     }
   });
 });
-

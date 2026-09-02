@@ -1,6 +1,5 @@
 import type { LexBlock } from "./types.ts";
 
-
 type Line = {
   /** Inclusive start offset in body */
   start: number;
@@ -38,15 +37,20 @@ const TABLE_ROW = /^\s*\|.*\|\s*$/;
 const TABLE_DELIM = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/;
 const IMAGE_MD = /^![ \t]*\[.*?\]\(.*\)\s*$/;
 const IMAGE_HTML = /^<img\b[^>]*>\s*$/i;
-const IMAGE_DESC_OPEN_LINE = "<!-- image-desc -->";
-const IMAGE_DESC_CLOSE_LINE = "<!-- /image-desc -->";
 
-function isImageDescOpen(lineText: string): boolean {
-  return lineText.trim() === IMAGE_DESC_OPEN_LINE;
+/**
+ * Single-line `<!-- image_desc: ... -->` block. The dash variant
+ * (`image-desc:`) is illegal. The capture group is the description text
+ * with surrounding whitespace stripped.
+ */
+const IMAGE_DESC_RE = /^<!--\s*image_desc:\s+([\s\S]*?)\s*-->$/;
+
+function matchImageDesc(text: string): RegExpMatchArray | null {
+  return text.match(IMAGE_DESC_RE);
 }
 
-function isImageDescClose(lineText: string): boolean {
-  return lineText.trim() === IMAGE_DESC_CLOSE_LINE;
+function isImageDesc(text: string): boolean {
+  return IMAGE_DESC_RE.test(text);
 }
 
 function isBlankLine(text: string): boolean {
@@ -97,11 +101,7 @@ export function lexBlocks(body: string): LexBlock[] {
       while (i < lines.length) {
         const t = lines[i]!.text;
         const close = t.match(/^( {0,3})(`{3,}|~{3,})[ \t]*$/);
-        if (
-          close &&
-          close[2]![0] === ch &&
-          close[2]!.length >= minLen
-        ) {
+        if (close && close[2]![0] === ch && close[2]!.length >= minLen) {
           end = lines[i]!.end;
           i++;
           break;
@@ -132,28 +132,13 @@ export function lexBlocks(body: string): LexBlock[] {
       continue;
     }
 
-    if (isImageDescOpen(line.text)) {
-      const start = line.start;
-      let end = line.end;
-      i++;
-      while (i < lines.length && !isImageDescClose(lines[i]!.text)) {
-        // Stop at next structural boundary if closer missing
-        const t = lines[i]!.text;
-        if (
-          ATX_HEADING.test(t) ||
-          FENCE_OPEN.test(t) ||
-          isImageDescOpen(t)
-        ) {
-          break;
-        }
-        end = lines[i]!.end;
-        i++;
-      }
-      if (i < lines.length && isImageDescClose(lines[i]!.text)) {
-        end = lines[i]!.end;
-        i++;
-      }
+    if (isImageDesc(line.text)) {
+      const m = matchImageDesc(line.text)!;
+      const descStartInLine = m[0].indexOf(m[1]!);
+      const start = line.start + descStartInLine;
+      const end = start + m[1]!.length;
       push({ kind: "image_desc", start, end, atomic: true });
+      i++;
       continue;
     }
 
@@ -206,16 +191,12 @@ export function lexBlocks(body: string): LexBlock[] {
           ATX_HEADING.test(t) ||
           FENCE_OPEN.test(t) ||
           HR.test(t) ||
-          isImageDescOpen(t)
+          isImageDesc(t)
         ) {
           break;
         }
         // New top-level paragraph that isn't a list item ends the list
-        if (
-          !LIST_ITEM.test(t) &&
-          !/^[ \t]/.test(t) &&
-          !BLOCKQUOTE.test(t)
-        ) {
+        if (!LIST_ITEM.test(t) && !/^[ \t]/.test(t) && !BLOCKQUOTE.test(t)) {
           // Could be tight continuation — CommonMark: non-indented non-list ends list after blank only
           break;
         }
@@ -245,7 +226,10 @@ export function lexBlocks(body: string): LexBlock[] {
       const start = line.start;
       let end = line.end;
       i++;
-      while (i < lines.length && (isIndentedCodeLine(lines[i]!.text) || isBlankLine(lines[i]!.text))) {
+      while (
+        i < lines.length &&
+        (isIndentedCodeLine(lines[i]!.text) || isBlankLine(lines[i]!.text))
+      ) {
         // Trailing blank after indented code: include only blanks that are followed by more indented code
         if (isBlankLine(lines[i]!.text)) {
           let j = i + 1;
@@ -284,7 +268,7 @@ export function lexBlocks(body: string): LexBlock[] {
         HR.test(t) ||
         LIST_ITEM.test(t) ||
         BLOCKQUOTE.test(t) ||
-        isImageDescOpen(t) ||
+        isImageDesc(t) ||
         (TABLE_ROW.test(t) &&
           i + 1 < lines.length &&
           TABLE_DELIM.test(lines[i + 1]!.text))

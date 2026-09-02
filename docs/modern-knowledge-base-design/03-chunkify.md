@@ -47,7 +47,7 @@ Child size tracks **embedding precision**; parent size tracks **useful context**
 
 **Lex** turns normalized `body` into an ordered list of **blocks** (heading, paragraph, fence, list, …), each with `start` / `end` into that string.
 
-It does not decide parent or child size. It only classifies source regions so later packing can work on whole blocks. Fences and image-desc win over paragraph rules; interior of an unclosed fence is not re-classified as headings or lists.
+It does not decide parent or child size. It only classifies source regions so later packing can work on whole blocks. Fences and image_desc win over paragraph rules; interior of an unclosed fence is not re-classified as headings or lists.
 
 Block kinds and edge rules: [Atomic blocks](#atomic-blocks-and-edge-cases).
 
@@ -139,13 +139,13 @@ The previous piece **owns** the terminator and any following spaces on that line
 ### Children
 
 1. Pack toward `childTargetTokens`. Mixed packs (any atomic + prose) **stop at target**: if adding the next unit would exceed target, flush first. `childHardMaxTokens` applies only when [force-splitting](#forced-prose-splits) a single paragraph. An atomic already over target stays alone ([Oversized](#oversized-atomic-blocks)).
-2. [Fence intro](#fence-intro-glue) and [image-desc glue](#image-descriptions) stay in one child (glue wins over knobs).
+2. [Fence intro](#fence-intro-glue) and [image_desc glue](#image-descriptions) stay in one child (glue wins over knobs).
 3. [Overlap](#overlap) only after [forced prose split](#forced-prose-splits).
 4. Merge crumbs under `childCrumbMinTokens` into the previous child if combined tokens ≤ `childHardMaxTokens`, **or** if that previous child is already over `childHardMaxTokens`.
 
 ## Atomic blocks and edge cases
 
-Same normalized `body` + knobs ⇒ same spans. Every region is exactly one block type; fences and image-desc win over paragraph rules.
+Same normalized `body` + knobs ⇒ same spans. Every region is exactly one block type; fences and image_desc win over paragraph rules.
 
 ### Block inventory
 
@@ -154,7 +154,7 @@ Same normalized `body` + knobs ⇒ same spans. Every region is exactly one block
 | ATX heading    | [Headings](#headings)                            | Yes                                          |
 | Fenced code    | [Code fences](#code-fences)                      | Yes                                          |
 | Image          | Sole `![…](…)` or `<img>` paragraph              | Yes                                          |
-| Image-desc     | [Image descriptions](#image-descriptions)        | Yes (glue with image)                        |
+| Image_desc     | [Image descriptions](#image-descriptions)        | Yes (glue with image)                        |
 | Indented code  | ≥4 spaces / tab run                              | Yes                                          |
 | List           | Items until list ends (loose blanks stay inside) | Yes                                          |
 | Table          | GFM header + delimiter + rows                    | Yes                                          |
@@ -170,7 +170,7 @@ Only ATX: `#{1,6} ` at line start. Setext (`Setup` / `=====`) is not a heading: 
 
 ### Glue groups
 
-Adjacent blocks that must share one parent and one child. Currently: **image + image-desc** (optional blank between).
+Adjacent blocks that must share one parent and one child. Currently: **image + image_desc** (optional blank between).
 
 ### Code fences
 
@@ -196,17 +196,23 @@ If the paragraph immediately before a fence (blanks between allowed) has ≤ `fe
 
 ### Image descriptions
 
+A single-line HTML comment immediately after an image:
+
 ```markdown
 ![Alt text](path-or-url "optional title")
-
-<!-- image-desc -->
-
-Description lines…
-
-<!-- /image-desc -->
+<!-- image_desc: Description text. -->
 ```
 
-Markers: lines exactly `<!-- image-desc -->` / `<!-- /image-desc -->` (trim that line only). Missing closer → through next heading, fence opener, or EOF; still glue to the image. Markers inside a fence are literal. Desc without an image = lone [HTML block](#html-blocks). Never split image and desc across parents.
+- **Prefix:** exactly `image_desc: ` (lowercase, underscore between `image` and `desc`, colon, single space). The dash variant `image-desc:` is **illegal** — never matched.
+- **Description text:** everything after the prefix through (but not including) the trailing ` -->`. Surrounding whitespace is stripped.
+- **Empty description:** `<!-- image_desc:  -->` is valid; the block's text is the empty string.
+- **Multi-word description:** `<!-- image_desc: a multi word description -->` — captured verbatim, internal whitespace preserved.
+- **No preceding image:** the `image_desc` block has no glue group and is reclassified to `html` in the second pass (see [Glue groups](#glue-groups)).
+- **Inside a fence:** the comment is literal text inside the fence; not recognized as `image_desc`.
+- **Glued with the preceding image:** `image + (optional blank) + image_desc` is one child (image + description stay together, glue wins over size knobs).
+- **Block text:** the `image_desc` block's `text` is just the description, not the full `<!-- ... -->` line. The image markdown line is included in the same child via glue.
+
+The match is exact: case-sensitive, no `i` flag. Misspellings, extra/missing whitespace around the colon, or the dash variant fall through to the regular [HTML block](#html-blocks) handling.
 
 ### HTML blocks
 
@@ -214,7 +220,7 @@ A line that starts with indent ≤3 and `<`, except image (`<img>`) and [image-d
 
 ### Forced prose splits
 
-Only when a **single paragraph** exceeds `childHardMaxTokens`. Choose the cut end, then the next start, with the [overlap](#overlap) rules. Never inside fences, tables, image-desc, or headings.
+Only when a **single paragraph** exceeds `childHardMaxTokens`. Choose the cut end, then the next start, with the [overlap](#overlap) rules. Never inside fences, tables, image_desc, or headings.
 
 ### Oversized atomic blocks
 

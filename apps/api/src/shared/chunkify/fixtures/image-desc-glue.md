@@ -2,6 +2,4 @@
 
 ![Alt](./a.png)
 
-<!-- image-desc -->
-A diagram of the flow.
-<!-- /image-desc -->
+<!-- image_desc: A diagram of the flow. -->
