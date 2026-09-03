@@ -50,7 +50,7 @@ const app = new Elysia()
       allowedHeaders: ["Content-Type", "Authorization"],
     }),
   )
-  .onError(({ code, error }) => {
+  .onError(({ code, error, request }) => {
     if (code === "PARSE") {
       return status(400, { error: "Invalid JSON body" });
     }
@@ -60,6 +60,13 @@ const app = new Elysia()
     if (code === "VALIDATION") {
       return status(400, {
         error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    if (error instanceof Error) {
+      const path = new URL(request.url).pathname;
+      console.error(`[http:${code}] ${request.method} ${path}`, error);
+      return status(500, {
+        error: error.message || "Internal Server Error",
       });
     }
   })

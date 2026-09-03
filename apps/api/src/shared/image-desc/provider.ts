@@ -38,6 +38,29 @@ type AnthropicMessageResponse = {
   content?: Array<{ type?: string; text?: string }>;
 };
 
+/**
+ * Extract the provider's own error text from a non-OK response. MiniMax's
+ * Anthropic-compatible endpoint returns `{ type, error: { type, message } }`;
+ * surface that `message` verbatim so the real cause (rate limit, auth, model
+ * name, …) reaches the caller instead of a summary we write ourselves.
+ */
+function providerErrorMessage(responseText: string, status: number): string {
+  if (responseText) {
+    try {
+      const json = JSON.parse(responseText) as {
+        error?: { message?: string };
+      };
+      const msg = json.error?.message?.trim();
+      if (msg) return msg;
+    } catch {
+      // non-JSON body; fall through to the raw text below.
+    }
+    const raw = responseText.trim();
+    if (raw) return raw;
+  }
+  return `MiniMax request failed with status ${status}`;
+}
+
 function textFromResponse(json: AnthropicMessageResponse): string {
   const blocks = json.content ?? [];
   const parts: string[] = [];
@@ -94,12 +117,10 @@ export function createMinimaxImageDescriber(
         },
         body: JSON.stringify(body),
       });
-      if (!res.ok) {
-        throw new Error(
-          `MiniMax image description failed (${res.status}) for ${absolutePath}`,
-        );
-      }
       const responseText = await res.text();
+      if (!res.ok) {
+        throw new Error(providerErrorMessage(responseText, res.status));
+      }
       let json: AnthropicMessageResponse;
       try {
         json = JSON.parse(responseText) as AnthropicMessageResponse;
