@@ -63,7 +63,7 @@ flowchart TD
   Match -- yes --> Skip([image unchanged: skip])
   Match -- no --> Vision[POST image to vision LLM<br/>→ description text]
   Vision --> Upsert[UPSERT kb_image_descriptions<br/>content_hash + description]
-  Upsert --> Inject["Inject &lt;!-- image-desc: ... --&gt;<br/>right after image line in body"]
+  Upsert --> Inject["Inject image_desc block<br/>(open + close) after image line in body"]
   Inject --> NextImg[Next image]
   Skip --> NextImg
   NextImg --> Loop
@@ -83,7 +83,7 @@ kb_image_descriptions (
 );
 ```
 
-**Idempotency:** if a `<!-- image-desc: ... -->` line already sits right after the image, the injector replaces it instead of appending a duplicate. Re-running the enricher on a body that already has descriptions is a no-op.
+**Idempotency:** if a `<!-- image_desc --> ... <!-- /image_desc -->` block already sits right after the image, the injector replaces it in place instead of appending a duplicate. Re-running the enricher on a body that already has descriptions is a no-op.
 
 **Hash unit:** image bytes (the file on disk), not the markdown line that references it. So changing the surrounding markdown text without swapping the image still re-describes that image (good — the description text gets the new context).
 

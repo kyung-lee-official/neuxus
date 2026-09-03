@@ -196,23 +196,26 @@ If the paragraph immediately before a fence (blanks between allowed) has ≤ `fe
 
 ### Image descriptions
 
-A single-line HTML comment immediately after an image:
+A two-line open/close pair immediately after an image:
 
 ```markdown
 ![Alt text](path-or-url "optional title")
-<!-- image_desc: Description text. -->
+<!-- image_desc -->
+Description lines (one or more)…
+<!-- /image_desc -->
 ```
 
-- **Prefix:** exactly `image_desc: ` (lowercase, underscore between `image` and `desc`, colon, single space). The dash variant `image-desc:` is **illegal** — never matched.
-- **Description text:** everything after the prefix through (but not including) the trailing ` -->`. Surrounding whitespace is stripped.
-- **Empty description:** `<!-- image_desc:  -->` is valid; the block's text is the empty string.
-- **Multi-word description:** `<!-- image_desc: a multi word description -->` — captured verbatim, internal whitespace preserved.
+- **Markers:** exact-match lines (after `String.prototype.trim`).
+  - Opener: `<!-- image_desc -->`
+  - Closer: `<!-- /image_desc -->`
+- **Whitespace:** no extra interior spaces. `<!--  image_desc -->` (with extra spaces inside the comment group) is rejected; the line falls through to the regular [HTML block](#html-blocks) handling.
+- **Description text:** the lines between opener and closer, exactly. Multi-line descriptions preserve their paragraph breaks.
+- **Empty description:** `<!-- image_desc -->\n<!-- /image_desc -->` (no lines between) is valid; the block's range is empty.
 - **No preceding image:** the `image_desc` block has no glue group and is reclassified to `html` in the second pass (see [Glue groups](#glue-groups)).
+- **Orphan opener (no closer in the file):** no `image_desc` block is emitted. The line falls through to the HTML block handler. The walker-level validator (see `shared/image-desc/validate.ts`) catches this and fail-fasts the whole markdown file.
 - **Inside a fence:** the comment is literal text inside the fence; not recognized as `image_desc`.
 - **Glued with the preceding image:** `image + (optional blank) + image_desc` is one child (image + description stay together, glue wins over size knobs).
-- **Block text:** the `image_desc` block's `text` is just the description, not the full `<!-- ... -->` line. The image markdown line is included in the same child via glue.
-
-The match is exact: case-sensitive, no `i` flag. Misspellings, extra/missing whitespace around the colon, or the dash variant fall through to the regular [HTML block](#html-blocks) handling.
+- **Block range:** from the end of the opener line (past the `\n`) through the start of the closer line. The block's text slice contains only the description lines (no marker text).
 
 ### HTML blocks
 

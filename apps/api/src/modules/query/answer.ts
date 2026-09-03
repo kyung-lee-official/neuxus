@@ -6,7 +6,7 @@ import {
   loadSynthesisSettings,
   type Synthesizer,
 } from "../../shared/synthesis/index.ts";
-import { buildSynthesisPrompt } from "./context.ts";
+import { buildSynthesisPrompt, stripMarkdownImageLines } from "./context.ts";
 
 export type AnswerFromContextOptions = {
   synthesizer?: Synthesizer;
@@ -38,5 +38,9 @@ export async function answerFromContext(
     ),
     settings,
   );
-  return synthesizer.synthesize(prompt);
+  // Strip markdown image references before sending to the LLM. The image
+  // bytes stay on disk; the description lives in the corresponding
+  // `<!-- image_desc ... -->` comment which we keep.
+  const promptWithoutImages = stripMarkdownImageLines(prompt);
+  return synthesizer.synthesize(promptWithoutImages);
 }

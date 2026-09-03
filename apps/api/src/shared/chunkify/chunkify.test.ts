@@ -176,51 +176,81 @@ describe("chunkify fixtures", () => {
     expect(hit!.text).toContain("A diagram of the flow.");
   });
 
-  test("image_desc without image is an HTML block", () => {
+  test("image_desc without image is treated as image_desc (orphan opener falls through later)", () => {
     const body = [
       "## Fig",
       "",
-      "<!-- image_desc: Orphan description. -->",
+      "<!-- image_desc -->",
+      "Orphan description.",
+      "<!-- /image_desc -->",
       "",
     ].join("\n");
     const kinds = lexBlocks(body)
       .filter((b) => b.kind !== "blank")
       .map((b) => b.kind);
+    // The opener+closer pair is detected, but with no preceding image the
+    // second pass reclassifies the unglued image_desc to html.
     expect(kinds).toEqual(["heading", "html"]);
+  });
+
+  test("image_desc opener without closer — orphan leaves no image_desc block", () => {
+    const body = [
+      "![Alt](./a.png)",
+      "",
+      "<!-- image_desc -->",
+      "Missing closer.",
+      "",
+    ].join("\n");
+    const kinds = lexBlocks(body)
+      .filter((b) => b.kind !== "blank")
+      .map((b) => b.kind);
+    expect(kinds).toEqual(["image", "html"]);
     expect(kinds).not.toContain("image_desc");
   });
 
-  test("image_desc prefix match — valid forms are recognized", () => {
+  test("image_desc matcher recognizes valid forms", () => {
     const basic = lexBlocks(
-      "![Alt](./a.png)\n\n<!-- image_desc: A diagram. -->\n",
+      "![Alt](./a.png)\n\n<!-- image_desc -->\nA diagram.\n<!-- /image_desc -->\n",
     );
     expect(basic.some((b) => b.kind === "image_desc")).toBe(true);
 
     const multi = lexBlocks(
-      "![Alt](./a.png)\n\n<!-- image_desc: a multi word description -->\n",
+      "![Alt](./a.png)\n\n<!-- image_desc -->\na multi word description\n<!-- /image_desc -->\n",
     );
     expect(multi.some((b) => b.kind === "image_desc")).toBe(true);
 
-    const empty = lexBlocks("![Alt](./a.png)\n\n<!-- image_desc:  -->\n");
+    const empty = lexBlocks(
+      "![Alt](./a.png)\n\n<!-- image_desc -->\n<!-- /image_desc -->\n",
+    );
     expect(empty.some((b) => b.kind === "image_desc")).toBe(true);
 
-    const leading = lexBlocks(
-      "![Alt](./a.png)\n\n<!--  image_desc: A diagram. -->\n",
+    const leadingWs = lexBlocks(
+      "![Alt](./a.png)\n\n<!--  image_desc -->\nA diagram.\n<!-- /image_desc -->\n",
     );
-    expect(leading.some((b) => b.kind === "image_desc")).toBe(true);
+    // Strict match: extra leading whitespace inside the `<!--` group is
+    // not normalized, so the opener is not recognized.
+    expect(leadingWs.some((b) => b.kind === "image_desc")).toBe(false);
   });
 
-  test("image_desc dash variant is illegal (image-desc ≠ image_desc)", () => {
-    const dash = lexBlocks(
-      "![Alt](./a.png)\n\n<!-- image-desc: A diagram. -->\n",
-    );
-    expect(dash.some((b) => b.kind === "image_desc")).toBe(false);
-    expect(dash.some((b) => b.kind === "html")).toBe(true);
-  });
-
-  test("image_desc missing space after colon is illegal", () => {
-    const noSpace = lexBlocks("![Alt](./a.png)\n\n<!-- image_desc:foo -->\n");
-    expect(noSpace.some((b) => b.kind === "image_desc")).toBe(false);
+  test("image_desc with multi-line description preserves body", () => {
+    const body = [
+      "![Alt](./a.png)",
+      "",
+      "<!-- image_desc -->",
+      "Paragraph one.",
+      "",
+      "Paragraph two.",
+      "<!-- /image_desc -->",
+      "",
+    ].join("\n");
+    const blocks = lexBlocks(body);
+    const desc = blocks.find((b) => b.kind === "image_desc");
+    expect(desc).toBeDefined();
+    // text slice is body[desc.start..desc.end]; verify the description
+    // content (both paragraphs + the blank between) is preserved.
+    expect(body.slice(desc!.start, desc!.end)).toContain("Paragraph one.");
+    expect(body.slice(desc!.start, desc!.end)).toContain("Paragraph two.");
+    expect(body.slice(desc!.start, desc!.end)).toContain("\n\n");
   });
 
   test("blank-lines-preserved.md → blank line kept in slice", async () => {

@@ -1,5 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { chunkify } from "../chunkify/index.ts";
+import {
+  enrichImagesWithDescriptions,
+  ImageDescValidationError,
+} from "../image-desc/index.ts";
 import { ingestMarkdown } from "../ingest/index.ts";
 import {
   deleteKnowledgePagesMissingSourcePaths,
@@ -23,23 +27,45 @@ export async function ingestCorpusCheckout(
   for (const file of files) {
     const source = await readFile(file.absolutePath, "utf8");
     const ingested = ingestMarkdown(source);
+
+    // Run image-description enrichment before the body-hash check.
+    // Orphan opener without closer fails the whole file; other enricher
+    // failures (vision API error, missing image) log and skip just that
+    // image so the rest of the page still proceeds.
+    let enrichedBody = ingested.body;
+    try {
+      const enrichment = await enrichImagesWithDescriptions({
+        pageId: file.slug,
+        sourceAbsPath: file.absolutePath,
+        body: ingested.body,
+      });
+      enrichedBody = enrichment.body;
+    } catch (err) {
+      if (err instanceof ImageDescValidationError) {
+        // Surface orphan image_desc as a top-level issue for the walker to
+        // report (it can't be salvaged — skip the file).
+        throw err;
+      }
+      // Otherwise the enricher swallowed per-image errors; body unchanged.
+    }
+
     const fields = {
       title: ingested.title,
       type: ingested.type,
       tags: ingested.tags,
-      body: ingested.body,
+      body: enrichedBody,
     };
     const storedHash = await findPageContentHash(file.slug);
     if (hashesMatch(storedHash, fields)) continue;
 
-    const chunks = chunkify(ingested.body);
+    const chunks = chunkify(enrichedBody);
     await persistKnowledgePage({
       id: file.slug,
       slug: file.slug,
       title: ingested.title,
       type: ingested.type,
       tags: ingested.tags,
-      body: ingested.body,
+      body: enrichedBody,
       sourcePath: file.sourcePath,
       chunks,
     });

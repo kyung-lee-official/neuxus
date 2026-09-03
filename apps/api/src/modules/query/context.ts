@@ -64,6 +64,25 @@ function trimToMax(text: string, max: number): string {
   return `${text.slice(0, max)}\n\n[context truncated]`;
 }
 
+/**
+ * Strip markdown image-reference lines (`![alt](path)` and the optional
+ * ` "title"` suffix) from `text`. The image information lives on disk and
+ * the LLM provider does not need to re-receive it; the
+ * `<!-- image_desc ... -->` comment is kept so the description is still
+ * available.
+ *
+ * - Strips a trailing newline so we don't leave a blank line where the
+ *   image used to be.
+ * - Per-line (`m` flag), so image references inside code fences are
+ *   matched but won't appear here in practice (chunkify fences already
+ *   isolate them).
+ * - Multi-line image syntax and `<img>` HTML are not handled — the
+ *   corpus stores `![…]()` only.
+ */
+export function stripMarkdownImageLines(text: string): string {
+  return text.replace(/^!\[.*?\]\(.*?\)\s*\n?/gm, "");
+}
+
 export function slugForMemoryNote(now = new Date()): string {
   return `memory/note-${now.getTime()}`;
 }
