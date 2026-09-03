@@ -88,6 +88,21 @@ export const serverSetting = new Elysia({ prefix: "/server-setting" })
         "Writes hardcoded `SYNTHESIS_DEFAULTS`: `provider=minimax`, `synthesisModel=MiniMax-M3`, `baseUrl=https://api.minimaxi.com/anthropic`, `maxTokens=4096`, `contextWindowTokens=1000000`, `apiKey=null`. An unknown model with no stored `contextWindowTokens` resolves to `0` on the Ask path.",
     },
   })
+  .post(
+    "/synthesis/image-test",
+    ({ body }) => ServerSetting.testImageDescription(body),
+    {
+      requireAdmin: true,
+      body: ServerSettingModel.imageTestBody,
+      response: ServerSettingModel.imageTestResponse,
+      detail: {
+        ...adminDetail,
+        summary: "Send an image to the vision LLM (test)",
+        description:
+          "Runs the configured MiniMax provider on the uploaded image and returns the description it produces. The image bytes stay on disk; only the description is returned. Same provider as the enricher pipeline, so a working response here means enrichments will also succeed.",
+      },
+    },
+  )
   .get("/log", () => ServerSetting.getLog(), {
     requireAdmin: true,
     detail: {

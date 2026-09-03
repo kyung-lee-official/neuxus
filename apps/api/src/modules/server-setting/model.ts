@@ -184,6 +184,15 @@ export const ServerSettingModel = {
       }),
     ),
   }),
+  imageTestBody: t.Object({
+    image: t.File(),
+  }),
+  imageTestResponse: t.Object({
+    description: t.String(),
+    mimeType: t.String(),
+    sizeBytes: t.Integer({ minimum: 0 }),
+    name: t.String(),
+  }),
 } as const;
 
 export type ServerSettingModel = {

@@ -7,6 +7,7 @@ import { useActiveUserStore } from "@/lib/active-user-store";
 import { ApiError, nukeDatabase } from "@/lib/api";
 import { useAdminUser } from "./admin-shell";
 import { EmbedSettingsBlock } from "./embed-settings-block";
+import { ImageDescTestBlock } from "./image-desc-test-block";
 import { LogSettingsBlock } from "./log-settings-block";
 import { Modal } from "./modal";
 import { RetrieveSettingsBlock } from "./retrieve-settings-block";
@@ -36,6 +37,7 @@ export function ServerSettingsPanel() {
       <EmbedSettingsBlock actorApiKey={user.apiKey} />
       <RetrieveSettingsBlock actorApiKey={user.apiKey} />
       <SynthesisSettingsBlock actorApiKey={user.apiKey} />
+      <ImageDescTestBlock actorApiKey={user.apiKey} />
       <LogSettingsBlock actorApiKey={user.apiKey} />
       <NukeDbBlock
         actorApiKey={user.apiKey}

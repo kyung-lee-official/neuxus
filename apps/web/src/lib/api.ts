@@ -425,6 +425,26 @@ export async function resetSynthesisSettings(
   });
 }
 
+export type ImageTestResult = {
+  description: string;
+  mimeType: string;
+  sizeBytes: number;
+  name: string;
+};
+
+export async function testImageDescription(
+  apiKey: string,
+  image: File,
+): Promise<ImageTestResult> {
+  const formData = new FormData();
+  formData.append("image", image);
+  return apiFetch<ImageTestResult>("/server-setting/synthesis/image-test", {
+    method: "POST",
+    apiKey,
+    body: formData,
+  });
+}
+
 export type RetrieveSettings = {
   childLimit: number | null;
   maxParents: number | null;

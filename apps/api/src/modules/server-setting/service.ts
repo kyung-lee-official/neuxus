@@ -22,6 +22,7 @@ import {
   resetEmbedSettings,
   saveEmbedSettings,
 } from "../../shared/embed/index.ts";
+import { createMinimaxImageDescriber } from "../../shared/image-desc/provider.ts";
 import {
   adminLogSettings,
   type LogSettingsRow,
@@ -41,6 +42,7 @@ import {
   type SynthesisSettingsRow,
   saveSynthesisSettings,
 } from "../../shared/synthesis/index.ts";
+import { loadSynthesisSettings } from "../../shared/synthesis/settings.ts";
 import { runTestEmbedSearch } from "./embed-search.ts";
 import type { ServerSettingModel } from "./model.ts";
 
@@ -243,5 +245,27 @@ export abstract class ServerSetting {
       throw status(500, { error: msg });
     }
     return { ok: true as const, nuked: true as const, target: body.target };
+  }
+
+  /**
+   * Admin test endpoint: POST an image to the configured vision LLM and
+   * return the description it produces. Uses the same MiniMax provider
+   * the enricher uses, so a working response here means the enricher
+   * pipeline will also work on the same image.
+   */
+  static async testImageDescription(body: ServerSettingModel["imageTestBody"]) {
+    const settings = await loadSynthesisSettings();
+    const describer = createMinimaxImageDescriber(settings);
+    const description = await describer.describe({
+      absolutePath: body.image.name,
+      bytes: Buffer.from(await body.image.arrayBuffer()),
+      mimeType: body.image.type || "application/octet-stream",
+    });
+    return {
+      description: description.replace(/\s+/g, " ").trim(),
+      mimeType: body.image.type,
+      sizeBytes: body.image.size,
+      name: body.image.name,
+    };
   }
 }

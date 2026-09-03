@@ -36,7 +36,11 @@ export async function apiFetch<T>(
   const headers = new Headers(initHeaders);
   if (apiKey) headers.set("Authorization", `Bearer ${apiKey}`);
   if (rest.body && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
+    if (rest.body instanceof FormData) {
+      // FormData sets its own multipart Content-Type with boundary.
+    } else {
+      headers.set("Content-Type", "application/json");
+    }
   }
 
   const res = await fetch(`${apiBaseUrl()}${path}`, {
