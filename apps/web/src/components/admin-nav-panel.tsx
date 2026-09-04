@@ -13,6 +13,7 @@ type NavItem =
 
 const NAV_ITEMS: readonly NavItem[] = [
   { href: "/server-settings", label: "Server settings" },
+  { href: "/server-settings/providers", label: "Providers" },
   { href: "/knowledge-base", label: "Knowledge base" },
   { href: `${apiBaseUrl()}/openapi`, label: "OpenAPI", external: true },
 ];

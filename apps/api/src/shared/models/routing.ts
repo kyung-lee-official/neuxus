@@ -16,12 +16,7 @@ import { createEmbedClient } from "./clients/embed.ts";
 import { createVisionClient } from "./clients/vision.ts";
 import { loadModelConfig, resolveModel } from "./config.ts";
 import { requireApiKey, resolveConnection } from "./connection.ts";
-import type {
-  Embedder,
-  ImageDescriber,
-  ModelSlot,
-  Synthesizer,
-} from "./types.ts";
+import type { Embedder, ImageDescriber, Synthesizer } from "./types.ts";
 
 export type GetSynthesizerOptions = {
   userId?: string;
@@ -31,8 +26,8 @@ export async function getSynthesizer(
   options?: GetSynthesizerOptions,
 ): Promise<Synthesizer> {
   const config = await loadModelConfig();
-  const { model, provider, slot } = resolveModel("llm", config);
-  const conn = resolveConnection(provider, slot);
+  const { model, provider, connection } = resolveModel("llm", config);
+  const conn = resolveConnection(provider, connection);
   return createChatClient({
     model,
     provider,
@@ -49,8 +44,8 @@ export async function getImageDescriber(
   options?: GetImageDescriberOptions,
 ): Promise<ImageDescriber> {
   const config = await loadModelConfig();
-  const { model, provider, slot } = resolveModel("vision", config);
-  const conn = resolveConnection(provider, slot);
+  const { model, provider, connection } = resolveModel("vision", config);
+  const conn = resolveConnection(provider, connection);
   return createVisionClient({
     model,
     provider,
@@ -60,20 +55,14 @@ export async function getImageDescriber(
 
 export type GetEmbedderOptions = {
   userId?: string;
-  /**
-   * Override the slot — used by tests and by callers that already
-   * loaded the config. Production callers leave this undefined.
-   */
-  slot?: ModelSlot;
 };
 
 export async function getEmbedder(
   options?: GetEmbedderOptions,
 ): Promise<Embedder> {
   const config = await loadModelConfig();
-  const { model, provider, slot } = resolveModel("embedding", config);
-  const effectiveSlot = options?.slot ?? slot;
-  const conn = resolveConnection(provider, effectiveSlot);
+  const { model, provider, connection } = resolveModel("embedding", config);
+  const conn = resolveConnection(provider, connection);
   return createEmbedClient({
     model,
     provider,

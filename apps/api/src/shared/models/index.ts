@@ -1,8 +1,12 @@
 export { getModelById, getModelsByCapability, MODELS } from "./catalog.ts";
 export {
+  fullyConfiguredModelIds,
+  isFullyConfigured,
   loadModelConfig,
+  parseModelConfig,
   type ResolveModelError,
   resolveModel,
+  type SaveModelConfigInput,
   saveModelConfig,
 } from "./config.ts";
 export { getProviderById, PROVIDERS } from "./providers.ts";
@@ -19,7 +23,7 @@ export type {
   ImageDescriber,
   Model,
   ModelConfig,
-  ModelSlot,
+  ModelConnection,
   Provider,
   RequestShape,
   ResolvedModel,

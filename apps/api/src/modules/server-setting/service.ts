@@ -32,7 +32,7 @@ import {
 import type {
   Model,
   ModelConfig,
-  ModelSlot,
+  ModelConnection,
   Provider,
 } from "../../shared/models/types.ts";
 import {
@@ -63,16 +63,12 @@ function asError(err: unknown): { error: string } {
   return { error: msg };
 }
 
-function readSlot(value: unknown): ModelSlot | null {
-  if (value == null || typeof value !== "object") return null;
+function readConnection(value: unknown): ModelConnection | null {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
   const v = value as Record<string, unknown>;
-  const modelId =
-    typeof v.modelId === "string" && v.modelId.trim() !== ""
-      ? v.modelId.trim()
-      : null;
-  if (!modelId) return null;
   return {
-    modelId,
     apiKey:
       typeof v.apiKey === "string" && v.apiKey.trim() !== ""
         ? v.apiKey.trim()
@@ -88,19 +84,37 @@ function readSlot(value: unknown): ModelSlot | null {
   };
 }
 
-function readSlotOrEmpty(value: unknown): ModelSlot {
-  return (
-    readSlot(value) ?? {
-      modelId: "",
-      apiKey: null,
-      baseUrl: null,
-      port: null,
-    }
-  );
+function readConnections(
+  raw: unknown,
+): Record<string, ModelConnection | null> | undefined {
+  if (raw == null || typeof raw !== "object" || Array.isArray(raw))
+    return undefined;
+  const out: Record<string, ModelConnection | null> = {};
+  for (const [modelId, value] of Object.entries(
+    raw as Record<string, unknown>,
+  )) {
+    out[modelId] = readConnection(value);
+  }
+  return out;
+}
+
+function readTasks(raw: unknown): ModelConfig["tasks"] | undefined {
+  if (raw == null || typeof raw !== "object" || Array.isArray(raw))
+    return undefined;
+  const v = raw as Record<string, unknown>;
+  const pick = (key: string): string | null => {
+    const x = v[key];
+    return typeof x === "string" && x.trim() !== "" ? x.trim() : null;
+  };
+  return {
+    embedding: pick("embedding"),
+    llm: pick("llm"),
+    vision: pick("vision"),
+  };
 }
 
 export abstract class ServerSetting {
-  /** Read the per-task model config plus the static catalog. */
+  /** Read the connections/tasks map plus the static catalog. */
   static async getModel(): Promise<ServerSettingModel["modelResponse"]> {
     const config = await loadModelConfig();
     return {
@@ -110,16 +124,14 @@ export abstract class ServerSetting {
     };
   }
 
-  /** Upsert the per-task model config. Each slot may be null to clear. */
+  /** Update connections and/or tasks. Either may be partial. */
   static async putModel(
     body: ServerSettingModel["modelBody"],
   ): Promise<ServerSettingModel["modelResponse"]> {
-    const config: ModelConfig = {
-      embedding: readSlot(body.embedding),
-      llm: readSlot(body.llm),
-      vision: readSlot(body.vision),
-    };
-    const saved = await saveModelConfig(config);
+    const saved = await saveModelConfig({
+      connections: readConnections(body.connections),
+      tasks: readTasks(body.tasks),
+    });
     return {
       config: saved,
       providers: [...PROVIDERS] as Provider[],

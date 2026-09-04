@@ -44,9 +44,8 @@ const corpusStageLiteral = t.Union([
   t.Literal("embed"),
 ]);
 
-/** One persisted per-task slot (matches `app_model_config` JSON columns). */
-const slotSchema = t.Object({
-  modelId: t.String({ minLength: 1 }),
+/** One persisted per-model connection (`app_model_config.connections`). */
+const connectionSchema = t.Object({
   apiKey: t.Union([t.String(), t.Null()]),
   baseUrl: t.Union([t.String(), t.Null()]),
   port: t.Union([t.Integer({ minimum: 1, maximum: 65535 }), t.Null()]),
@@ -90,26 +89,32 @@ const modelSchema = t.Object({
   }),
 });
 
-export const ServerSettingModel = {
-  /** Per-task slot read/write (any of the three JSON columns). */
-  slot: slotSchema,
+const taskPointerSchema = t.Object({
+  embedding: t.Union([t.String(), t.Null()]),
+  llm: t.Union([t.String(), t.Null()]),
+  vision: t.Union([t.String(), t.Null()]),
+});
 
-  /** GET /model response: persisted slots + static catalog. */
+export const ServerSettingModel = {
+  /** Per-model connection (any value in `connections` map). */
+  connection: connectionSchema,
+
+  /** GET /model response: connections + tasks + static catalog. */
   modelResponse: t.Object({
     config: t.Object({
-      embedding: t.Union([slotSchema, t.Null()]),
-      llm: t.Union([slotSchema, t.Null()]),
-      vision: t.Union([slotSchema, t.Null()]),
+      connections: t.Record(t.String(), connectionSchema),
+      tasks: taskPointerSchema,
     }),
     providers: t.Array(providerSchema),
     models: t.Array(modelSchema),
   }),
 
-  /** PUT /model body: all three slots at once. */
+  /** PUT /model body: connections and/or tasks. Either may be partial. */
   modelBody: t.Object({
-    embedding: t.Union([slotSchema, t.Null()]),
-    llm: t.Union([slotSchema, t.Null()]),
-    vision: t.Union([slotSchema, t.Null()]),
+    connections: t.Optional(
+      t.Record(t.String(), t.Union([connectionSchema, t.Null()])),
+    ),
+    tasks: t.Optional(taskPointerSchema),
   }),
 
   /**

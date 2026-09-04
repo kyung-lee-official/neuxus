@@ -336,12 +336,11 @@ export async function testEmbedSearch(
   );
 }
 
-// --- Model registry (replaces per-task embed/synthesis/image endpoints) ---
+// --- Model registry (Providers page + Server-settings task pointers) ---
 
 export type ModelCapability = "embedding" | "llm" | "vision";
 
-export type ModelSlot = {
-  modelId: string;
+export type ModelConnection = {
   apiKey: string | null;
   baseUrl: string | null;
   port: number | null;
@@ -373,10 +372,15 @@ export type ModelInfo = {
   };
 };
 
+export type ModelTaskPointers = {
+  embedding: string | null;
+  llm: string | null;
+  vision: string | null;
+};
+
 export type ModelConfig = {
-  embedding: ModelSlot | null;
-  llm: ModelSlot | null;
-  vision: ModelSlot | null;
+  connections: Record<string, ModelConnection>;
+  tasks: ModelTaskPointers;
 };
 
 export type ModelConfigResponse = {
@@ -391,14 +395,19 @@ export async function getModelConfig(
   return apiFetch<ModelConfigResponse>("/server-setting/model", { apiKey });
 }
 
+export type PutModelConfigInput = {
+  connections?: Record<string, ModelConnection | null>;
+  tasks?: Partial<ModelTaskPointers>;
+};
+
 export async function putModelConfig(input: {
   apiKey: string;
-  config: ModelConfig;
+  patch: PutModelConfigInput;
 }): Promise<ModelConfigResponse> {
   return apiFetch<ModelConfigResponse>("/server-setting/model", {
     method: "PUT",
     apiKey: input.apiKey,
-    body: JSON.stringify(input.config),
+    body: JSON.stringify(input.patch),
   });
 }
 

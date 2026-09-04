@@ -1,21 +1,21 @@
 /**
- * Per-slot connection resolver.
+ * Per-model connection resolver.
  *
- * Combines the provider's hardcoded `baseUrl` with the per-slot
- * overrides (`baseUrl`, `port`) stored in `app_model_config`. Used by
- * the routing layer when constructing adapter clients.
+ * Combines the provider's hardcoded `baseUrl` with the per-model
+ * overrides (`baseUrl`, `port`) stored in
+ * `app_model_config.connections`. Used by the routing layer when
+ * constructing adapter clients.
  *
  * Override rules:
- *   - `baseUrl` slot override → replaces the provider base URL entirely.
+ *   - `baseUrl` override → replaces the provider base URL entirely.
  *     Useful for an on-prem Ollama.
- *   - `port` slot override → replaces the port of the provider base URL.
- *     Most useful together with the provider default `baseUrl` when the
- *     user wants to keep the same host but change the port.
- *   - `apiKey` slot override → sent as the Authorization header
- *     (Ollama) or `x-api-key` (Anthropic-compatible).
+ *   - `port` override → replaces the port of the (provider default or
+ *     overridden) base URL.
+ *   - `apiKey` override → sent as the Authorization header (Ollama) or
+ *     `x-api-key` (Anthropic-compatible).
  */
 
-import type { ModelSlot, Provider } from "./types.ts";
+import type { ModelConnection, Provider } from "./types.ts";
 
 export type ResolvedConnection = {
   baseUrl: string;
@@ -38,14 +38,14 @@ function applyPortOverride(
 
 export function resolveConnection(
   provider: Provider,
-  slot: ModelSlot,
+  connection: ModelConnection,
 ): ResolvedConnection {
-  const baseUrl = slot.baseUrl
-    ? applyPortOverride(slot.baseUrl, slot.port)
-    : applyPortOverride(provider.baseUrl, slot.port);
+  const baseUrl = connection.baseUrl
+    ? applyPortOverride(connection.baseUrl, connection.port)
+    : applyPortOverride(provider.baseUrl, connection.port);
   return {
     baseUrl: baseUrl.replace(/\/$/, ""),
-    apiKey: slot.apiKey ?? null,
+    apiKey: connection.apiKey ?? null,
   };
 }
 

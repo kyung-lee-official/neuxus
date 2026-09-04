@@ -52,35 +52,42 @@ export type Model = {
 };
 
 /**
- * Persisted per-task slot (`app_model_config.embedding` /
- * `.llm` / `.vision`). Stored as JSON; the union fields mirror
- * `Provider.userInputs`. Each connection field is always present (may
- * be `null`) so the JSON shape is stable round-tripping.
+ * Per-model connection settings (one row in the `connections` map on
+ * `app_model_config`). The fields present mirror
+ * `Provider.userInputs`; each is always defined (may be `null`) so the
+ * JSON shape round-trips cleanly.
  */
-export type ModelSlot = {
-  /** Catalog model id. */
-  modelId: string;
-  /** Per-slot API key override. Falls back to "no override" — providers
-   * without `apiKey` user input simply ignore it. */
+export type ModelConnection = {
+  /** Per-model API key. Required when the provider's `userInputs`
+   * contains `"apiKey"`; otherwise leave null. */
   apiKey: string | null;
-  /** Per-slot base URL override (e.g. local Ollama). */
+  /** Per-model base URL override (e.g. local Ollama). */
   baseUrl: string | null;
-  /** Per-slot port override (e.g. local Ollama). */
+  /** Per-model port override (e.g. local Ollama). */
   port: number | null;
 };
 
-/** Resolved at runtime: catalog entry + provider + slot overrides merged. */
+/** Resolved at runtime: catalog entry + provider + connection merged. */
 export type ResolvedModel = {
   task: CapabilityTag;
-  slot: ModelSlot;
+  connection: ModelConnection;
   model: Model;
   provider: Provider;
 };
 
+/**
+ * Persisted shape of `app_model_config`. `connections` keys are
+ * catalog `modelId`s; `tasks[tag]` is one of those ids (or null).
+ */
 export type ModelConfig = {
-  embedding: ModelSlot | null;
-  llm: ModelSlot | null;
-  vision: ModelSlot | null;
+  /** Keyed by catalog `modelId`. Empty object when nothing configured. */
+  connections: Record<string, ModelConnection>;
+  /** Active model id for each task, or null. */
+  tasks: {
+    embedding: string | null;
+    llm: string | null;
+    vision: string | null;
+  };
 };
 
 /** Public client interfaces — stable contracts callers depend on. */

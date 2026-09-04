@@ -19,7 +19,7 @@ export const serverSetting = new Elysia({ prefix: "/server-setting" })
       ...adminDetail,
       summary: "Get the model registry config",
       description:
-        "Returns the three persisted task slots (`embedding` / `llm` / `vision`) plus the static catalog of providers and models the admin UI uses to render the dropdowns.",
+        "Returns the persisted per-model connection map (`connections`, keyed by catalog `modelId`) plus the task-pointer map (`tasks`) and the static catalog of providers and models used to render the UI.",
     },
   })
   .put("/model", ({ body }) => ServerSetting.putModel(body), {
@@ -30,7 +30,7 @@ export const serverSetting = new Elysia({ prefix: "/server-setting" })
       ...adminDetail,
       summary: "Update the model registry config",
       description:
-        "Each task slot is independent. Pass `null` to clear a slot; pass `{ modelId, apiKey?, baseUrl?, port? }` to configure one. The catalog owns every other parameter.",
+        "`connections` and `tasks` are each optional. Pass `null` for a connection to delete it; any task pointing at a model that no longer exists or is no longer fully configured is auto-nulled on save.",
     },
   })
   .post("/model/test/:task", ({ body }) => ServerSetting.testModel(body), {
