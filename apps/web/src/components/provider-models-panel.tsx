@@ -187,6 +187,15 @@ function describeRequestShape(shape: ProviderInfo["requestShape"]): string {
   }
 }
 
+/** Pull just the hostname out of a base URL for placeholder display. */
+function hostFromUrl(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return "";
+  }
+}
+
 function isModelUsedByAnyTask(
   config: ModelConfig | undefined,
   modelId: string,
@@ -229,6 +238,8 @@ function ProviderModelRow({
 
   const check = checkConfigured(draft, provider);
   const fullyConfigured = check.ok;
+
+  const hostPlaceholder = hostFromUrl(provider.baseUrl) || "127.0.0.1";
 
   const capabilityTags = (
     Object.entries(model.capabilities) as Array<
@@ -300,13 +311,13 @@ function ProviderModelRow({
 
         {provider.userInputs.includes("baseUrl") ? (
           <label className="flex flex-col gap-1.5 text-sm">
-            <span>Base URL</span>
+            <span>Host</span>
             <input
               type="text"
               className="w-full rounded border border-line bg-canvas px-2.5 py-2 text-ink disabled:opacity-60"
               value={draft.baseUrl ?? ""}
               disabled={busy}
-              placeholder={provider.baseUrl}
+              placeholder={hostPlaceholder}
               onChange={(e) =>
                 setDraft({
                   ...draft,
@@ -314,6 +325,11 @@ function ProviderModelRow({
                 })
               }
             />
+            <span className="text-muted text-xs">
+              Hostname or IP, e.g.{" "}
+              <span className="font-mono">{hostPlaceholder}</span>. Scheme and
+              port come from the URL field below + the Port field.
+            </span>
           </label>
         ) : null}
 
@@ -323,6 +339,8 @@ function ProviderModelRow({
             <input
               type="number"
               inputMode="numeric"
+              min={1}
+              max={65535}
               className="w-full rounded border border-line bg-canvas px-2.5 py-2 text-ink disabled:opacity-60"
               value={draft.port ?? ""}
               disabled={busy}
