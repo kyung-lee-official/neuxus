@@ -1,6 +1,6 @@
 export { getModelById, getModelsByCapability, MODELS } from "./catalog.ts";
 export {
-  fullyConfiguredModelIds,
+  fullyConfiguredProviderIds,
   isFullyConfigured,
   loadModelConfig,
   parseModelConfig,
@@ -23,9 +23,10 @@ export type {
   ImageDescriber,
   Model,
   ModelConfig,
-  ModelConnection,
   Provider,
+  ProviderConnection,
   RequestShape,
+  ResolvedConnection,
   ResolvedModel,
   Synthesizer,
   UserInputField,

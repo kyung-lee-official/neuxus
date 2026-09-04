@@ -13,7 +13,12 @@ import {
   AnthropicMessagesClient,
   textFromAnthropicResponse,
 } from "../adapters/anthropic-messages.ts";
-import type { Model, Provider, Synthesizer } from "../types.ts";
+import type {
+  Model,
+  Provider,
+  ResolvedConnection,
+  Synthesizer,
+} from "../types.ts";
 
 const synthesisLog = childLogger({ module: "synthesis" }, "synthesis");
 
@@ -33,6 +38,13 @@ const DEFAULT_TEMPERATURE = 1;
 export type ChatClientOptions = {
   model: Model;
   provider: Provider;
+  /** Resolved `baseUrl` + `apiKey` for this provider. Routed upstream via
+   * `requireApiKey` so `apiKey` is non-null for cloud providers. */
+  connection: ResolvedConnection;
+  /** Convenience: `connection.apiKey` validated non-null. Routed via
+   * `requireApiKey` upstream; kept as a separate parameter so the
+   * AnthropicMessagesClient constructor (which requires `string`) keeps
+   * its existing shape. */
   apiKey: string;
   /** Owner of the request. Stamped on every `app_log` row this client emits. */
   userId?: string;
@@ -43,11 +55,12 @@ export type CreateChatClient = (options: ChatClientOptions) => Synthesizer;
 export const createChatClient: CreateChatClient = ({
   model,
   provider,
+  connection,
   apiKey,
   userId,
 }) => {
   const client = new AnthropicMessagesClient({
-    baseUrl: provider.baseUrl,
+    baseUrl: connection.baseUrl,
     apiKey,
     headers: provider.headers,
   });

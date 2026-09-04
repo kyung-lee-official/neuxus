@@ -7,6 +7,7 @@ import {
   getModelConfig,
   type ModelConfig,
   type ModelInfo,
+  type ProviderConnection,
   type ProviderInfo,
   UserQueryKey,
 } from "@/lib/api";
@@ -19,9 +20,7 @@ const CAPABILITY_LABEL = {
 } as const;
 
 function isFullyConfiguredClient(
-  conn:
-    | { apiKey: string | null; baseUrl: string | null; port: number | null }
-    | undefined,
+  conn: ProviderConnection | undefined,
   required: ProviderInfo["userInputs"],
 ): boolean {
   if (!conn) return false;
@@ -34,7 +33,9 @@ function isFullyConfiguredClient(
 /**
  * `/server-settings/providers` — list every catalog provider as a
  * navigation entry. Each row links to `/server-settings/providers/[providerId]`
- * where the user configures individual model connections.
+ * where the user configures that provider's connection. Every model
+ * under a fully-configured provider becomes selectable in the task
+ * dropdowns on the Server settings page.
  */
 export function ProviderListPanel() {
   const user = useAdminUser();
@@ -59,8 +60,8 @@ export function ProviderListPanel() {
         <h1 className="m-0 font-display text-2xl text-ink">Providers</h1>
         <p className="m-0 text-muted text-sm">
           Each provider hosts one or more catalog models. Pick a provider to
-          configure its models' connection settings — fully-configured models
-          appear in the task dropdowns on the Server settings page.
+          configure its connection — fully-configured providers make every model
+          under them selectable on the Server settings page.
         </p>
       </section>
 
@@ -80,9 +81,8 @@ export function ProviderListPanel() {
 type ProviderRow = {
   provider: ProviderInfo;
   modelCount: number;
-  configuredCount: number;
+  configured: boolean;
   capabilities: string[];
-  allConfigured: boolean;
   anyInUse: boolean;
 };
 
@@ -93,22 +93,22 @@ function buildRows(
 ): ProviderRow[] {
   return providers.map((provider) => {
     const providerModels = models.filter((m) => m.providerId === provider.id);
-    let configuredCount = 0;
+    const conn = config?.providerConnections[provider.id];
+    const configured = isFullyConfiguredClient(conn, provider.userInputs);
+
     let anyInUse = false;
-    for (const m of providerModels) {
-      const conn = config?.connections[m.id];
-      if (isFullyConfiguredClient(conn, provider.userInputs)) {
-        configuredCount += 1;
-      }
-      if (config) {
+    if (config) {
+      for (const m of providerModels) {
         for (const id of Object.values(config.tasks)) {
           if (id === m.id) {
             anyInUse = true;
             break;
           }
         }
+        if (anyInUse) break;
       }
     }
+
     const caps = new Set<string>();
     for (const m of providerModels) {
       for (const k of Object.keys(m.capabilities) as Array<
@@ -120,24 +120,15 @@ function buildRows(
     return {
       provider,
       modelCount: providerModels.length,
-      configuredCount,
+      configured,
       capabilities: Array.from(caps),
-      allConfigured:
-        providerModels.length > 0 && configuredCount === providerModels.length,
       anyInUse,
     };
   });
 }
 
 function ProviderRow({ row }: { row: ProviderRow }) {
-  const {
-    provider,
-    modelCount,
-    configuredCount,
-    capabilities,
-    allConfigured,
-    anyInUse,
-  } = row;
+  const { provider, modelCount, configured, capabilities, anyInUse } = row;
   return (
     <Link
       href={`/server-settings/providers/${encodeURIComponent(provider.id)}`}
@@ -168,13 +159,13 @@ function ProviderRow({ row }: { row: ProviderRow }) {
             <span className="rounded bg-line px-2 py-0.5 font-mono text-muted text-xs">
               no models
             </span>
-          ) : allConfigured ? (
+          ) : configured ? (
             <span className="rounded bg-ok/15 px-2 py-0.5 font-mono text-ok text-xs">
-              {configuredCount} / {modelCount} configured
+              configured · {modelCount} model{modelCount === 1 ? "" : "s"}
             </span>
           ) : (
             <span className="rounded bg-warning/15 px-2 py-0.5 font-mono text-warning text-xs">
-              {configuredCount} / {modelCount} configured
+              not configured · {modelCount} model{modelCount === 1 ? "" : "s"}
             </span>
           )}
         </div>

@@ -32,8 +32,8 @@ import {
 import type {
   Model,
   ModelConfig,
-  ModelConnection,
   Provider,
+  ProviderConnection,
 } from "../../shared/models/types.ts";
 import {
   adminRetrieveSettings,
@@ -63,7 +63,7 @@ function asError(err: unknown): { error: string } {
   return { error: msg };
 }
 
-function readConnection(value: unknown): ModelConnection | null {
+function readConnection(value: unknown): ProviderConnection | null {
   if (value == null || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
@@ -84,16 +84,16 @@ function readConnection(value: unknown): ModelConnection | null {
   };
 }
 
-function readConnections(
+function readProviderConnections(
   raw: unknown,
-): Record<string, ModelConnection | null> | undefined {
+): Record<string, ProviderConnection | null> | undefined {
   if (raw == null || typeof raw !== "object" || Array.isArray(raw))
     return undefined;
-  const out: Record<string, ModelConnection | null> = {};
-  for (const [modelId, value] of Object.entries(
+  const out: Record<string, ProviderConnection | null> = {};
+  for (const [providerId, value] of Object.entries(
     raw as Record<string, unknown>,
   )) {
-    out[modelId] = readConnection(value);
+    out[providerId] = readConnection(value);
   }
   return out;
 }
@@ -114,7 +114,7 @@ function readTasks(raw: unknown): ModelConfig["tasks"] | undefined {
 }
 
 export abstract class ServerSetting {
-  /** Read the connections/tasks map plus the static catalog. */
+  /** Read the providerConnections/tasks map plus the static catalog. */
   static async getModel(): Promise<ServerSettingModel["modelResponse"]> {
     const config = await loadModelConfig();
     return {
@@ -124,12 +124,12 @@ export abstract class ServerSetting {
     };
   }
 
-  /** Update connections and/or tasks. Either may be partial. */
+  /** Update providerConnections and/or tasks. Either may be partial. */
   static async putModel(
     body: ServerSettingModel["modelBody"],
   ): Promise<ServerSettingModel["modelResponse"]> {
     const saved = await saveModelConfig({
-      connections: readConnections(body.connections),
+      providerConnections: readProviderConnections(body.providerConnections),
       tasks: readTasks(body.tasks),
     });
     return {

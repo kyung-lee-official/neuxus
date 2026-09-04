@@ -15,7 +15,7 @@ import { createChatClient } from "./clients/chat.ts";
 import { createEmbedClient } from "./clients/embed.ts";
 import { createVisionClient } from "./clients/vision.ts";
 import { loadModelConfig, resolveModel } from "./config.ts";
-import { requireApiKey, resolveConnection } from "./connection.ts";
+import { requireApiKey } from "./connection.ts";
 import type { Embedder, ImageDescriber, Synthesizer } from "./types.ts";
 
 export type GetSynthesizerOptions = {
@@ -27,11 +27,11 @@ export async function getSynthesizer(
 ): Promise<Synthesizer> {
   const config = await loadModelConfig();
   const { model, provider, connection } = resolveModel("llm", config);
-  const conn = resolveConnection(provider, connection);
   return createChatClient({
     model,
     provider,
-    apiKey: requireApiKey(provider, conn.apiKey),
+    connection,
+    apiKey: requireApiKey(provider, connection.apiKey),
     userId: options?.userId,
   });
 }
@@ -45,11 +45,11 @@ export async function getImageDescriber(
 ): Promise<ImageDescriber> {
   const config = await loadModelConfig();
   const { model, provider, connection } = resolveModel("vision", config);
-  const conn = resolveConnection(provider, connection);
   return createVisionClient({
     model,
     provider,
-    apiKey: requireApiKey(provider, conn.apiKey),
+    connection,
+    apiKey: requireApiKey(provider, connection.apiKey),
   });
 }
 
@@ -62,11 +62,10 @@ export async function getEmbedder(
 ): Promise<Embedder> {
   const config = await loadModelConfig();
   const { model, provider, connection } = resolveModel("embedding", config);
-  const conn = resolveConnection(provider, connection);
   return createEmbedClient({
     model,
     provider,
-    apiKey: conn.apiKey,
+    connection,
   });
 }
 

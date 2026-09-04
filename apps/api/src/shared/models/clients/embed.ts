@@ -7,13 +7,19 @@
  */
 
 import { OllamaEmbeddingsClient } from "../adapters/ollama-embed.ts";
-import type { Embedder, Model, Provider } from "../types.ts";
+import type {
+  Embedder,
+  Model,
+  Provider,
+  ResolvedConnection,
+} from "../types.ts";
 
 export type EmbedClientOptions = {
   model: Model;
   provider: Provider;
-  /** Ollama accepts but doesn't require an API key. */
-  apiKey?: string | null;
+  /** Resolved `baseUrl` + `apiKey` for this provider. Ollama accepts but
+   * doesn't require an API key, so `connection.apiKey` may be null. */
+  connection: ResolvedConnection;
 };
 
 export type CreateEmbedClient = (options: EmbedClientOptions) => Embedder;
@@ -21,7 +27,7 @@ export type CreateEmbedClient = (options: EmbedClientOptions) => Embedder;
 export const createEmbedClient: CreateEmbedClient = ({
   model,
   provider,
-  apiKey,
+  connection,
 }) => {
   if (provider.requestShape !== "ollama-embed") {
     throw new Error(
@@ -29,8 +35,8 @@ export const createEmbedClient: CreateEmbedClient = ({
     );
   }
   const client = new OllamaEmbeddingsClient({
-    baseUrl: provider.baseUrl,
-    apiKey: apiKey ?? null,
+    baseUrl: connection.baseUrl,
+    apiKey: connection.apiKey,
   });
   return {
     async embed(texts: string[]): Promise<number[][]> {

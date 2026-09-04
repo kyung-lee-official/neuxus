@@ -9,6 +9,7 @@ import {
   type ModelConfig,
   type ModelInfo,
   type ModelTaskPointers,
+  type ProviderConnection,
   type ProviderInfo,
   putModelConfig,
   testEmbedSearch,
@@ -46,14 +47,13 @@ function errorMessage(err: unknown): string {
 }
 
 /**
- * A model is "fully configured" iff every provider-declared user input
- * field is non-empty. Mirrors the server's check (`isFullyConfigured`
+ * A provider is "fully configured" iff every user input field declared
+ * by it is non-empty. A model is selectable for a task iff its provider
+ * is fully configured. Mirrors the server's check (`isFullyConfigured`
  * in `shared/models/config.ts`).
  */
 function isFullyConfiguredClient(
-  conn:
-    | { apiKey: string | null; baseUrl: string | null; port: number | null }
-    | undefined,
+  conn: ProviderConnection | undefined,
   required: ProviderInfo["userInputs"],
 ): boolean {
   if (!conn) return false;
@@ -136,11 +136,11 @@ function ScenarioPanel({
         const provider = providers.find((p) => p.id === m.providerId);
         if (!provider) return false;
         return isFullyConfiguredClient(
-          config.connections[m.id],
+          config.providerConnections[m.providerId],
           provider.userInputs,
         );
       });
-  }, [models, providers, scenario, config.connections]);
+  }, [models, providers, scenario, config.providerConnections]);
 
   const updateMutation = useMutation({
     mutationFn: (next: string | null) =>

@@ -11,7 +11,12 @@ import {
   AnthropicMessagesClient,
   textFromAnthropicResponse,
 } from "../adapters/anthropic-messages.ts";
-import type { ImageDescriber, Model, Provider } from "../types.ts";
+import type {
+  ImageDescriber,
+  Model,
+  Provider,
+  ResolvedConnection,
+} from "../types.ts";
 
 /**
  * Fixed description prompt — same wording the previous
@@ -27,6 +32,13 @@ const DEFAULT_TEMPERATURE = 1;
 export type VisionClientOptions = {
   model: Model;
   provider: Provider;
+  /** Resolved `baseUrl` + `apiKey` for this provider. Routed upstream via
+   * `requireApiKey` so `apiKey` is non-null for cloud providers. */
+  connection: ResolvedConnection;
+  /** Convenience: `connection.apiKey` validated non-null. Routed via
+   * `requireApiKey` upstream; kept as a separate parameter so the
+   * AnthropicMessagesClient constructor (which requires `string`) keeps
+   * its existing shape. */
   apiKey: string;
 };
 
@@ -37,10 +49,11 @@ export type CreateVisionClient = (
 export const createVisionClient: CreateVisionClient = ({
   model,
   provider,
+  connection,
   apiKey,
 }) => {
   const client = new AnthropicMessagesClient({
-    baseUrl: provider.baseUrl,
+    baseUrl: connection.baseUrl,
     apiKey,
     headers: provider.headers,
   });

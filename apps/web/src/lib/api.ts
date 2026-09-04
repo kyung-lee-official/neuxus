@@ -340,7 +340,7 @@ export async function testEmbedSearch(
 
 export type ModelCapability = "embedding" | "llm" | "vision";
 
-export type ModelConnection = {
+export type ProviderConnection = {
   apiKey: string | null;
   baseUrl: string | null;
   port: number | null;
@@ -379,7 +379,7 @@ export type ModelTaskPointers = {
 };
 
 export type ModelConfig = {
-  connections: Record<string, ModelConnection>;
+  providerConnections: Record<string, ProviderConnection>;
   tasks: ModelTaskPointers;
 };
 
@@ -396,7 +396,7 @@ export async function getModelConfig(
 }
 
 export type PutModelConfigInput = {
-  connections?: Record<string, ModelConnection | null>;
+  providerConnections?: Record<string, ProviderConnection | null>;
   tasks?: Partial<ModelTaskPointers>;
 };
 

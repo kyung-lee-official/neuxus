@@ -2,9 +2,9 @@
  * Model registry: capability tags, model + provider shapes, and persisted
  * per-task slots.
  *
- * The catalog (`catalog.ts`) owns every supported model and provider — the
- * `app_model_config` row only stores which `modelId` the user picked for
- * each task plus optional per-slot connection overrides.
+ * The catalog (`catalog.ts`) owns every supported model and provider —
+ * the `app_model_config` row only stores which `modelId` the user picked
+ * for each task plus optional per-provider connection overrides.
  */
 
 export type CapabilityTag = "embedding" | "llm" | "vision";
@@ -52,36 +52,55 @@ export type Model = {
 };
 
 /**
- * Per-model connection settings (one row in the `connections` map on
- * `app_model_config`). The fields present mirror
- * `Provider.userInputs`; each is always defined (may be `null`) so the
- * JSON shape round-trips cleanly.
+ * Per-provider connection settings (one row in the
+ * `providerConnections` map on `app_model_config`). Connection fields
+ * are provider-level — every model under one provider shares the same
+ * key, base URL, and port — so the map is keyed by `providerId`, not
+ * `modelId`. Each field is always defined (may be `null`) so the JSON
+ * shape round-trips cleanly.
  */
-export type ModelConnection = {
-  /** Per-model API key. Required when the provider's `userInputs`
-   * contains `"apiKey"`; otherwise leave null. */
+export type ProviderConnection = {
+  /** API key sent on every request to this provider. Required when the
+   * provider's `userInputs` contains `"apiKey"`; otherwise leave null. */
   apiKey: string | null;
-  /** Per-model base URL override (e.g. local Ollama). */
+  /** Base URL override (e.g. local Ollama). Replaces the provider's
+   * catalog `baseUrl` entirely when set. */
   baseUrl: string | null;
-  /** Per-model port override (e.g. local Ollama). */
+  /** Port override. Replaces the port of the (provider default or
+   * overridden) base URL when set. */
   port: number | null;
 };
 
-/** Resolved at runtime: catalog entry + provider + connection merged. */
+/**
+ * Connection merged with the provider's catalog defaults — what
+ * adapters actually use to reach the upstream API. `baseUrl` is the
+ * post-override URL; `apiKey` is the post-default null value.
+ */
+export type ResolvedConnection = {
+  baseUrl: string;
+  apiKey: string | null;
+};
+
+/**
+ * Resolved at runtime: catalog entry + provider + resolved connection.
+ * Callers can hand `connection` straight to adapter clients — clients
+ * no longer recompute the baseUrl / apiKey from `Provider`.
+ */
 export type ResolvedModel = {
   task: CapabilityTag;
-  connection: ModelConnection;
+  connection: ResolvedConnection;
   model: Model;
   provider: Provider;
 };
 
 /**
- * Persisted shape of `app_model_config`. `connections` keys are
- * catalog `modelId`s; `tasks[tag]` is one of those ids (or null).
+ * Persisted shape of `app_model_config`. `providerConnections` keys are
+ * catalog `providerId`s; `tasks[tag]` is one of the catalog `modelId`s
+ * (or null) that the provider entry must cover.
  */
 export type ModelConfig = {
-  /** Keyed by catalog `modelId`. Empty object when nothing configured. */
-  connections: Record<string, ModelConnection>;
+  /** Keyed by catalog `providerId`. Empty object when nothing configured. */
+  providerConnections: Record<string, ProviderConnection>;
   /** Active model id for each task, or null. */
   tasks: {
     embedding: string | null;

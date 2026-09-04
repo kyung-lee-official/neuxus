@@ -7,8 +7,8 @@ import {
   ApiError,
   getModelConfig,
   type ModelConfig,
-  type ModelConnection,
   type ModelInfo,
+  type ProviderConnection,
   type ProviderInfo,
   putModelConfig,
   UserQueryKey,
@@ -23,7 +23,7 @@ function errorMessage(err: unknown): string {
 
 /** Mirrors `isFullyConfigured` in `shared/models/config.ts`. */
 function checkConfigured(
-  conn: ModelConnection,
+  conn: ProviderConnection,
   provider: ProviderInfo,
 ): { ok: true } | { ok: false; missing: string } {
   for (const field of provider.userInputs) {
@@ -43,10 +43,12 @@ const CAPABILITY_LABEL = {
 } as const;
 
 /**
- * `/server-settings/providers/[providerId]` — list the catalog models
- * hosted by `providerId`. Per-model connection fields are configured
- * here. Models whose connection isn't fully configured don't appear in
- * the task dropdowns on the Server settings page.
+ * `/server-settings/providers/[providerId]` — edit the connection for
+ * `providerId` and read-only list the catalog models that resolve to it.
+ *
+ * Connection settings are provider-level: every model under this
+ * provider shares the same key, base URL, and port. Configuring the
+ * provider once enables every model that points at it.
  */
 export function ProviderModelsPanel({ providerId }: { providerId: string }) {
   const user = useAdminUser();
@@ -68,7 +70,7 @@ export function ProviderModelsPanel({ providerId }: { providerId: string }) {
 
   const saveMutation = useMutation({
     mutationFn: (patch: {
-      connections?: Record<string, ModelConnection | null>;
+      providerConnections?: Record<string, ProviderConnection | null>;
     }) => putModelConfig({ apiKey: user.apiKey, patch }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
@@ -77,9 +79,9 @@ export function ProviderModelsPanel({ providerId }: { providerId: string }) {
     },
   });
 
-  function persist(modelId: string, next: ModelConnection | null) {
+  function persist(providerId: string, next: ProviderConnection | null) {
     saveMutation.mutate({
-      connections: { [modelId]: next },
+      providerConnections: { [providerId]: next },
     });
   }
 
@@ -128,105 +130,55 @@ export function ProviderModelsPanel({ providerId }: { providerId: string }) {
           <span>{describeRequestShape(provider.requestShape)}</span>
         </p>
         <p className="m-0 text-muted text-sm">
-          Configure connection settings for each model below. Save per row;
-          fully-configured models become selectable on the Server settings page.
+          Connection settings apply to every model under this provider. Save
+          once; fully-configured models become selectable on the Server settings
+          page.
         </p>
       </section>
+
+      <ProviderConnectionCard
+        provider={provider}
+        connection={config?.providerConnections[provider.id]}
+        busy={saveMutation.isPending}
+        onChange={(next) => persist(provider.id, next)}
+      />
 
       {models.length === 0 ? (
         <section className="rounded-md border border-line bg-surface p-6 text-muted text-sm">
           No models are catalogued under this provider.
         </section>
       ) : (
-        <div className="flex flex-col gap-3">
-          {models.map((m) => (
-            <ProviderModelRow
-              key={m.id}
-              model={m}
-              provider={provider}
-              connection={config?.connections[m.id]}
-              isTaskActive={isModelUsedByAnyTask(config, m.id)}
-              busy={saveMutation.isPending}
-              onChange={(next) => persist(m.id, next)}
-            />
-          ))}
-          {saveMutation.isError ? (
-            <p className="m-0 text-danger text-sm">
-              {errorMessage(saveMutation.error)}
-            </p>
-          ) : null}
-        </div>
+        <ModelsUnderProvider config={config} models={models} />
       )}
+
+      {saveMutation.isError ? (
+        <p className="m-0 text-danger text-sm">
+          {errorMessage(saveMutation.error)}
+        </p>
+      ) : null}
     </div>
   );
 }
 
-function Breadcrumb({ providerLabel }: { providerLabel: string }) {
-  return (
-    <nav className="flex items-center gap-1 text-muted text-sm">
-      <Link
-        href="/server-settings/providers"
-        className="text-accent no-underline hover:underline"
-      >
-        Providers
-      </Link>
-      <span>/</span>
-      <span className="text-ink">{providerLabel}</span>
-    </nav>
-  );
-}
-
-function describeRequestShape(shape: ProviderInfo["requestShape"]): string {
-  switch (shape) {
-    case "anthropic-messages":
-      return "Anthropic-compatible Messages";
-    case "openai-embeddings":
-      return "OpenAI-compatible embeddings";
-    case "ollama-embed":
-      return "Ollama /api/embed";
-  }
-}
-
-/** Pull just the hostname out of a base URL for placeholder display. */
-function hostFromUrl(url: string): string {
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return "";
-  }
-}
-
-function isModelUsedByAnyTask(
-  config: ModelConfig | undefined,
-  modelId: string,
-): boolean {
-  if (!config) return false;
-  return Object.values(config.tasks).some((id) => id === modelId);
-}
-
-function ProviderModelRow({
-  model,
+function ProviderConnectionCard({
   provider,
   connection,
-  isTaskActive,
   busy,
   onChange,
 }: {
-  model: ModelInfo;
   provider: ProviderInfo;
-  connection: ModelConnection | undefined;
-  isTaskActive: boolean;
+  connection: ProviderConnection | undefined;
   busy: boolean;
-  onChange: (next: ModelConnection | null) => void;
+  onChange: (next: ProviderConnection | null) => void;
 }) {
   // `local` is what the server currently holds (or the empty default).
   // Memoize so the reference is stable between refetches — otherwise the
   // useEffect below would fire on every render and call setDraft, looping.
-  const local = useMemo<ModelConnection>(
+  const local = useMemo<ProviderConnection>(
     () => connection ?? { apiKey: null, baseUrl: null, port: null },
     [connection],
   );
-  const [draft, setDraft] = useState<ModelConnection>(local);
+  const [draft, setDraft] = useState<ProviderConnection>(local);
   const dirty = !sameConnection(draft, local);
 
   // Refresh draft when the persisted connection changes (after a save
@@ -241,40 +193,16 @@ function ProviderModelRow({
 
   const hostPlaceholder = hostFromUrl(provider.baseUrl) || "127.0.0.1";
 
-  const capabilityTags = (
-    Object.entries(model.capabilities) as Array<
-      [keyof typeof CAPABILITY_LABEL, true | undefined]
-    >
-  )
-    .filter(([, v]) => v === true)
-    .map(([k]) => CAPABILITY_LABEL[k]);
-
   function save() {
     onChange(draft);
     // Saving even when not fully-configured: server accepts partial entries
-    // (they just stay out of task dropdowns until filled).
+    // (the provider just stays out of task dropdowns until filled).
   }
 
   return (
     <section className="flex flex-col gap-3 rounded-md border border-line bg-surface p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-          <h2 className="m-0 font-display text-ink text-lg">
-            {model.displayName}
-          </h2>
-          <p className="m-0 text-muted text-xs">
-            <span className="font-mono">{model.id}</span>
-          </p>
-          <p className="m-0 text-muted text-xs">
-            Capabilities:{" "}
-            {capabilityTags.length > 0 ? capabilityTags.join(", ") : "—"}
-            {isTaskActive ? (
-              <span className="ml-2 rounded bg-accent/15 px-1.5 py-0.5 text-accent">
-                in use
-              </span>
-            ) : null}
-          </p>
-        </div>
+        <h2 className="m-0 font-display text-ink text-lg">Connection</h2>
         <div className="flex items-center gap-2">
           {fullyConfigured ? (
             <span className="rounded bg-ok/15 px-2 py-0.5 font-mono text-ok text-xs">
@@ -389,7 +317,92 @@ function ProviderModelRow({
   );
 }
 
-function sameConnection(a: ModelConnection, b: ModelConnection): boolean {
+function ModelsUnderProvider({
+  config,
+  models,
+}: {
+  config: ModelConfig | undefined;
+  models: ModelInfo[];
+}) {
+  return (
+    <section className="flex flex-col gap-3 rounded-md border border-line bg-surface p-6">
+      <h2 className="m-0 font-display text-ink text-lg">Models</h2>
+      <ul className="m-0 flex list-none flex-col gap-2 p-0">
+        {models.map((m) => {
+          const capabilityTags = (
+            Object.entries(m.capabilities) as Array<
+              [keyof typeof CAPABILITY_LABEL, true | undefined]
+            >
+          )
+            .filter(([, v]) => v === true)
+            .map(([k]) => CAPABILITY_LABEL[k]);
+          const inUse = config
+            ? Object.values(config.tasks).some((id) => id === m.id)
+            : false;
+          return (
+            <li
+              key={m.id}
+              className="flex flex-wrap items-baseline justify-between gap-2 rounded border border-line bg-canvas p-3"
+            >
+              <div>
+                <p className="m-0 font-display text-ink text-sm">
+                  {m.displayName}
+                </p>
+                <p className="m-0 font-mono text-muted text-xs">{m.id}</p>
+                <p className="m-0 text-muted text-xs">
+                  Capabilities:{" "}
+                  {capabilityTags.length > 0 ? capabilityTags.join(", ") : "—"}
+                </p>
+              </div>
+              {inUse ? (
+                <span className="rounded bg-accent/15 px-1.5 py-0.5 font-mono text-accent text-xs">
+                  in use
+                </span>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+function Breadcrumb({ providerLabel }: { providerLabel: string }) {
+  return (
+    <nav className="flex items-center gap-1 text-muted text-sm">
+      <Link
+        href="/server-settings/providers"
+        className="text-accent no-underline hover:underline"
+      >
+        Providers
+      </Link>
+      <span>/</span>
+      <span className="text-ink">{providerLabel}</span>
+    </nav>
+  );
+}
+
+function describeRequestShape(shape: ProviderInfo["requestShape"]): string {
+  switch (shape) {
+    case "anthropic-messages":
+      return "Anthropic-compatible Messages";
+    case "openai-embeddings":
+      return "OpenAI-compatible embeddings";
+    case "ollama-embed":
+      return "Ollama /api/embed";
+  }
+}
+
+/** Pull just the hostname out of a base URL for placeholder display. */
+function hostFromUrl(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return "";
+  }
+}
+
+function sameConnection(a: ProviderConnection, b: ProviderConnection): boolean {
   return (
     (a.apiKey ?? null) === (b.apiKey ?? null) &&
     (a.baseUrl ?? null) === (b.baseUrl ?? null) &&

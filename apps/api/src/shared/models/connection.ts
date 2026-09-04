@@ -1,10 +1,11 @@
 /**
- * Per-model connection resolver.
+ * Per-provider connection resolver.
  *
- * Combines the provider's hardcoded `baseUrl` with the per-model
+ * Combines the provider's hardcoded `baseUrl` with the per-provider
  * overrides (`baseUrl`, `port`) stored in
- * `app_model_config.connections`. Used by the routing layer when
- * constructing adapter clients.
+ * `app_model_config.providerConnections`. Used by `resolveModel` in
+ * `config.ts` so adapter clients can hand the resolved values straight
+ * to their underlying HTTP clients.
  *
  * Override rules:
  *   - `baseUrl` override → replaces the provider base URL entirely.
@@ -15,12 +16,11 @@
  *     `x-api-key` (Anthropic-compatible).
  */
 
-import type { ModelConnection, Provider } from "./types.ts";
-
-export type ResolvedConnection = {
-  baseUrl: string;
-  apiKey: string | null;
-};
+import type {
+  Provider,
+  ProviderConnection,
+  ResolvedConnection,
+} from "./types.ts";
 
 function applyPortOverride(
   baseUrl: string,
@@ -38,7 +38,7 @@ function applyPortOverride(
 
 export function resolveConnection(
   provider: Provider,
-  connection: ModelConnection,
+  connection: ProviderConnection,
 ): ResolvedConnection {
   const baseUrl = connection.baseUrl
     ? applyPortOverride(connection.baseUrl, connection.port)

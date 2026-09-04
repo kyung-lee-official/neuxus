@@ -44,7 +44,7 @@ const corpusStageLiteral = t.Union([
   t.Literal("embed"),
 ]);
 
-/** One persisted per-model connection (`app_model_config.connections`). */
+/** One persisted per-provider connection (`app_model_config.providerConnections`). */
 const connectionSchema = t.Object({
   apiKey: t.Union([t.String(), t.Null()]),
   baseUrl: t.Union([t.String(), t.Null()]),
@@ -96,22 +96,22 @@ const taskPointerSchema = t.Object({
 });
 
 export const ServerSettingModel = {
-  /** Per-model connection (any value in `connections` map). */
+  /** Per-provider connection (any value in `providerConnections` map). */
   connection: connectionSchema,
 
-  /** GET /model response: connections + tasks + static catalog. */
+  /** GET /model response: providerConnections + tasks + static catalog. */
   modelResponse: t.Object({
     config: t.Object({
-      connections: t.Record(t.String(), connectionSchema),
+      providerConnections: t.Record(t.String(), connectionSchema),
       tasks: taskPointerSchema,
     }),
     providers: t.Array(providerSchema),
     models: t.Array(modelSchema),
   }),
 
-  /** PUT /model body: connections and/or tasks. Either may be partial. */
+  /** PUT /model body: providerConnections and/or tasks. Either may be partial. */
   modelBody: t.Object({
-    connections: t.Optional(
+    providerConnections: t.Optional(
       t.Record(t.String(), t.Union([connectionSchema, t.Null()])),
     ),
     tasks: t.Optional(taskPointerSchema),
