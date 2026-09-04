@@ -1,17 +1,17 @@
 import { Elysia } from "elysia";
-import { API_TAGS, bearerSecurity } from "../../shared/openapi.ts";
-import { auth } from "../auth/index.ts";
-import { ServerSettingModel } from "./model.ts";
-import { ServerSetting } from "./service.ts";
+import { API_TAGS, bearerSecurity } from "../../../shared/openapi.ts";
+import { auth } from "../../auth/index.ts";
+import { LogSettingsModel } from "./model.ts";
+import { LogSettings } from "./service.ts";
 
 const logDetail = {
   security: [bearerSecurity],
   tags: [API_TAGS.serverSettingLog],
 };
 
-export const logRoute = new Elysia({ prefix: "/log" })
+export const logSettings = new Elysia({ prefix: "/log" })
   .use(auth)
-  .get("/", () => ServerSetting.getLog(), {
+  .get("/", () => LogSettings.get(), {
     requireAdmin: true,
     detail: {
       ...logDetail,
@@ -20,9 +20,9 @@ export const logRoute = new Elysia({ prefix: "/log" })
         "Returns the stored `app_log_settings` row (or nulls) plus hardcoded `defaults`. Shape: `{ sinks, queueSize, drainTimeoutMs, pretty, defaults, availableSinks }`. `sinks` and `availableSinks` are arrays of `'console' | 'postgres'`.",
     },
   })
-  .put("/", ({ body }) => ServerSetting.putLog(body), {
+  .put("/", ({ body }) => LogSettings.put(body), {
     requireAdmin: true,
-    body: ServerSettingModel.logBody,
+    body: LogSettingsModel.logBody,
     detail: {
       ...logDetail,
       summary: "Update log settings",
@@ -30,7 +30,7 @@ export const logRoute = new Elysia({ prefix: "/log" })
         "Empty / `null` fields are stored as null; runtime falls back to `defaults`. Returns the same shape as `GET /log`.",
     },
   })
-  .post("/reset", () => ServerSetting.resetLog(), {
+  .post("/reset", () => LogSettings.reset(), {
     requireAdmin: true,
     detail: {
       ...logDetail,
@@ -39,9 +39,9 @@ export const logRoute = new Elysia({ prefix: "/log" })
         "Writes hardcoded `LOG_DEFAULTS`: `sinks=['console']`, `queueSize=1000`, `drainTimeoutMs=2000`, `pretty=false`. Returns the same shape as `GET /log`.",
     },
   })
-  .post("/purge", () => ServerSetting.purgeLogs(), {
+  .post("/purge", () => LogSettings.purge(), {
     requireAdmin: true,
-    response: ServerSettingModel.logPurgeResponse,
+    response: LogSettingsModel.logPurgeResponse,
     detail: {
       ...logDetail,
       summary: "Purge persisted log entries",

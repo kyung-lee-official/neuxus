@@ -11,10 +11,10 @@
  */
 
 import { sql } from "bun";
-import { pgvectorLiteral } from "../../shared/embed/index.ts";
-import type { KnowledgePageListItem } from "../../shared/knowledge/list.ts";
-import { tagsFromRow } from "../../shared/knowledge/row.ts";
-import { createEmbedClient } from "../../shared/models/clients/embed.ts";
+import { pgvectorLiteral } from "../../../shared/embed/index.ts";
+import type { KnowledgePageListItem } from "../../../shared/knowledge/list.ts";
+import { tagsFromRow } from "../../../shared/knowledge/row.ts";
+import { createEmbedClient } from "../../../shared/models/clients/embed.ts";
 import {
   getEmbedder,
   getEmbedModelId,
@@ -22,9 +22,9 @@ import {
   getSynthesizer,
   loadModelConfig,
   resolveModelByModelId,
-} from "../../shared/models/index.ts";
-import type { Embedder } from "../../shared/models/types.ts";
-import { isoFromDate } from "../../shared/serialize.ts";
+} from "../../../shared/models/index.ts";
+import type { Embedder } from "../../../shared/models/types.ts";
+import { isoFromDate } from "../../../shared/serialize.ts";
 
 export type EmbedTestSearchHit = KnowledgePageListItem & {
   /** Cosine similarity in [0, 1]; 1 - distance. */

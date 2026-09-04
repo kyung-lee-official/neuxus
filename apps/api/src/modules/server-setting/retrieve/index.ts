@@ -1,19 +1,19 @@
 import { Elysia } from "elysia";
-import { API_TAGS, bearerSecurity } from "../../shared/openapi.ts";
-import { auth } from "../auth/index.ts";
-import { ServerSettingModel } from "./model.ts";
-import { ServerSetting } from "./service.ts";
+import { API_TAGS, bearerSecurity } from "../../../shared/openapi.ts";
+import { auth } from "../../auth/index.ts";
+import { RetrieveSettingsModel } from "./model.ts";
+import { RetrieveSettings } from "./service.ts";
 
 const retrieveDetail = {
   security: [bearerSecurity],
   tags: [API_TAGS.serverSettingRetrieve],
 };
 
-export const retrieveRoute = new Elysia({ prefix: "/retrieve" })
+export const retrieveSettings = new Elysia({ prefix: "/retrieve" })
   .use(auth)
-  .get("/", () => ServerSetting.getRetrieve(), {
+  .get("/", () => RetrieveSettings.get(), {
     requireAdmin: true,
-    response: ServerSettingModel.retrieveResponse,
+    response: RetrieveSettingsModel.retrieveResponse,
     detail: {
       ...retrieveDetail,
       summary: "Get retrieve settings",
@@ -21,10 +21,10 @@ export const retrieveRoute = new Elysia({ prefix: "/retrieve" })
         "Returns the stored `kb_retrieve_settings` row (or nulls) plus hardcoded defaults.",
     },
   })
-  .put("/", ({ body }) => ServerSetting.putRetrieve(body), {
+  .put("/", ({ body }) => RetrieveSettings.put(body), {
     requireAdmin: true,
-    body: ServerSettingModel.retrieveBody,
-    response: ServerSettingModel.retrieveResponse,
+    body: RetrieveSettingsModel.retrieveBody,
+    response: RetrieveSettingsModel.retrieveResponse,
     detail: {
       ...retrieveDetail,
       summary: "Update retrieve settings",
@@ -32,9 +32,9 @@ export const retrieveRoute = new Elysia({ prefix: "/retrieve" })
         "Empty / `null` fields store as null; runtime falls back to `defaults`.",
     },
   })
-  .post("/reset", () => ServerSetting.resetRetrieve(), {
+  .post("/reset", () => RetrieveSettings.reset(), {
     requireAdmin: true,
-    response: ServerSettingModel.retrieveResponse,
+    response: RetrieveSettingsModel.retrieveResponse,
     detail: {
       ...retrieveDetail,
       summary: "Reset retrieve settings to defaults",

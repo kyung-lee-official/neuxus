@@ -1,19 +1,19 @@
 import { Elysia } from "elysia";
-import { API_TAGS, bearerSecurity } from "../../shared/openapi.ts";
-import { auth } from "../auth/index.ts";
-import { ServerSettingModel } from "./model.ts";
-import { ServerSetting } from "./service.ts";
+import { API_TAGS, bearerSecurity } from "../../../shared/openapi.ts";
+import { auth } from "../../auth/index.ts";
+import { CorpusModel } from "./model.ts";
+import { Corpus } from "./service.ts";
 
 const corpusDetail = {
   security: [bearerSecurity],
   tags: [API_TAGS.serverSettingCorpus],
 };
 
-export const corpusRoute = new Elysia({ prefix: "/corpus" })
+export const corpus = new Elysia({ prefix: "/corpus" })
   .use(auth)
-  .get("/", () => ServerSetting.getCorpus(), {
+  .get("/", () => Corpus.get(), {
     requireAdmin: true,
-    response: ServerSettingModel.corpusResponse,
+    response: CorpusModel.corpusResponse,
     detail: {
       ...corpusDetail,
       summary: "Get corpus settings",
@@ -21,10 +21,10 @@ export const corpusRoute = new Elysia({ prefix: "/corpus" })
         "Returns the stored `kb_corpus_settings` row (or nulls). `lastSyncedSha` is read-only.",
     },
   })
-  .put("/", ({ body }) => ServerSetting.putCorpus(body), {
+  .put("/", ({ body }) => Corpus.put(body), {
     requireAdmin: true,
-    body: ServerSettingModel.corpusBody,
-    response: ServerSettingModel.corpusResponse,
+    body: CorpusModel.corpusBody,
+    response: CorpusModel.corpusResponse,
     detail: {
       ...corpusDetail,
       summary: "Update corpus settings",
@@ -32,9 +32,9 @@ export const corpusRoute = new Elysia({ prefix: "/corpus" })
         "Empty / `null` fields store as null. Null `repoUrl` means do not clone. `lastSyncedSha` is read-only (clone, pull, and a finished Sync write it).",
     },
   })
-  .post("/clone", () => ServerSetting.cloneCorpus(), {
+  .post("/clone", () => Corpus.clone(), {
     requireAdmin: true,
-    response: ServerSettingModel.corpusResponse,
+    response: CorpusModel.corpusResponse,
     detail: {
       ...corpusDetail,
       summary: "Clone the configured corpus repo",
@@ -42,9 +42,9 @@ export const corpusRoute = new Elysia({ prefix: "/corpus" })
         "`git clone` the saved `repoUrl` into `apps/api/data/corpus`. Optional saved `branch`. 409 if already cloned. 400 if no `repoUrl` is saved. Git must be on `PATH`; SSH uses the API process user's keys.",
     },
   })
-  .post("/pull", () => ServerSetting.pullCorpus(), {
+  .post("/pull", () => Corpus.pull(), {
     requireAdmin: true,
-    response: ServerSettingModel.corpusResponse,
+    response: CorpusModel.corpusResponse,
     detail: {
       ...corpusDetail,
       summary: "Fast-forward pull the corpus checkout",
@@ -52,9 +52,9 @@ export const corpusRoute = new Elysia({ prefix: "/corpus" })
         "`git fetch` + `git pull --ff-only`. 400 if not cloned yet, 400 if no `repoUrl` is saved.",
     },
   })
-  .post("/chunkify", () => ServerSetting.chunkifyCorpus(), {
+  .post("/chunkify", () => Corpus.chunkify(), {
     requireAdmin: true,
-    response: ServerSettingModel.corpusChunkifyResponse,
+    response: CorpusModel.corpusChunkifyResponse,
     detail: {
       ...corpusDetail,
       summary: "Chunkify the corpus",
@@ -62,9 +62,9 @@ export const corpusRoute = new Elysia({ prefix: "/corpus" })
         "Re-chunk every page (replace each page's `kb_parents` and `kb_children`). Existing embeddings become stale; run `/server-setting/corpus/embed` or a full Sync next.",
     },
   })
-  .post("/embed", () => ServerSetting.embedCorpus(), {
+  .post("/embed", () => Corpus.embed(), {
     requireAdmin: true,
-    response: ServerSettingModel.corpusEmbedResponse,
+    response: CorpusModel.corpusEmbedResponse,
     detail: {
       ...corpusDetail,
       summary: "Embed stale corpus children",
@@ -72,10 +72,10 @@ export const corpusRoute = new Elysia({ prefix: "/corpus" })
         "Embeds children with null or stale `embeddingModel`. Fail-fast on provider errors.",
     },
   })
-  .post("/sync", () => ServerSetting.startCorpusSync(), {
+  .post("/sync", () => Corpus.startSync(), {
     requireAdmin: true,
     response: {
-      202: ServerSettingModel.corpusSyncResponse,
+      202: CorpusModel.corpusSyncResponse,
     },
     detail: {
       ...corpusDetail,
@@ -84,9 +84,9 @@ export const corpusRoute = new Elysia({ prefix: "/corpus" })
         "Returns 202 and starts a background singleton Sync: clone-if-missing else pull, walk `docs_root`, ingest/chunkify/persist (hash skip), delete missing `source_path` rows, embed stale children, then write `last_synced_sha` from `HEAD`. Second concurrent operation of any kind returns 409. Fail-fast; no job table. In-process lock (one API process). Stream progress via `/server-setting/corpus/events`.",
     },
   })
-  .get("/events", () => ServerSetting.corpusEvents(), {
+  .get("/events", () => Corpus.events(), {
     requireAdmin: true,
-    response: ServerSettingModel.corpusEvent,
+    response: CorpusModel.corpusEvent,
     detail: {
       ...corpusDetail,
       summary: "Stream corpus sync events (SSE)",
