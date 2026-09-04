@@ -27,6 +27,21 @@ function navItemClass(selected: boolean): string {
 export function AdminNavPanel({ user }: { user: ApiUser }) {
   const pathname = usePathname();
 
+  // Multiple nav items can match a single pathname (e.g. on
+  // `/server-settings/providers/<id>` both `/server-settings` and
+  // `/server-settings/providers` are prefixes). Pick the longest match
+  // so the deepest nav item is highlighted, not all of them.
+  const activeHref = NAV_ITEMS.reduce<string | null>((longest, item) => {
+    if (item.external) return longest;
+    const matches =
+      pathname === item.href || pathname.startsWith(`${item.href}/`);
+    if (!matches) return longest;
+    if (longest === null || item.href.length > longest.length) {
+      return item.href;
+    }
+    return longest;
+  }, null);
+
   return (
     <aside className="sticky top-0 flex h-dvh w-64 shrink-0 flex-col gap-3 border-line border-r bg-surface p-4">
       <div className="flex shrink-0 items-center justify-between gap-2">
@@ -46,9 +61,7 @@ export function AdminNavPanel({ user }: { user: ApiUser }) {
         </p>
         <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
           {NAV_ITEMS.map((item) => {
-            const selected =
-              !item.external &&
-              (pathname === item.href || pathname.startsWith(`${item.href}/`));
+            const selected = !item.external && item.href === activeHref;
             const className = navItemClass(selected);
             return (
               <li key={item.href}>
