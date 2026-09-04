@@ -15,6 +15,9 @@ Model handling is split so that each concern changes independently:
 | **Model catalog**     | What a model can do and its call defaults                          | A vendor ships a new model          |
 | **Task assignment**   | Which model answers which job (embedding / chat / vision)          | An operator re-points a role        |
 
+> **Wire dialect** = the HTTP request/response shape a vendor's API expects
+> (endpoint layout, JSON body schema, auth header). One dialect per provider.
+
 Connection settings (credentials) sit between the catalog and the assignment:
 they are operator-supplied values per provider, not per model.
 
