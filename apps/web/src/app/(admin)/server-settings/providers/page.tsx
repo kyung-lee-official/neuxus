@@ -1,5 +1,5 @@
-import { ProvidersConfigPanel } from "@/components/providers-config-panel";
+import { ProviderListPanel } from "@/components/provider-list-panel";
 
-export default function ProvidersSettingsPage() {
-  return <ProvidersConfigPanel />;
+export default function ProvidersPage() {
+  return <ProviderListPanel />;
 }

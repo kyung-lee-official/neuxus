@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   ApiError,
@@ -41,7 +42,13 @@ const CAPABILITY_LABEL = {
   vision: "Vision",
 } as const;
 
-export function ProvidersConfigPanel() {
+/**
+ * `/server-settings/providers/[providerId]` — list the catalog models
+ * hosted by `providerId`. Per-model connection fields are configured
+ * here. Models whose connection isn't fully configured don't appear in
+ * the task dropdowns on the Server settings page.
+ */
+export function ProviderModelsPanel({ providerId }: { providerId: string }) {
   const user = useAdminUser();
   const queryClient = useQueryClient();
 
@@ -51,13 +58,13 @@ export function ProvidersConfigPanel() {
   });
 
   const providers = configQuery.data?.providers ?? [];
-  const models = configQuery.data?.models ?? [];
-  const config = configQuery.data?.config;
-
-  const providerById = useMemo(
-    () => new Map(providers.map((p) => [p.id, p])),
-    [providers],
+  const provider = providers.find((p) => p.id === providerId);
+  const allModels = configQuery.data?.models ?? [];
+  const models = useMemo(
+    () => allModels.filter((m) => m.providerId === providerId),
+    [allModels, providerId],
   );
+  const config = configQuery.data?.config;
 
   const saveMutation = useMutation({
     mutationFn: (patch: {
@@ -76,36 +83,73 @@ export function ProvidersConfigPanel() {
     });
   }
 
+  // Loading state — wait until the catalog arrives so we can decide
+  // whether `providerId` is valid before showing the "not found" UI.
+  if (configQuery.isLoading) {
+    return <p className="m-0 text-muted text-sm">Loading provider…</p>;
+  }
+
+  if (!provider) {
+    return (
+      <div className="flex w-full flex-col gap-4">
+        <Breadcrumb providerLabel={providerId} />
+        <section className="flex flex-col gap-2 rounded-md border border-line bg-surface p-6 shadow-sm">
+          <h1 className="m-0 font-display text-2xl text-ink">
+            Provider not found
+          </h1>
+          <p className="m-0 text-muted text-sm">
+            No provider with id <span className="font-mono">{providerId}</span>{" "}
+            in the catalog.
+          </p>
+          <Link
+            href="/server-settings/providers"
+            className="self-start rounded border border-line bg-transparent px-3.5 py-1.5 text-ink text-sm no-underline hover:border-accent"
+          >
+            ← Back to providers
+          </Link>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="flex w-full flex-col gap-4">
+      <Breadcrumb providerLabel={provider.displayName} />
+
       <section className="flex flex-col gap-2 rounded-md border border-line bg-surface p-6 shadow-sm">
-        <h1 className="m-0 font-display text-2xl text-ink">Providers</h1>
+        <h1 className="m-0 font-display text-2xl text-ink">
+          {provider.displayName}
+        </h1>
+        <p className="m-0 text-muted text-xs">
+          <span className="font-mono">{provider.id}</span>
+          {" · "}
+          <span className="font-mono">{provider.baseUrl}</span>
+          {" · "}
+          <span>{describeRequestShape(provider.requestShape)}</span>
+        </p>
         <p className="m-0 text-muted text-sm">
-          Configure connection settings for each catalog model. Tasks on the
-          Server settings page only see fully-configured models — finish each
-          row's required fields to make it available in the task dropdowns.
+          Configure connection settings for each model below. Save per row;
+          fully-configured models become selectable on the Server settings page.
         </p>
       </section>
 
-      {configQuery.isLoading || !config ? (
-        <p className="m-0 text-muted text-sm">Loading providers…</p>
+      {models.length === 0 ? (
+        <section className="rounded-md border border-line bg-surface p-6 text-muted text-sm">
+          No models are catalogued under this provider.
+        </section>
       ) : (
         <div className="flex flex-col gap-3">
-          {models.map((m) => {
-            const provider = providerById.get(m.providerId);
-            if (!provider) return null;
-            return (
-              <ProviderModelRow
-                key={m.id}
-                model={m}
-                provider={provider}
-                connection={config.connections[m.id]}
-                isTaskActive={isModelUsedByAnyTask(config, m.id)}
-                busy={saveMutation.isPending}
-                onChange={(next) => persist(m.id, next)}
-              />
-            );
-          })}
+          {models.map((m) => (
+            <ProviderModelRow
+              key={m.id}
+              model={m}
+              provider={provider}
+              connection={config?.connections[m.id]}
+              isTaskActive={isModelUsedByAnyTask(config, m.id)}
+              busy={saveMutation.isPending}
+              onChange={(next) => persist(m.id, next)}
+            />
+          ))}
           {saveMutation.isError ? (
             <p className="m-0 text-danger text-sm">
               {errorMessage(saveMutation.error)}
@@ -117,7 +161,37 @@ export function ProvidersConfigPanel() {
   );
 }
 
-function isModelUsedByAnyTask(config: ModelConfig, modelId: string): boolean {
+function Breadcrumb({ providerLabel }: { providerLabel: string }) {
+  return (
+    <nav className="flex items-center gap-1 text-muted text-sm">
+      <Link
+        href="/server-settings/providers"
+        className="text-accent no-underline hover:underline"
+      >
+        Providers
+      </Link>
+      <span>/</span>
+      <span className="text-ink">{providerLabel}</span>
+    </nav>
+  );
+}
+
+function describeRequestShape(shape: ProviderInfo["requestShape"]): string {
+  switch (shape) {
+    case "anthropic-messages":
+      return "Anthropic-compatible Messages";
+    case "openai-embeddings":
+      return "OpenAI-compatible embeddings";
+    case "ollama-embed":
+      return "Ollama /api/embed";
+  }
+}
+
+function isModelUsedByAnyTask(
+  config: ModelConfig | undefined,
+  modelId: string,
+): boolean {
+  if (!config) return false;
   return Object.values(config.tasks).some((id) => id === modelId);
 }
 
@@ -179,10 +253,6 @@ function ProviderModelRow({
           </h2>
           <p className="m-0 text-muted text-xs">
             <span className="font-mono">{model.id}</span>
-            {" · "}
-            <span>{provider.displayName}</span>
-            {" · "}
-            <span className="font-mono">{provider.baseUrl}</span>
           </p>
           <p className="m-0 text-muted text-xs">
             Capabilities:{" "}
