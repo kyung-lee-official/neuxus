@@ -66,22 +66,6 @@ model Message {
     @@map("app_messages")
 }
 
-/// Synthesis LLM config (`app_synthesis_settings`). Nullable columns — app
-/// defaults live in code, not SQL DEFAULT. Single row: id = `"default"`.
-/// `context_window_tokens` is required at runtime (app default when null).
-model AppSynthesisSettings {
-    id String @id @default("default")
-
-    provider            String?
-    synthesisModel      String? @map("synthesis_model")
-    baseUrl             String? @map("base_url")
-    apiKey              String? @map("api_key")
-    maxTokens           Int?    @map("max_tokens")
-    contextWindowTokens Int?    @map("context_window_tokens")
-
-    @@map("app_synthesis_settings")
-}
-
 /// Corpus git remote (`kb_corpus_settings`). Nullable columns — app defaults
 /// live in code, not SQL DEFAULT. Single row: id = `"default"`.
 /// `repo_url` null means no remote (do not clone).
@@ -114,7 +98,7 @@ model KnowledgeChunkSettings {
 
 /// Retrieval knobs (`kb_retrieve_settings`). Nullable columns — app defaults
 /// live in code (`RETRIEVE_DEFAULTS`), not SQL DEFAULT. Single row: id =
-/// `"default"`. Mirrors `kb_embed_settings` / `kb_chunk_settings` shape.
+/// `"default"`. Mirrors the other single-row config tables.
 model KnowledgeRetrieveSettings {
     id String @id @default("default")
 
@@ -153,18 +137,25 @@ model KnowledgeImageDescription {
     @@map("kb_image_descriptions")
 }
 
-/// Embed runtime config (`kb_embed_settings`). Nullable columns — app defaults
-/// live in code (`EMBED_DEFAULTS`), not SQL DEFAULT. Single row: id = `"default"`.
-model KnowledgeEmbedSettings {
+/// Model registry configuration (`app_model_config`). Single row, id =
+/// `"default"`. Three task slots — `embedding`, `llm`, `vision` — each
+/// independent (no inheritance). Each slot picks one model id from the
+/// in-code `MODELS` catalog; per-slot `apiKey` / `baseUrl` / `port`
+/// overrides the provider defaults. The catalog (not this row) owns the
+/// wire format, headers, context window, and capability flags.
+model AppModelConfig {
     id String @id @default("default")
 
-    embeddingModel String? @map("embedding_model")
-    provider       String?
-    host           String?
-    port           Int?
-    apiKey         String? @map("api_key")
+    /// Embedding task slot. Shape:
+    /// `{ modelId: string, apiKey?: string, baseUrl?: string, port?: number }`.
+    /// Null until the user configures a model.
+    embedding Json?
+    /// LLM task slot. Same shape as `embedding`.
+    llm       Json?
+    /// Vision (image description) task slot. Same shape as `embedding`.
+    vision    Json?
 
-    @@map("kb_embed_settings")
+    @@map("app_model_config")
 }
 
 /// Knowledge page (`kb_pages`). `body` is ingest-normalized. Apply via your own migrate.
@@ -250,8 +241,7 @@ model AppLog {
 
 /// Logger runtime config (`app_log_settings`). Nullable columns — app
 /// defaults live in code (`LOG_DEFAULTS`), not SQL DEFAULT. Single row:
-/// id = `"default"`. Mirrors the `app_synthesis_settings` /
-/// `kb_chunk_settings` pattern.
+/// id = `"default"`. Mirrors the other single-row config tables.
 model AppLogSettings {
     id String @id @default("default")
 
