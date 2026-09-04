@@ -1,11 +1,11 @@
 import { ProviderModelsPanel } from "@/components/provider-models-panel";
 
-export default function ProviderDetailPage({
-  params,
-}: {
-  params: { providerId: string };
-}) {
-  return (
-    <ProviderModelsPanel providerId={decodeURIComponent(params.providerId)} />
-  );
+type Props = {
+  params: Promise<{ providerId: string }>;
+};
+
+export default async function ProviderDetailPage({ params }: Props) {
+  const { providerId } = await params;
+
+  return <ProviderModelsPanel providerId={decodeURIComponent(providerId)} />;
 }
