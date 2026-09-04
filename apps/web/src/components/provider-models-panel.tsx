@@ -5,12 +5,14 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   ApiError,
+  type EmbedTestResult,
   getModelConfig,
   type ModelConfig,
   type ModelInfo,
   type ProviderConnection,
   type ProviderInfo,
   putModelConfig,
+  testEmbed,
   UserQueryKey,
 } from "@/lib/api";
 import { useAdminUser } from "./admin-shell";
@@ -114,6 +116,15 @@ export function ProviderModelsPanel({ providerId }: { providerId: string }) {
     );
   }
 
+  // The per-model "Test embed" runs against the *saved* provider
+  // connection, so it only makes sense once a fully-configured
+  // connection for this provider is persisted (the card above may hold
+  // an unsaved draft).
+  const savedConnection = config?.providerConnections[provider.id];
+  const canTestEmbed = Boolean(
+    config && savedConnection && checkConfigured(savedConnection, provider).ok,
+  );
+
   return (
     <div className="flex w-full flex-col gap-4">
       <Breadcrumb providerLabel={provider.displayName} />
@@ -148,7 +159,11 @@ export function ProviderModelsPanel({ providerId }: { providerId: string }) {
           No models are catalogued under this provider.
         </section>
       ) : (
-        <ModelsUnderProvider config={config} models={models} />
+        <ModelsUnderProvider
+          config={config}
+          models={models}
+          canTestEmbed={canTestEmbed}
+        />
       )}
 
       {saveMutation.isError ? (
@@ -320,9 +335,11 @@ function ProviderConnectionCard({
 function ModelsUnderProvider({
   config,
   models,
+  canTestEmbed,
 }: {
   config: ModelConfig | undefined;
   models: ModelInfo[];
+  canTestEmbed: boolean;
 }) {
   return (
     <section className="flex flex-col gap-3 rounded-md border border-line bg-surface p-6">
@@ -340,30 +357,122 @@ function ModelsUnderProvider({
             ? Object.values(config.tasks).some((id) => id === m.id)
             : false;
           return (
-            <li
+            <ModelRow
               key={m.id}
-              className="flex flex-wrap items-baseline justify-between gap-2 rounded border border-line bg-canvas p-3"
-            >
-              <div>
-                <p className="m-0 font-display text-ink text-sm">
-                  {m.displayName}
-                </p>
-                <p className="m-0 font-mono text-muted text-xs">{m.id}</p>
-                <p className="m-0 text-muted text-xs">
-                  Capabilities:{" "}
-                  {capabilityTags.length > 0 ? capabilityTags.join(", ") : "—"}
-                </p>
-              </div>
-              {inUse ? (
-                <span className="rounded bg-accent/15 px-1.5 py-0.5 font-mono text-accent text-xs">
-                  in use
-                </span>
-              ) : null}
-            </li>
+              model={m}
+              capabilityTags={capabilityTags}
+              inUse={inUse}
+              canTestEmbed={canTestEmbed}
+            />
           );
         })}
       </ul>
     </section>
+  );
+}
+
+function ModelRow({
+  model,
+  capabilityTags,
+  inUse,
+  canTestEmbed,
+}: {
+  model: ModelInfo;
+  capabilityTags: string[];
+  inUse: boolean;
+  canTestEmbed: boolean;
+}) {
+  const user = useAdminUser();
+  const mutation = useMutation({
+    mutationFn: () => testEmbed(user.apiKey, model.id),
+  });
+  const supportsEmbed = model.capabilities.embedding === true;
+
+  return (
+    <li className="flex flex-col gap-2 rounded border border-line bg-canvas p-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <p className="m-0 font-display text-ink text-sm">
+            {model.displayName}
+          </p>
+          <p className="m-0 font-mono text-muted text-xs">{model.id}</p>
+          <p className="m-0 text-muted text-xs">
+            Capabilities:{" "}
+            {capabilityTags.length > 0 ? capabilityTags.join(", ") : "—"}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {supportsEmbed ? (
+            <button
+              type="button"
+              className="rounded border border-accent bg-accent px-3 py-1 text-white text-xs disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={mutation.isPending || !canTestEmbed}
+              title={
+                canTestEmbed
+                  ? "Embed a diagnostic string with this model"
+                  : "Save a fully-configured connection above to test this model"
+              }
+              onClick={() => mutation.mutate()}
+            >
+              {mutation.isPending ? "Embedding…" : "Test embed"}
+            </button>
+          ) : null}
+          {inUse ? (
+            <span className="rounded bg-accent/15 px-1.5 py-0.5 font-mono text-accent text-xs">
+              in use
+            </span>
+          ) : null}
+        </div>
+      </div>
+      {supportsEmbed && !canTestEmbed ? (
+        <p className="m-0 text-muted text-xs">
+          Save a fully-configured connection above to test this model.
+        </p>
+      ) : null}
+      {supportsEmbed ? <EmbedTestPanel mutation={mutation} /> : null}
+    </li>
+  );
+}
+
+function EmbedTestPanel({
+  mutation,
+}: {
+  mutation: ReturnType<typeof useMutation<EmbedTestResult, Error>>;
+}) {
+  if (mutation.isPending) {
+    return (
+      <p className="m-0 text-muted text-xs">Embedding the diagnostic string…</p>
+    );
+  }
+  if (mutation.isError) {
+    return (
+      <p className="m-0 text-danger text-xs">
+        {mutation.error instanceof Error
+          ? mutation.error.message
+          : String(mutation.error)}
+      </p>
+    );
+  }
+  if (!mutation.data) return null;
+  const { embedding, modelId, dim, inputText } = mutation.data;
+  const previewCount = Math.min(8, embedding.length);
+  const preview = embedding.slice(0, previewCount).map((v) => v.toFixed(4));
+  return (
+    <div className="flex flex-col gap-1 rounded border border-line bg-surface p-2 text-xs">
+      <p className="m-0 text-muted">
+        Embedded{" "}
+        <span className="font-mono text-ink">&ldquo;{inputText}&rdquo;</span>{" "}
+        via <span className="font-mono text-ink">{modelId}</span>
+      </p>
+      <p className="m-0 text-muted">
+        Dim <span className="font-mono text-ink">{dim}</span> · first{" "}
+        {previewCount} values:{" "}
+        <span className="break-all font-mono text-ink">
+          [{preview.join(", ")}
+          {embedding.length > previewCount ? ", …" : ""}]
+        </span>
+      </p>
+    </div>
   );
 }
 

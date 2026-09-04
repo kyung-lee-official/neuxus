@@ -155,6 +155,19 @@ export const ServerSettingModel = {
     deleted: t.Integer({ minimum: 0, examples: [42] }),
   }),
 
+  /** POST /model/test/embed body: which catalog model to embed with. */
+  testEmbedBody: t.Object({
+    modelId: t.String(),
+  }),
+
+  /** POST /model/test/embed response: raw vector from the embedder. */
+  testEmbedResponse: t.Object({
+    embedding: t.Array(t.Number()),
+    modelId: t.String(),
+    dim: t.Integer({ minimum: 1 }),
+    inputText: t.String(),
+  }),
+
   retrieveBody: t.Object(retrieveFields),
   retrieveResponse: t.Object({
     ...retrieveFields,

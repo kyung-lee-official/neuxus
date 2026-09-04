@@ -6,6 +6,7 @@ export {
   parseModelConfig,
   type ResolveModelError,
   resolveModel,
+  resolveModelByModelId,
   type SaveModelConfigInput,
   saveModelConfig,
 } from "./config.ts";

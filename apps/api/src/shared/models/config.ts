@@ -224,22 +224,16 @@ export type ResolveModelError =
   | { kind: "missing_capability"; task: CapabilityTag };
 
 /**
- * Resolve a task to a `(Model, Provider, ResolvedConnection)` triple.
- * Throws a descriptive `Error` when the task is unset, the model id is
- * unknown, the provider id is unknown, the model doesn't declare the
- * requested capability, or the provider's connection is not fully
- * configured.
+ * Shared resolution core: check `modelId` exists, is catalogued under a
+ * known provider, declares the `task` capability, and the provider has a
+ * fully-configured saved connection. Returns the `(Model, Provider,
+ * ResolvedConnection)` triple.
  */
-export function resolveModel(
+function resolveCapabilityModel(
+  modelId: string,
   task: CapabilityTag,
   config: ModelConfig,
 ): ResolvedModel {
-  const modelId = config.tasks[task];
-  if (!modelId) {
-    throw new Error(
-      `No model assigned to ${task}. Configure one under Server settings → ${capitalize(task)} first.`,
-    );
-  }
   const model = getModelById(modelId);
   if (!model) {
     throw new Error(`Unknown model id: ${modelId}`);
@@ -256,17 +250,51 @@ export function resolveModel(
   const rawConnection = config.providerConnections[provider.id];
   if (!rawConnection) {
     throw new Error(
-      `Task ${task} model ${modelId} provider ${provider.id} has no saved connection. Configure it under Providers.`,
+      `Model ${modelId} provider ${provider.id} has no saved connection. Save one under Providers first.`,
     );
   }
   const check = isFullyConfigured(rawConnection, provider.id);
   if (!check.ok) {
     throw new Error(
-      `Task ${task} model ${modelId} provider ${provider.id} is missing ${check.missing}. Finish configuration under Providers.`,
+      `Model ${modelId} provider ${provider.id} is missing ${check.missing}. Finish configuration under Providers first.`,
     );
   }
   const connection = resolveConnection(provider, rawConnection);
   return { task, connection, model, provider };
+}
+
+/**
+ * Resolve the model assigned to `task` to a `(Model, Provider,
+ * ResolvedConnection)` triple. Throws a descriptive `Error` when the
+ * task is unset, the model id is unknown, the provider id is unknown,
+ * the model doesn't declare the requested capability, or the provider's
+ * connection is not fully configured.
+ */
+export function resolveModel(
+  task: CapabilityTag,
+  config: ModelConfig,
+): ResolvedModel {
+  const modelId = config.tasks[task];
+  if (!modelId) {
+    throw new Error(
+      `No model assigned to ${task}. Configure one under Server settings → ${capitalize(task)} first.`,
+    );
+  }
+  return resolveCapabilityModel(modelId, task, config);
+}
+
+/**
+ * Resolve an explicit catalog model id for `task` — same capability and
+ * connection checks as `resolveModel`, but without needing a task
+ * assignment. Lets a caller (e.g. the per-model "Test embed" button)
+ * exercise a specific model over its provider's saved connection.
+ */
+export function resolveModelByModelId(
+  modelId: string,
+  task: CapabilityTag,
+  config: ModelConfig,
+): ResolvedModel {
+  return resolveCapabilityModel(modelId, task, config);
 }
 
 function capitalize(s: string): string {

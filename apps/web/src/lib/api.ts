@@ -430,6 +430,24 @@ export type EmbeddingTestResult = {
   results: EmbedTestSearchHit[];
 };
 
+export type EmbedTestResult = {
+  embedding: number[];
+  modelId: string;
+  dim: number;
+  inputText: string;
+};
+
+export async function testEmbed(
+  apiKey: string,
+  modelId: string,
+): Promise<EmbedTestResult> {
+  return apiFetch<EmbedTestResult>("/server-setting/model/test/embed", {
+    method: "POST",
+    apiKey,
+    body: JSON.stringify({ modelId }),
+  });
+}
+
 export async function testModelChat(
   apiKey: string,
   prompt: string,

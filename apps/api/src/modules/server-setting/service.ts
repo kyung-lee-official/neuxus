@@ -44,6 +44,7 @@ import {
 import type { ServerSettingModel } from "./model.ts";
 import {
   runTestChat,
+  runTestEmbed,
   runTestEmbeddingSearch,
   runTestVision,
 } from "./model-test.ts";
@@ -198,6 +199,25 @@ export abstract class ServerSetting {
             `unknown task: ${String((body as { task?: unknown }).task)}`,
           );
       }
+    } catch (err) {
+      throw status(400, asError(err));
+    }
+  }
+
+  /**
+   * Embed a hardcoded diagnostic string via the clicked catalog model
+   * and return the raw vector. Used by the per-model "Test embed"
+   * button on the providers page. Unlike the task-scoped tests, this
+   * does not require an embedding task assignment — it tests the model
+   * itself over its provider's saved connection.
+   */
+  static async testEmbed(
+    body: ServerSettingModel["testEmbedBody"],
+  ): Promise<ServerSettingModel["testEmbedResponse"]> {
+    try {
+      return await runTestEmbed("Why is the sky blue?", {
+        modelId: body.modelId,
+      });
     } catch (err) {
       throw status(400, asError(err));
     }

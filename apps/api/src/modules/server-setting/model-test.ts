@@ -14,11 +14,14 @@ import { sql } from "bun";
 import { pgvectorLiteral } from "../../shared/embed/index.ts";
 import type { KnowledgePageListItem } from "../../shared/knowledge/list.ts";
 import { tagsFromRow } from "../../shared/knowledge/row.ts";
+import { createEmbedClient } from "../../shared/models/clients/embed.ts";
 import {
   getEmbedder,
   getEmbedModelId,
   getImageDescriber,
   getSynthesizer,
+  loadModelConfig,
+  resolveModelByModelId,
 } from "../../shared/models/index.ts";
 import type { Embedder } from "../../shared/models/types.ts";
 import { isoFromDate } from "../../shared/serialize.ts";
@@ -190,5 +193,48 @@ export async function runTestVision(input: {
     mimeType: input.mimeType,
     sizeBytes: bytes.length,
     name: input.name,
+  };
+}
+
+export type RunTestEmbedResult = {
+  embedding: number[];
+  modelId: string;
+  dim: number;
+  inputText: string;
+};
+
+export type RunTestEmbedOptions = {
+  /** Catalog model id to embed with (must declare the `embedding` capability). */
+  modelId: string;
+};
+
+/**
+ * Run the chosen model's embedder on a single string and return the raw
+ * vector (no cosine search). Used by the per-model "Test embed" button
+ * on the providers page. Resolution goes through
+ * `resolveModelByModelId`, so it tests exactly the clicked model over
+ * its provider's saved connection — no embedding-task assignment is
+ * required.
+ */
+export async function runTestEmbed(
+  text: string,
+  options: RunTestEmbedOptions,
+): Promise<RunTestEmbedResult> {
+  const trimmed = text.trim();
+  if (trimmed === "") {
+    throw new Error("text is required");
+  }
+  const config = await loadModelConfig();
+  const resolved = resolveModelByModelId(options.modelId, "embedding", config);
+  const vectors = await createEmbedClient(resolved).embed([trimmed]);
+  const embedding = vectors[0];
+  if (!embedding) {
+    throw new Error("Embedder returned no vector");
+  }
+  return {
+    embedding,
+    modelId: resolved.model.id,
+    dim: embedding.length,
+    inputText: trimmed,
   };
 }
