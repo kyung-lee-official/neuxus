@@ -91,7 +91,7 @@ export const UserQueryKey = {
   Data: (id: string, messagePage: number) =>
     ["users", id, "data", messagePage] as const,
   Sessions: (userId: string) => ["sessions", userId] as const,
-  ModelConfig: ["server-setting", "model"] as const,
+  ModelConfig: ["server-setting", "model-providers"] as const,
   CorpusSettings: ["server-setting", "corpus"] as const,
   LogSettings: ["server-setting", "log"] as const,
   RetrieveSettings: ["server-setting", "retrieve"] as const,
@@ -327,7 +327,7 @@ export async function testEmbedSearch(
   results: EmbedTestSearchHit[];
 }> {
   return apiFetch<{ task: "embedding"; results: EmbedTestSearchHit[] }>(
-    "/server-setting/model/test/embedding",
+    "/server-setting/model-providers/test/embedding",
     {
       method: "POST",
       apiKey,
@@ -392,7 +392,9 @@ export type ModelConfigResponse = {
 export async function getModelConfig(
   apiKey: string,
 ): Promise<ModelConfigResponse> {
-  return apiFetch<ModelConfigResponse>("/server-setting/model", { apiKey });
+  return apiFetch<ModelConfigResponse>("/server-setting/model-providers", {
+    apiKey,
+  });
 }
 
 export type PutModelConfigInput = {
@@ -404,7 +406,7 @@ export async function putModelConfig(input: {
   apiKey: string;
   patch: PutModelConfigInput;
 }): Promise<ModelConfigResponse> {
-  return apiFetch<ModelConfigResponse>("/server-setting/model", {
+  return apiFetch<ModelConfigResponse>("/server-setting/model-providers", {
     method: "PUT",
     apiKey: input.apiKey,
     body: JSON.stringify(input.patch),
@@ -441,18 +443,21 @@ export async function testEmbed(
   apiKey: string,
   modelId: string,
 ): Promise<EmbedTestResult> {
-  return apiFetch<EmbedTestResult>("/server-setting/model/test/embed", {
-    method: "POST",
-    apiKey,
-    body: JSON.stringify({ modelId }),
-  });
+  return apiFetch<EmbedTestResult>(
+    "/server-setting/model-providers/test/embed",
+    {
+      method: "POST",
+      apiKey,
+      body: JSON.stringify({ modelId }),
+    },
+  );
 }
 
 export async function testModelChat(
   apiKey: string,
   prompt: string,
 ): Promise<ChatTestResult> {
-  return apiFetch<ChatTestResult>("/server-setting/model/test/llm", {
+  return apiFetch<ChatTestResult>("/server-setting/model-providers/test/llm", {
     method: "POST",
     apiKey,
     body: JSON.stringify({ task: "llm", prompt }),
@@ -472,16 +477,19 @@ export async function testModelVision(
   });
   const comma = dataUrl.indexOf(",");
   const imageBase64 = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
-  return apiFetch<VisionTestResult>("/server-setting/model/test/vision", {
-    method: "POST",
-    apiKey,
-    body: JSON.stringify({
-      task: "vision",
-      imageBase64,
-      mimeType: image.type,
-      name: image.name,
-    }),
-  });
+  return apiFetch<VisionTestResult>(
+    "/server-setting/model-providers/test/vision",
+    {
+      method: "POST",
+      apiKey,
+      body: JSON.stringify({
+        task: "vision",
+        imageBase64,
+        mimeType: image.type,
+        name: image.name,
+      }),
+    },
+  );
 }
 
 export type RetrieveSettings = {

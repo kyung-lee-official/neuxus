@@ -51,8 +51,8 @@ const taskPointerSchema = t.Object({
   vision: t.Union([t.String(), t.Null()]),
 });
 
-export const ModelRegistryModel = {
-  /** GET /model response: providerConnections + tasks + static catalog. */
+export const ModelProvidersModel = {
+  /** GET /model-providers response: providerConnections + tasks + static catalog. */
   modelResponse: t.Object({
     config: t.Object({
       providerConnections: t.Record(t.String(), connectionSchema),
@@ -62,7 +62,7 @@ export const ModelRegistryModel = {
     models: t.Array(modelSchema),
   }),
 
-  /** PUT /model body: providerConnections and/or tasks. Either may be partial. */
+  /** PUT /model-providers body: providerConnections and/or tasks. Either may be partial. */
   modelBody: t.Object({
     providerConnections: t.Optional(
       t.Record(t.String(), t.Union([connectionSchema, t.Null()])),
@@ -71,7 +71,7 @@ export const ModelRegistryModel = {
   }),
 
   /**
-   * POST /model/test/:task body — discriminated by `task`. Each task
+   * POST /model-providers/test/:task body — discriminated by `task`. Each task
    * carries only the fields it needs; the others may be absent.
    */
   modelTestBody: t.Object({
@@ -87,7 +87,7 @@ export const ModelRegistryModel = {
     name: t.Optional(t.String()),
   }),
 
-  /** POST /model/test/embed body: which catalog model to embed with. */
+  /** POST /model-providers/test/embed body: which catalog model to embed with. */
   testEmbedBody: t.Object({
     modelId: t.String(),
   }),
@@ -101,8 +101,8 @@ export const ModelRegistryModel = {
   }),
 } as const;
 
-export type ModelRegistryModel = {
-  [K in keyof typeof ModelRegistryModel]: Static<
-    (typeof ModelRegistryModel)[K]
+export type ModelProvidersModel = {
+  [K in keyof typeof ModelProvidersModel]: Static<
+    (typeof ModelProvidersModel)[K]
   >;
 };

@@ -6,7 +6,7 @@
  * invoke the chat and vision clients with a one-shot prompt/image.
  *
  * Each function is the production-callable test for one capability.
- * The HTTP layer (`/server-setting/model/test/:task`) dispatches to
+ * The HTTP layer (`/server-setting/model-providers/test/:task`) dispatches to
  * one of them.
  */
 

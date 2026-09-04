@@ -17,7 +17,7 @@ import {
   runTestEmbeddingSearch,
   runTestVision,
 } from "./diagnostics.ts";
-import type { ModelRegistryModel } from "./model.ts";
+import type { ModelProvidersModel } from "./model.ts";
 
 function asError(err: unknown): { error: string } {
   const msg = err instanceof Error ? err.message : String(err);
@@ -74,9 +74,9 @@ function readTasks(raw: unknown): ModelConfig["tasks"] | undefined {
   };
 }
 
-export abstract class ModelRegistry {
+export abstract class ModelProviders {
   /** Read the providerConnections/tasks map plus the static catalog. */
-  static async get(): Promise<ModelRegistryModel["modelResponse"]> {
+  static async get(): Promise<ModelProvidersModel["modelResponse"]> {
     const config = await loadModelConfig();
     return {
       config,
@@ -87,8 +87,8 @@ export abstract class ModelRegistry {
 
   /** Update providerConnections and/or tasks. Either may be partial. */
   static async put(
-    body: ModelRegistryModel["modelBody"],
-  ): Promise<ModelRegistryModel["modelResponse"]> {
+    body: ModelProvidersModel["modelBody"],
+  ): Promise<ModelProvidersModel["modelResponse"]> {
     const saved = await saveModelConfig({
       providerConnections: readProviderConnections(body.providerConnections),
       tasks: readTasks(body.tasks),
@@ -106,7 +106,7 @@ export abstract class ModelRegistry {
    * shape (embed / chat / vision).
    */
   static async test(
-    body: ModelRegistryModel["modelTestBody"],
+    body: ModelProvidersModel["modelTestBody"],
   ): Promise<unknown> {
     try {
       switch (body.task) {
@@ -172,8 +172,8 @@ export abstract class ModelRegistry {
    * itself over its provider's saved connection.
    */
   static async testEmbed(
-    body: ModelRegistryModel["testEmbedBody"],
-  ): Promise<ModelRegistryModel["testEmbedResponse"]> {
+    body: ModelProvidersModel["testEmbedBody"],
+  ): Promise<ModelProvidersModel["testEmbedResponse"]> {
     try {
       return await runTestEmbed("Why is the sky blue?", {
         modelId: body.modelId,
