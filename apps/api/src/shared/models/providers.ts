@@ -4,7 +4,7 @@
  * Each provider owns one wire format (the `requestShape`) and a base URL.
  * Models reference providers by id; per-model `defaults` can override
  * provider-level base URL only via the per-slot override stored in
- * `app_model_config`.
+ * `app_model_provider_config`.
  */
 
 import type { Provider } from "./types.ts";

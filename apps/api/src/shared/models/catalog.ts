@@ -3,7 +3,7 @@
  *
  * Single source of truth for every supported model. The admin UI renders
  * the dropdown from `MODELS` (filtered by capability); the routing layer
- * (`routing.ts`) resolves a `ModelSlot` from `app_model_config` to a
+ * (`routing.ts`) resolves a `ModelSlot` from `app_model_provider_config` to a
  * `(Model, Provider)` pair via this catalog.
  *
  * To add a new model:

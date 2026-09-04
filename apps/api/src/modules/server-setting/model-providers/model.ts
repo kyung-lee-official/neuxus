@@ -1,6 +1,6 @@
 import { type Static, t } from "elysia";
 
-/** One persisted per-provider connection (`app_model_config.providerConnections`). */
+/** One persisted per-provider connection (`app_model_provider_config.providerConnections`). */
 const connectionSchema = t.Object({
   apiKey: t.Union([t.String(), t.Null()]),
   baseUrl: t.Union([t.String(), t.Null()]),

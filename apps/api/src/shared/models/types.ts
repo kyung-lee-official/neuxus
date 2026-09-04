@@ -3,7 +3,7 @@
  * per-task slots.
  *
  * The catalog (`catalog.ts`) owns every supported model and provider —
- * the `app_model_config` row only stores which `modelId` the user picked
+ * the `app_model_provider_config` row only stores which `modelId` the user picked
  * for each task plus optional per-provider connection overrides.
  */
 
@@ -53,7 +53,7 @@ export type Model = {
 
 /**
  * Per-provider connection settings (one row in the
- * `providerConnections` map on `app_model_config`). Connection fields
+ * `providerConnections` map on `app_model_provider_config`). Connection fields
  * are provider-level — every model under one provider shares the same
  * key, base URL, and port — so the map is keyed by `providerId`, not
  * `modelId`. Each field is always defined (may be `null`) so the JSON
@@ -94,7 +94,7 @@ export type ResolvedModel = {
 };
 
 /**
- * Persisted shape of `app_model_config`. `providerConnections` keys are
+ * Persisted shape of `app_model_provider_config`. `providerConnections` keys are
  * catalog `providerId`s; `tasks[tag]` is one of the catalog `modelId`s
  * (or null) that the provider entry must cover.
  */

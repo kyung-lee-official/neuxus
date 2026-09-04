@@ -1,5 +1,5 @@
 /**
- * DB-backed model registry (`app_model_config`).
+ * DB-backed model registry (`app_model_provider_config`).
  *
  * Single row, id = `"default"`. Two JSON columns:
  *   - `providerConnections` — `Record<providerId, ProviderConnection>`.
@@ -95,7 +95,7 @@ function readJsonField(
 }
 
 export async function loadModelConfig(): Promise<ModelConfig> {
-  const row = await getPrisma().appModelConfig.findUnique({
+  const row = await getPrisma().appModelProviderConfig.findUnique({
     where: { id: CONFIG_ID },
   });
   return parseModelConfig(row);
@@ -201,7 +201,7 @@ export async function saveModelConfig(
     }
   }
 
-  await getPrisma().appModelConfig.upsert({
+  await getPrisma().appModelProviderConfig.upsert({
     where: { id: CONFIG_ID },
     create: {
       id: CONFIG_ID,

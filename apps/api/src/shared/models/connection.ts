@@ -3,7 +3,7 @@
  *
  * Combines the provider's hardcoded `baseUrl` with the per-provider
  * overrides (`baseUrl`, `port`) stored in
- * `app_model_config.providerConnections`. Used by `resolveModel` in
+ * `app_model_provider_config.providerConnections`. Used by `resolveModel` in
  * `config.ts` so adapter clients can hand the resolved values straight
  * to their underlying HTTP clients.
  *
