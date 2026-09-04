@@ -138,29 +138,14 @@ model KnowledgeImageDescription {
 }
 
 /// Model registry configuration (`app_model_config`). Single row, id =
-/// `"default"`. Connection settings live per catalog model on
-/// `/server-settings/providers`; each task slot on `/server-settings`
-/// just points at one of the configured models.
-///
-/// `connections` shape: `Record<modelId, { apiKey: string | null,
-/// baseUrl: string | null, port: number | null }>`. A model is "fully
-/// configured" iff every field declared by its provider's `userInputs`
-/// is non-null.
-///
-/// `tasks` shape: `{ embedding: modelId | null, llm: modelId | null,
-/// vision: modelId | null }`. Each task independently picks a
-/// fully-configured model; the server auto-nulls any task pointer
-/// whose target falls out of the fully-configured set on save.
+/// `"default"`. JSON shapes are documented in `shared/models/config.ts`.
 model AppModelConfig {
     id String @id @default("default")
 
-    /// Per-model connection settings, keyed by catalog `modelId`. May
-    /// include entries that are not yet fully configured — those show
-    /// on the Providers page with a warning but are filtered out of
-    /// the task dropdowns.
-    connections Json?
+    /// Per-provider connection settings, keyed by catalog `providerId`.
+    providerConnections Json? @map("provider_connections")
     /// Active model for each task. Null when nothing configured.
-    tasks       Json?
+    tasks               Json?
 
     @@map("app_model_config")
 }
