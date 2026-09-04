@@ -6,8 +6,10 @@
  *   - parse.ts       : image-ref extraction + strict manual pair
  *   - resolve.ts     : body-relative path → absolute filesystem path
  *   - store.ts       : Prisma CRUD for kb_image_descriptions
- *   - provider.ts    : MiniMax vision LLM (one description per image)
  *   - pipeline.ts    : enrichImagesWithDescriptions() orchestrator
+ *
+ * The vision LLM client itself lives in `shared/models/clients/vision.ts`
+ * and is selected at runtime by `shared/models/routing.ts`.
  */
 
 export { dedupByPath, type ParsedImageRef, parseImageRefs } from "./parse.ts";
@@ -19,10 +21,6 @@ export {
   ImageDescValidationError,
   type PersistHooks,
 } from "./pipeline.ts";
-export {
-  createMinimaxImageDescriber,
-  type ImageDescriber,
-} from "./provider.ts";
 export { resolveImagePath } from "./resolve.ts";
 export {
   findImageDescription,

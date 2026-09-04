@@ -1,12 +1,26 @@
+/**
+ * Per-task test handlers for the model registry.
+ *
+ * `runTestEmbeddingSearch` exercises the configured embedder with a
+ * cosine search over `kb_children`. `runTestChat` and `runTestVision`
+ * invoke the chat and vision clients with a one-shot prompt/image.
+ *
+ * Each function is the production-callable test for one capability.
+ * The HTTP layer (`/server-setting/model/test/:task`) dispatches to
+ * one of them.
+ */
+
 import { sql } from "bun";
-import {
-  createEmbedder,
-  type Embedder,
-  loadEmbedSettings,
-  pgvectorLiteral,
-} from "../../shared/embed/index.ts";
+import { pgvectorLiteral } from "../../shared/embed/index.ts";
 import type { KnowledgePageListItem } from "../../shared/knowledge/list.ts";
 import { tagsFromRow } from "../../shared/knowledge/row.ts";
+import {
+  getEmbedder,
+  getEmbedModelId,
+  getImageDescriber,
+  getSynthesizer,
+} from "../../shared/models/index.ts";
+import type { Embedder } from "../../shared/models/types.ts";
 import { isoFromDate } from "../../shared/serialize.ts";
 
 export type EmbedTestSearchHit = KnowledgePageListItem & {
@@ -63,7 +77,7 @@ export type RunTestEmbedSearchOptions = {
  * aggregate the top child score per `page_id`, and return the highest-scoring
  * `kb_pages` (with metadata + child/parent counts).
  */
-export async function runTestEmbedSearch(
+export async function runTestEmbeddingSearch(
   query: string,
   limit: number = EMBED_TEST_SEARCH_DEFAULT_LIMIT,
   options?: RunTestEmbedSearchOptions,
@@ -77,16 +91,14 @@ export async function runTestEmbedSearch(
     Math.min(EMBED_TEST_SEARCH_MAX_LIMIT, Math.floor(limit)),
   );
 
-  const embedder =
-    options?.embedder ?? createEmbedder(await loadEmbedSettings());
+  const embedder = options?.embedder ?? (await getEmbedder());
   const vectors = await embedder.embed([trimmed]);
   const vector = vectors[0];
   if (!vector) {
     throw new Error("Question embed returned no vector");
   }
   const literal = pgvectorLiteral(vector);
-  const currentModel =
-    options?.embeddingModel ?? (await loadEmbedSettings()).embeddingModel;
+  const currentModel = options?.embeddingModel ?? (await getEmbedModelId());
   const runSql: SqlRunner = options?.runSql ?? (sql as SqlRunner);
 
   const rows = (await runSql`
@@ -134,5 +146,49 @@ export async function runTestEmbedSearch(
       childCount: row.child_count,
       score: numberFromSql(row.score),
     })),
+  };
+}
+
+/**
+ * Run a one-shot chat call against the configured LLM. Echoes the
+ * model id / provider id alongside the response so the test panel can
+ * show which model produced it.
+ */
+export async function runTestChat(prompt: string): Promise<{
+  response: string;
+  prompt: string;
+}> {
+  const synthesizer = await getSynthesizer();
+  const response = await synthesizer.synthesize(prompt);
+  return { response, prompt };
+}
+
+/**
+ * Run a one-shot vision call against the configured vision model.
+ * `imageBase64` is the raw base64 (no `data:` prefix); `mimeType` and
+ * `name` are echoed in the response for the test panel UI.
+ */
+export async function runTestVision(input: {
+  imageBase64: string;
+  mimeType: string;
+  name: string;
+}): Promise<{
+  description: string;
+  mimeType: string;
+  sizeBytes: number;
+  name: string;
+}> {
+  const describer = await getImageDescriber();
+  const bytes = Buffer.from(input.imageBase64, "base64");
+  const description = await describer.describe({
+    absolutePath: input.name,
+    bytes,
+    mimeType: input.mimeType || "application/octet-stream",
+  });
+  return {
+    description: description.replace(/\s+/g, " ").trim(),
+    mimeType: input.mimeType,
+    sizeBytes: bytes.length,
+    name: input.name,
   };
 }

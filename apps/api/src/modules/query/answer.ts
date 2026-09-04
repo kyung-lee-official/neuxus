@@ -1,17 +1,18 @@
 import type { AppMemory, AppMessage } from "../../shared/db.ts";
-import type { RetrievedParent } from "../../shared/retrieve/index.ts";
+import { fitPromptToWindow } from "../../shared/models/clients/chat.ts";
 import {
-  createSynthesizer,
-  fitPromptToWindow,
-  loadSynthesisSettings,
-  type Synthesizer,
-} from "../../shared/synthesis/index.ts";
+  getSynthesizer,
+  loadModelConfig,
+  resolveModel,
+} from "../../shared/models/index.ts";
+import type { Synthesizer } from "../../shared/models/types.ts";
+import type { RetrievedParent } from "../../shared/retrieve/index.ts";
 import { buildSynthesisPrompt, stripMarkdownImageLines } from "./context.ts";
 
 export type AnswerFromContextOptions = {
   synthesizer?: Synthesizer;
   /**
-   * Forwarded to `createSynthesizer` when no pre-built synthesizer is
+   * Forwarded to `getSynthesizer` when no pre-built synthesizer is
    * supplied. Stamps the resulting synthesis log rows with this user.
    */
   userId?: string;
@@ -25,10 +26,11 @@ export async function answerFromContext(
   parents: RetrievedParent[] = [],
   options?: AnswerFromContextOptions,
 ): Promise<string> {
-  const settings = await loadSynthesisSettings();
+  const config = await loadModelConfig();
+  const { model } = resolveModel("llm", config);
+  const maxTokens = model.defaults.maxOutputTokens ?? 4096;
   const synthesizer =
-    options?.synthesizer ??
-    createSynthesizer(settings, { userId: options?.userId });
+    options?.synthesizer ?? (await getSynthesizer({ userId: options?.userId }));
   const prompt = fitPromptToWindow(
     buildSynthesisPrompt(
       recentMessages,
@@ -36,7 +38,8 @@ export async function answerFromContext(
       personalMemories,
       parents,
     ),
-    settings,
+    model,
+    maxTokens,
   );
   // Strip markdown image references before sending to the LLM. The image
   // bytes stay on disk; the description lives in the corresponding

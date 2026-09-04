@@ -23,12 +23,9 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { extname } from "node:path";
 
-import { loadSynthesisSettings } from "../synthesis/settings.ts";
+import { getImageDescriber } from "../models/routing.ts";
+import type { ImageDescriber } from "../models/types.ts";
 import { dedupByPath, type ParsedImageRef, parseImageRefs } from "./parse.ts";
-import {
-  createMinimaxImageDescriber,
-  type ImageDescriber,
-} from "./provider.ts";
 import { findImageDescription, upsertImageDescription } from "./store.ts";
 import { findOrphanImageDescOpeners } from "./validate.ts";
 
@@ -80,8 +77,8 @@ export type EnrichOptions = {
   sourceAbsPath: string;
   body: string;
   /**
-   * Override the vision provider. If omitted, a MiniMax image
-   * describer is constructed from the current synthesis settings.
+   * Override the vision provider. If omitted, an image describer is
+   * built from the configured vision model via `getImageDescriber()`.
    */
   describer?: ImageDescriber;
   /**
@@ -134,8 +131,7 @@ export async function enrichImagesWithDescriptions(
 export class ImageDescValidationError extends Error {}
 
 async function buildDefaultDescriber(): Promise<ImageDescriber> {
-  const settings = await loadSynthesisSettings();
-  return createMinimaxImageDescriber(settings);
+  return getImageDescriber();
 }
 
 async function enrichOne(

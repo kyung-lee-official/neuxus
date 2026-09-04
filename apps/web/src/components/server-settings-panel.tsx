@@ -6,12 +6,10 @@ import { useState } from "react";
 import { useActiveUserStore } from "@/lib/active-user-store";
 import { ApiError, nukeDatabase } from "@/lib/api";
 import { useAdminUser } from "./admin-shell";
-import { EmbedSettingsBlock } from "./embed-settings-block";
-import { ImageDescTestBlock } from "./image-desc-test-block";
 import { LogSettingsBlock } from "./log-settings-block";
 import { Modal } from "./modal";
+import { ModelConfigPanel } from "./model-config-panel";
 import { RetrieveSettingsBlock } from "./retrieve-settings-block";
-import { SynthesisSettingsBlock } from "./synthesis-settings-block";
 
 function errorMessage(err: unknown): string {
   if (err instanceof ApiError) return err.message;
@@ -28,16 +26,8 @@ export function ServerSettingsPanel() {
 
   return (
     <div className="flex w-full flex-col gap-4">
-      <section className="flex flex-col gap-2 rounded-md border border-line bg-surface p-6 shadow-sm">
-        <h1 className="m-0 font-display text-2xl text-ink">Server settings</h1>
-        <p className="m-0 text-muted text-sm">
-          Admin-only provider config for embeddings and Ask synthesis.
-        </p>
-      </section>
-      <EmbedSettingsBlock actorApiKey={user.apiKey} />
+      <ModelConfigPanel />
       <RetrieveSettingsBlock actorApiKey={user.apiKey} />
-      <SynthesisSettingsBlock actorApiKey={user.apiKey} />
-      <ImageDescTestBlock actorApiKey={user.apiKey} />
       <LogSettingsBlock actorApiKey={user.apiKey} />
       <NukeDbBlock
         actorApiKey={user.apiKey}

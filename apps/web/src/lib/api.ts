@@ -91,8 +91,7 @@ export const UserQueryKey = {
   Data: (id: string, messagePage: number) =>
     ["users", id, "data", messagePage] as const,
   Sessions: (userId: string) => ["sessions", userId] as const,
-  EmbedSettings: ["server-setting", "embed"] as const,
-  SynthesisSettings: ["server-setting", "synthesis"] as const,
+  ModelConfig: ["server-setting", "model"] as const,
   CorpusSettings: ["server-setting", "corpus"] as const,
   LogSettings: ["server-setting", "log"] as const,
   RetrieveSettings: ["server-setting", "retrieve"] as const,
@@ -305,25 +304,6 @@ export async function postRemember(input: {
   });
 }
 
-export type EmbedSettings = {
-  embeddingModel: string | null;
-  provider: string | null;
-  host: string | null;
-  port: number | null;
-  apiKey: string | null;
-  defaults: {
-    embeddingModel: string;
-    provider: string;
-    host: string;
-    port: number;
-    apiKey: string | null;
-  };
-};
-
-export async function getEmbedSettings(apiKey: string): Promise<EmbedSettings> {
-  return apiFetch<EmbedSettings>("/server-setting/embed", { apiKey });
-}
-
 export type EmbedTestSearchHit = {
   id: string;
   slug: string;
@@ -342,106 +322,138 @@ export type EmbedTestSearchHit = {
 export async function testEmbedSearch(
   apiKey: string,
   input: { query: string; limit?: number },
-): Promise<{ results: EmbedTestSearchHit[] }> {
-  return apiFetch<{ results: EmbedTestSearchHit[] }>(
-    "/server-setting/embed/test-search",
-    { method: "POST", apiKey, body: JSON.stringify(input) },
+): Promise<{
+  task: "embedding";
+  results: EmbedTestSearchHit[];
+}> {
+  return apiFetch<{ task: "embedding"; results: EmbedTestSearchHit[] }>(
+    "/server-setting/model/test/embedding",
+    {
+      method: "POST",
+      apiKey,
+      body: JSON.stringify({ task: "embedding", ...input }),
+    },
   );
 }
 
-export async function putEmbedSettings(input: {
-  apiKey: string;
-  settings: {
-    embeddingModel: string | null;
-    provider: string | null;
-    host: string | null;
-    port: number | null;
-    apiKey: string | null;
-  };
-}): Promise<EmbedSettings> {
-  return apiFetch<EmbedSettings>("/server-setting/embed", {
-    method: "PUT",
-    apiKey: input.apiKey,
-    body: JSON.stringify(input.settings),
-  });
-}
+// --- Model registry (replaces per-task embed/synthesis/image endpoints) ---
 
-export async function resetEmbedSettings(
-  apiKey: string,
-): Promise<EmbedSettings> {
-  return apiFetch<EmbedSettings>("/server-setting/embed/reset", {
-    method: "POST",
-    apiKey,
-  });
-}
+export type ModelCapability = "embedding" | "llm" | "vision";
 
-export type SynthesisSettings = {
-  provider: string | null;
-  synthesisModel: string | null;
-  baseUrl: string | null;
+export type ModelSlot = {
+  modelId: string;
   apiKey: string | null;
-  maxTokens: number | null;
-  contextWindowTokens: number | null;
+  baseUrl: string | null;
+  port: number | null;
+};
+
+export type ProviderInfo = {
+  id: string;
+  displayName: string;
+  baseUrl: string;
+  requestShape: "anthropic-messages" | "openai-embeddings" | "ollama-embed";
+  headers?: Record<string, string>;
+  userInputs: ("apiKey" | "baseUrl" | "port")[];
+};
+
+export type ModelInfo = {
+  id: string;
+  providerId: string;
+  displayName: string;
+  capabilities: {
+    embedding?: true;
+    llm?: true;
+    vision?: true;
+  };
   defaults: {
-    provider: string;
-    synthesisModel: string;
-    baseUrl: string;
-    apiKey: string | null;
-    maxTokens: number;
-    contextWindowTokens: number;
+    contextWindowTokens?: number;
+    maxOutputTokens?: number;
+    embeddingDimensions?: number;
+    temperature?: number;
   };
 };
 
-export async function getSynthesisSettings(
+export type ModelConfig = {
+  embedding: ModelSlot | null;
+  llm: ModelSlot | null;
+  vision: ModelSlot | null;
+};
+
+export type ModelConfigResponse = {
+  config: ModelConfig;
+  providers: ProviderInfo[];
+  models: ModelInfo[];
+};
+
+export async function getModelConfig(
   apiKey: string,
-): Promise<SynthesisSettings> {
-  return apiFetch<SynthesisSettings>("/server-setting/synthesis", { apiKey });
+): Promise<ModelConfigResponse> {
+  return apiFetch<ModelConfigResponse>("/server-setting/model", { apiKey });
 }
 
-export async function putSynthesisSettings(input: {
+export async function putModelConfig(input: {
   apiKey: string;
-  settings: {
-    provider: string | null;
-    synthesisModel: string | null;
-    baseUrl: string | null;
-    apiKey: string | null;
-    maxTokens: number | null;
-    contextWindowTokens: number | null;
-  };
-}): Promise<SynthesisSettings> {
-  return apiFetch<SynthesisSettings>("/server-setting/synthesis", {
+  config: ModelConfig;
+}): Promise<ModelConfigResponse> {
+  return apiFetch<ModelConfigResponse>("/server-setting/model", {
     method: "PUT",
     apiKey: input.apiKey,
-    body: JSON.stringify(input.settings),
+    body: JSON.stringify(input.config),
   });
 }
 
-export async function resetSynthesisSettings(
-  apiKey: string,
-): Promise<SynthesisSettings> {
-  return apiFetch<SynthesisSettings>("/server-setting/synthesis/reset", {
-    method: "POST",
-    apiKey,
-  });
-}
+export type ChatTestResult = {
+  task: "llm";
+  response: string;
+  prompt: string;
+};
 
-export type ImageTestResult = {
+export type VisionTestResult = {
+  task: "vision";
   description: string;
   mimeType: string;
   sizeBytes: number;
   name: string;
 };
 
-export async function testImageDescription(
+export type EmbeddingTestResult = {
+  task: "embedding";
+  results: EmbedTestSearchHit[];
+};
+
+export async function testModelChat(
   apiKey: string,
-  image: File,
-): Promise<ImageTestResult> {
-  const formData = new FormData();
-  formData.append("image", image);
-  return apiFetch<ImageTestResult>("/server-setting/synthesis/image-test", {
+  prompt: string,
+): Promise<ChatTestResult> {
+  return apiFetch<ChatTestResult>("/server-setting/model/test/llm", {
     method: "POST",
     apiKey,
-    body: formData,
+    body: JSON.stringify({ task: "llm", prompt }),
+  });
+}
+
+export async function testModelVision(
+  apiKey: string,
+  image: File,
+): Promise<VisionTestResult> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("FileReader error"));
+    reader.readAsDataURL(image);
+  });
+  const comma = dataUrl.indexOf(",");
+  const imageBase64 = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
+  return apiFetch<VisionTestResult>("/server-setting/model/test/vision", {
+    method: "POST",
+    apiKey,
+    body: JSON.stringify({
+      task: "vision",
+      imageBase64,
+      mimeType: image.type,
+      name: image.name,
+    }),
   });
 }
 

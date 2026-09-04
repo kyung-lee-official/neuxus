@@ -26,7 +26,7 @@ export const apiTagList: { name: string; description: string }[] = [
   {
     name: API_TAGS.serverSetting,
     description:
-      "Admin server settings (embed, retrieve, synthesis, log, corpus, nuke)",
+      "Admin server settings (model registry, retrieve, log, corpus, nuke)",
   },
 ];
 

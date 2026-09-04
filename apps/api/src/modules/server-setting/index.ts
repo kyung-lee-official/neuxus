@@ -11,98 +11,39 @@ const adminDetail = {
 
 export const serverSetting = new Elysia({ prefix: "/server-setting" })
   .use(auth)
-  .get("/embed", () => ServerSetting.getEmbed(), {
+  // ---------- Model registry ----------
+  .get("/model", () => ServerSetting.getModel(), {
     requireAdmin: true,
-    response: ServerSettingModel.embedResponse,
+    response: ServerSettingModel.modelResponse,
     detail: {
       ...adminDetail,
-      summary: "Get embed settings",
+      summary: "Get the model registry config",
       description:
-        "Returns the stored `kb_embed_settings` row (or nulls when no row exists) plus hardcoded defaults. Stored nulls mean the runtime falls back to `defaults`.",
+        "Returns the three persisted task slots (`embedding` / `llm` / `vision`) plus the static catalog of providers and models the admin UI uses to render the dropdowns.",
     },
   })
-  .put("/embed", ({ body }) => ServerSetting.putEmbed(body), {
+  .put("/model", ({ body }) => ServerSetting.putModel(body), {
     requireAdmin: true,
-    body: ServerSettingModel.embedBody,
-    response: ServerSettingModel.embedResponse,
+    body: ServerSettingModel.modelBody,
+    response: ServerSettingModel.modelResponse,
     detail: {
       ...adminDetail,
-      summary: "Update embed settings",
+      summary: "Update the model registry config",
       description:
-        "Empty strings and nulls are stored as null; the runtime falls back to `defaults`.",
+        "Each task slot is independent. Pass `null` to clear a slot; pass `{ modelId, apiKey?, baseUrl?, port? }` to configure one. The catalog owns every other parameter.",
     },
   })
-  .post("/embed/reset", () => ServerSetting.resetEmbed(), {
+  .post("/model/test/:task", ({ body }) => ServerSetting.testModel(body), {
     requireAdmin: true,
-    response: ServerSettingModel.embedResponse,
+    body: ServerSettingModel.modelTestBody,
     detail: {
       ...adminDetail,
-      summary: "Reset embed settings to defaults",
+      summary: "Run a one-shot test against a configured model",
       description:
-        "Writes hardcoded `EMBED_DEFAULTS` into the row: `embeddingModel=nomic-embed-text:latest`, `provider=ollama`, `host=127.0.0.1`, `port=11434`, `apiKey=null`.",
+        "Dispatches by `body.task`. Embedding takes `{ query, limit? }`; LLM takes `{ prompt }`; vision takes `{ imageBase64, mimeType?, name? }`. Image bytes never persist — only the response is returned.",
     },
   })
-  .post(
-    "/embed/test-search",
-    ({ body }) => ServerSetting.testEmbedSearch(body),
-    {
-      requireAdmin: true,
-      body: ServerSettingModel.embedTestSearchBody,
-      response: ServerSettingModel.embedTestSearchResponse,
-      detail: {
-        ...adminDetail,
-        summary: "Run a test embed search",
-        description:
-          "Embeds `query`, cosine-searches `kb_children` for the configured model, aggregates the top child score per page, and returns the highest-scoring pages (with metadata + parent/child counts).",
-      },
-    },
-  )
-  .get("/synthesis", () => ServerSetting.getSynthesis(), {
-    requireAdmin: true,
-    response: ServerSettingModel.synthesisResponse,
-    detail: {
-      ...adminDetail,
-      summary: "Get synthesis settings",
-      description:
-        "Returns the stored `app_synthesis_settings` row (or nulls) plus hardcoded defaults. `apiKey` is never logged.",
-    },
-  })
-  .put("/synthesis", ({ body }) => ServerSetting.putSynthesis(body), {
-    requireAdmin: true,
-    body: ServerSettingModel.synthesisBody,
-    response: ServerSettingModel.synthesisResponse,
-    detail: {
-      ...adminDetail,
-      summary: "Update synthesis settings",
-      description:
-        "Empty strings and nulls are stored as null; the runtime falls back to `defaults`. `apiKey` is never logged.",
-    },
-  })
-  .post("/synthesis/reset", () => ServerSetting.resetSynthesis(), {
-    requireAdmin: true,
-    response: ServerSettingModel.synthesisResponse,
-    detail: {
-      ...adminDetail,
-      summary: "Reset synthesis settings to defaults",
-      description:
-        "Writes hardcoded `SYNTHESIS_DEFAULTS`: `provider=minimax`, `synthesisModel=MiniMax-M3`, `baseUrl=https://api.minimaxi.com/anthropic`, `maxTokens=4096`, `contextWindowTokens=1000000`, `apiKey=null`. An unknown model with no stored `contextWindowTokens` resolves to `0` on the Ask path.",
-    },
-  })
-  .post(
-    "/synthesis/image-test",
-    ({ body }) => ServerSetting.testImageDescription(body),
-    {
-      requireAdmin: true,
-      body: ServerSettingModel.imageTestBody,
-      response: ServerSettingModel.imageTestResponse,
-      detail: {
-        ...adminDetail,
-        summary: "Send an image to the vision LLM (test)",
-        description:
-          "Runs the configured MiniMax provider on the uploaded image and returns the description it produces. The image bytes stay on disk; only the description is returned. Same provider as the enricher pipeline, so a working response here means enrichments will also succeed.",
-      },
-    },
-  )
+  // ---------- Logs ----------
   .get("/log", () => ServerSetting.getLog(), {
     requireAdmin: true,
     detail: {
@@ -140,6 +81,7 @@ export const serverSetting = new Elysia({ prefix: "/server-setting" })
       description: "Deletes every row in `app_log`.",
     },
   })
+  // ---------- Retrieve ----------
   .get("/retrieve", () => ServerSetting.getRetrieve(), {
     requireAdmin: true,
     response: ServerSettingModel.retrieveResponse,
@@ -171,6 +113,7 @@ export const serverSetting = new Elysia({ prefix: "/server-setting" })
         "Writes hardcoded `RETRIEVE_DEFAULTS`: `childLimit=24`, `maxParents=8`, `maxCharacters=12000`.",
     },
   })
+  // ---------- Corpus ----------
   .get("/corpus", () => ServerSetting.getCorpus(), {
     requireAdmin: true,
     response: ServerSettingModel.corpusResponse,

@@ -17,13 +17,6 @@ import {
 import { nukeDatabases } from "../../shared/db.ts";
 import { embedStaleChildren } from "../../shared/embed/children.ts";
 import {
-  adminEmbedSettings,
-  type EmbedSettingsRow,
-  resetEmbedSettings,
-  saveEmbedSettings,
-} from "../../shared/embed/index.ts";
-import { createMinimaxImageDescriber } from "../../shared/image-desc/provider.ts";
-import {
   adminLogSettings,
   type LogSettingsRow,
   purgeLogs,
@@ -31,20 +24,29 @@ import {
   saveLogSettings,
 } from "../../shared/log/index.ts";
 import {
+  loadModelConfig,
+  MODELS,
+  PROVIDERS,
+  saveModelConfig,
+} from "../../shared/models/index.ts";
+import type {
+  Model,
+  ModelConfig,
+  ModelSlot,
+  Provider,
+} from "../../shared/models/types.ts";
+import {
   adminRetrieveSettings,
   type RetrieveSettingsRow,
   resetRetrieveSettings,
   saveRetrieveSettings,
 } from "../../shared/retrieve/index.ts";
-import {
-  adminSynthesisSettings,
-  resetSynthesisSettings,
-  type SynthesisSettingsRow,
-  saveSynthesisSettings,
-} from "../../shared/synthesis/index.ts";
-import { loadSynthesisSettings } from "../../shared/synthesis/settings.ts";
-import { runTestEmbedSearch } from "./embed-search.ts";
 import type { ServerSettingModel } from "./model.ts";
+import {
+  runTestChat,
+  runTestEmbeddingSearch,
+  runTestVision,
+} from "./model-test.ts";
 
 const LOCKED_MESSAGE = "A corpus operation is already running.";
 
@@ -56,57 +58,137 @@ function mapCorpusError(err: unknown): never {
   throw status(500, { error: msg });
 }
 
-export abstract class ServerSetting {
-  static async getEmbed() {
-    return adminEmbedSettings();
-  }
+function asError(err: unknown): { error: string } {
+  const msg = err instanceof Error ? err.message : String(err);
+  return { error: msg };
+}
 
-  static async putEmbed(body: ServerSettingModel["embedBody"]) {
-    const row: EmbedSettingsRow = {
-      embeddingModel: body.embeddingModel,
-      provider: body.provider,
-      host: body.host,
-      port: body.port,
-      apiKey: body.apiKey,
-    };
-    await saveEmbedSettings(row);
-    return adminEmbedSettings();
-  }
+function readSlot(value: unknown): ModelSlot | null {
+  if (value == null || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  const modelId =
+    typeof v.modelId === "string" && v.modelId.trim() !== ""
+      ? v.modelId.trim()
+      : null;
+  if (!modelId) return null;
+  return {
+    modelId,
+    apiKey:
+      typeof v.apiKey === "string" && v.apiKey.trim() !== ""
+        ? v.apiKey.trim()
+        : null,
+    baseUrl:
+      typeof v.baseUrl === "string" && v.baseUrl.trim() !== ""
+        ? v.baseUrl.trim()
+        : null,
+    port:
+      typeof v.port === "number" && Number.isInteger(v.port) && v.port > 0
+        ? v.port
+        : null,
+  };
+}
 
-  static async resetEmbed() {
-    return resetEmbedSettings();
-  }
-
-  static async testEmbedSearch(
-    body: ServerSettingModel["embedTestSearchBody"],
-  ) {
-    try {
-      return await runTestEmbedSearch(body.query, body.limit ?? 10);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      throw status(500, { error: msg });
+function readSlotOrEmpty(value: unknown): ModelSlot {
+  return (
+    readSlot(value) ?? {
+      modelId: "",
+      apiKey: null,
+      baseUrl: null,
+      port: null,
     }
-  }
+  );
+}
 
-  static async getSynthesis() {
-    return adminSynthesisSettings();
-  }
-
-  static async putSynthesis(body: ServerSettingModel["synthesisBody"]) {
-    const row: SynthesisSettingsRow = {
-      provider: body.provider,
-      synthesisModel: body.synthesisModel,
-      baseUrl: body.baseUrl,
-      apiKey: body.apiKey,
-      maxTokens: body.maxTokens,
-      contextWindowTokens: body.contextWindowTokens,
+export abstract class ServerSetting {
+  /** Read the per-task model config plus the static catalog. */
+  static async getModel(): Promise<ServerSettingModel["modelResponse"]> {
+    const config = await loadModelConfig();
+    return {
+      config,
+      providers: [...PROVIDERS] as Provider[],
+      models: [...MODELS] as Model[],
     };
-    await saveSynthesisSettings(row);
-    return adminSynthesisSettings();
   }
 
-  static async resetSynthesis() {
-    return resetSynthesisSettings();
+  /** Upsert the per-task model config. Each slot may be null to clear. */
+  static async putModel(
+    body: ServerSettingModel["modelBody"],
+  ): Promise<ServerSettingModel["modelResponse"]> {
+    const config: ModelConfig = {
+      embedding: readSlot(body.embedding),
+      llm: readSlot(body.llm),
+      vision: readSlot(body.vision),
+    };
+    const saved = await saveModelConfig(config);
+    return {
+      config: saved,
+      providers: [...PROVIDERS] as Provider[],
+      models: [...MODELS] as Model[],
+    };
+  }
+
+  /**
+   * Run a one-shot test against the configured model for the given
+   * task. Dispatches on `body.task` since each task has its own body
+   * shape (embed / chat / vision).
+   */
+  static async testModel(
+    body: ServerSettingModel["modelTestBody"],
+  ): Promise<unknown> {
+    try {
+      switch (body.task) {
+        case "embedding": {
+          const query = typeof body.query === "string" ? body.query.trim() : "";
+          if (query === "") {
+            throw new Error("query is required for embedding test");
+          }
+          const limit =
+            typeof body.limit === "number" && Number.isInteger(body.limit)
+              ? Math.max(1, Math.min(50, body.limit))
+              : 10;
+          return {
+            task: "embedding" as const,
+            ...(await runTestEmbeddingSearch(query, limit)),
+          };
+        }
+        case "llm": {
+          const prompt =
+            typeof body.prompt === "string" ? body.prompt.trim() : "";
+          if (prompt === "") {
+            throw new Error("prompt is required for llm test");
+          }
+          return {
+            task: "llm" as const,
+            ...(await runTestChat(prompt)),
+          };
+        }
+        case "vision": {
+          const imageBase64 =
+            typeof body.imageBase64 === "string" ? body.imageBase64 : "";
+          const mimeType =
+            typeof body.mimeType === "string" && body.mimeType !== ""
+              ? body.mimeType
+              : "application/octet-stream";
+          const name =
+            typeof body.name === "string" && body.name !== ""
+              ? body.name
+              : "image";
+          if (imageBase64 === "") {
+            throw new Error("imageBase64 is required for vision test");
+          }
+          return {
+            task: "vision" as const,
+            ...(await runTestVision({ imageBase64, mimeType, name })),
+          };
+        }
+        default:
+          throw new Error(
+            `unknown task: ${String((body as { task?: unknown }).task)}`,
+          );
+      }
+    } catch (err) {
+      throw status(400, asError(err));
+    }
   }
 
   static async getLog() {
@@ -245,27 +327,5 @@ export abstract class ServerSetting {
       throw status(500, { error: msg });
     }
     return { ok: true as const, nuked: true as const, target: body.target };
-  }
-
-  /**
-   * Admin test endpoint: POST an image to the configured vision LLM and
-   * return the description it produces. Uses the same MiniMax provider
-   * the enricher uses, so a working response here means the enricher
-   * pipeline will also work on the same image.
-   */
-  static async testImageDescription(body: ServerSettingModel["imageTestBody"]) {
-    const settings = await loadSynthesisSettings();
-    const describer = createMinimaxImageDescriber(settings);
-    const description = await describer.describe({
-      absolutePath: body.image.name,
-      bytes: Buffer.from(await body.image.arrayBuffer()),
-      mimeType: body.image.type || "application/octet-stream",
-    });
-    return {
-      description: description.replace(/\s+/g, " ").trim(),
-      mimeType: body.image.type,
-      sizeBytes: body.image.size,
-      name: body.image.name,
-    };
   }
 }

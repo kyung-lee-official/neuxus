@@ -1,11 +1,8 @@
 import { sql } from "bun";
-import {
-  createEmbedder,
-  type Embedder,
-  loadEmbedSettings,
-  pgvectorLiteral,
-} from "../embed/index.ts";
+import { pgvectorLiteral } from "../embed/index.ts";
 import { childLogger } from "../log/index.ts";
+import { getEmbedder, getEmbedModelId } from "../models/routing.ts";
+import type { Embedder } from "../models/types.ts";
 import { type RetrieveOptions, resolveRetrieveOptions } from "./defaults.ts";
 import {
   type ChildHit,
@@ -84,8 +81,7 @@ export async function retrieveParentsByQuestion(
 ): Promise<RetrieveParentsByQuestionResult> {
   const trimmed = question.trim();
   const knobs = resolveRetrieveOptions(options);
-  const settings = await loadEmbedSettings();
-  const currentModel = settings.embeddingModel;
+  const currentModel = await getEmbedModelId();
   const start = performance.now();
 
   if (trimmed === "") {
@@ -100,7 +96,7 @@ export async function retrieveParentsByQuestion(
   }
 
   try {
-    const embedder = options?.embedder ?? createEmbedder(settings);
+    const embedder = options?.embedder ?? (await getEmbedder());
     const vectors = await embedder.embed([trimmed]);
     const vector = vectors[0];
     if (!vector) {

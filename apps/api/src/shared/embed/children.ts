@@ -1,8 +1,7 @@
 import { sql } from "bun";
 import { getPrisma } from "../db.ts";
-import { createEmbedder } from "./provider.ts";
-import { loadEmbedSettings } from "./settings.ts";
-import type { Embedder } from "./types.ts";
+import { getEmbedder, getEmbedModelId } from "../models/routing.ts";
+import type { Embedder } from "../models/types.ts";
 
 export type EmbedChildRow = {
   id: string;
@@ -81,9 +80,8 @@ export async function embedChildRows(
 export async function embedStaleChildren(
   options?: EmbedStaleChildrenOptions,
 ): Promise<EmbedStaleChildrenResult> {
-  const settings = await loadEmbedSettings();
-  const embedder = options?.embedder ?? createEmbedder(settings);
-  const currentModel = settings.embeddingModel;
+  const embedder = options?.embedder ?? (await getEmbedder());
+  const currentModel = await getEmbedModelId();
 
   const rows = await getPrisma().knowledgeChild.findMany({
     where: {
