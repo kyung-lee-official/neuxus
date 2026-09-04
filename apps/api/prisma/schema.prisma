@@ -137,9 +137,9 @@ model KnowledgeImageDescription {
     @@map("kb_image_descriptions")
 }
 
-/// Model registry configuration (`app_model_config`). Single row, id =
+/// Model provider configuration (`app_model_provider_config`). Single row, id =
 /// `"default"`. JSON shapes are documented in `shared/models/config.ts`.
-model AppModelConfig {
+model AppModelProviderConfig {
     id String @id @default("default")
 
     /// Per-provider connection settings, keyed by catalog `providerId`.
@@ -147,7 +147,7 @@ model AppModelConfig {
     /// Active model for each task. Null when nothing configured.
     tasks               Json?
 
-    @@map("app_model_config")
+    @@map("app_model_provider_config")
 }
 
 /// Knowledge page (`kb_pages`). `body` is ingest-normalized. Apply via your own migrate.
