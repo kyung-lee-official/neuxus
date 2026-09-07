@@ -7,12 +7,6 @@ const connectionSchema = t.Object({
   port: t.Union([t.Integer({ minimum: 1, maximum: 65535 }), t.Null()]),
 });
 
-const capabilityLiteral = t.Union([
-  t.Literal("embedding"),
-  t.Literal("llm"),
-  t.Literal("vision"),
-]);
-
 const providerSchema = t.Object({
   id: t.String(),
   displayName: t.String(),
@@ -45,55 +39,34 @@ const modelSchema = t.Object({
   }),
 });
 
-const taskPointerSchema = t.Object({
-  embedding: t.Union([t.String(), t.Null()]),
-  llm: t.Union([t.String(), t.Null()]),
-  vision: t.Union([t.String(), t.Null()]),
-});
-
 export const ModelProvidersModel = {
-  /** GET /model-providers response: providerConnections + tasks + static catalog. */
-  modelResponse: t.Object({
+  /**
+   * GET /model-providers response: saved per-provider connections + the
+   * static catalog. App task→model assignment is a separate resource
+   * (`/model-tasks`).
+   */
+  response: t.Object({
     config: t.Object({
       providerConnections: t.Record(t.String(), connectionSchema),
-      tasks: taskPointerSchema,
     }),
     providers: t.Array(providerSchema),
     models: t.Array(modelSchema),
   }),
 
-  /** PUT /model-providers body: providerConnections and/or tasks. Either may be partial. */
-  modelBody: t.Object({
+  /** PUT /model-providers body: partial per-provider connections. */
+  putBody: t.Object({
     providerConnections: t.Optional(
       t.Record(t.String(), t.Union([connectionSchema, t.Null()])),
     ),
-    tasks: t.Optional(taskPointerSchema),
-  }),
-
-  /**
-   * POST /model-providers/test/:task body — discriminated by `task`. Each task
-   * carries only the fields it needs; the others may be absent.
-   */
-  modelTestBody: t.Object({
-    task: capabilityLiteral,
-    /** embedding */
-    query: t.Optional(t.String()),
-    limit: t.Optional(t.Integer({ minimum: 1, maximum: 50 })),
-    /** llm */
-    prompt: t.Optional(t.String()),
-    /** vision (image as base64, no `data:` prefix) */
-    imageBase64: t.Optional(t.String()),
-    mimeType: t.Optional(t.String()),
-    name: t.Optional(t.String()),
   }),
 
   /** POST /model-providers/test/embed body: which catalog model to embed with. */
-  testEmbedBody: t.Object({
+  embedBody: t.Object({
     modelId: t.String(),
   }),
 
-  /** POST /model/test/embed response: raw vector from the embedder. */
-  testEmbedResponse: t.Object({
+  /** POST /model-providers/test/embed response: raw vector from the embedder. */
+  embedResponse: t.Object({
     embedding: t.Array(t.Number()),
     modelId: t.String(),
     dim: t.Integer({ minimum: 1 }),

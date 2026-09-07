@@ -1,28 +1,16 @@
 import { status } from "elysia";
 import {
   loadModelConfig,
-  MODELS,
-  PROVIDERS,
   saveModelConfig,
-} from "../../../shared/models/index.ts";
+} from "../../../shared/model-tasks/index.ts";
+import { MODELS, PROVIDERS } from "../../../shared/models/index.ts";
 import type {
   Model,
-  ModelConfig,
   Provider,
   ProviderConnection,
 } from "../../../shared/models/types.ts";
-import {
-  runTestChat,
-  runTestEmbed,
-  runTestEmbeddingSearch,
-  runTestVision,
-} from "./diagnostics.ts";
+import { runTestEmbed } from "./diagnostics.ts";
 import type { ModelProvidersModel } from "./model.ts";
-
-function asError(err: unknown): { error: string } {
-  const msg = err instanceof Error ? err.message : String(err);
-  return { error: msg };
-}
 
 function readConnection(value: unknown): ProviderConnection | null {
   if (value == null || typeof value !== "object" || Array.isArray(value)) {
@@ -59,127 +47,49 @@ function readProviderConnections(
   return out;
 }
 
-function readTasks(raw: unknown): ModelConfig["tasks"] | undefined {
-  if (raw == null || typeof raw !== "object" || Array.isArray(raw))
-    return undefined;
-  const v = raw as Record<string, unknown>;
-  const pick = (key: string): string | null => {
-    const x = v[key];
-    return typeof x === "string" && x.trim() !== "" ? x.trim() : null;
-  };
+function providerResponse(config: {
+  providerConnections: Record<string, ProviderConnection>;
+}): ModelProvidersModel["response"] {
   return {
-    embedding: pick("embedding"),
-    llm: pick("llm"),
-    vision: pick("vision"),
+    config: { providerConnections: config.providerConnections },
+    providers: [...PROVIDERS] as Provider[],
+    models: [...MODELS] as Model[],
   };
 }
 
 export abstract class ModelProviders {
-  /** Read the providerConnections/tasks map plus the static catalog. */
-  static async get(): Promise<ModelProvidersModel["modelResponse"]> {
+  /** Read the saved per-provider connections plus the static catalog. */
+  static async get(): Promise<ModelProvidersModel["response"]> {
     const config = await loadModelConfig();
-    return {
-      config,
-      providers: [...PROVIDERS] as Provider[],
-      models: [...MODELS] as Model[],
-    };
+    return providerResponse(config);
   }
 
-  /** Update providerConnections and/or tasks. Either may be partial. */
+  /** Update per-provider connections (partial). */
   static async put(
-    body: ModelProvidersModel["modelBody"],
-  ): Promise<ModelProvidersModel["modelResponse"]> {
+    body: ModelProvidersModel["putBody"],
+  ): Promise<ModelProvidersModel["response"]> {
     const saved = await saveModelConfig({
       providerConnections: readProviderConnections(body.providerConnections),
-      tasks: readTasks(body.tasks),
     });
-    return {
-      config: saved,
-      providers: [...PROVIDERS] as Provider[],
-      models: [...MODELS] as Model[],
-    };
+    return providerResponse(saved);
   }
 
   /**
-   * Run a one-shot test against the configured model for the given
-   * task. Dispatches on `body.task` since each task has its own body
-   * shape (embed / chat / vision).
-   */
-  static async test(
-    body: ModelProvidersModel["modelTestBody"],
-  ): Promise<unknown> {
-    try {
-      switch (body.task) {
-        case "embedding": {
-          const query = typeof body.query === "string" ? body.query.trim() : "";
-          if (query === "") {
-            throw new Error("query is required for embedding test");
-          }
-          const limit =
-            typeof body.limit === "number" && Number.isInteger(body.limit)
-              ? Math.max(1, Math.min(50, body.limit))
-              : 10;
-          return {
-            task: "embedding" as const,
-            ...(await runTestEmbeddingSearch(query, limit)),
-          };
-        }
-        case "llm": {
-          const prompt =
-            typeof body.prompt === "string" ? body.prompt.trim() : "";
-          if (prompt === "") {
-            throw new Error("prompt is required for llm test");
-          }
-          return {
-            task: "llm" as const,
-            ...(await runTestChat(prompt)),
-          };
-        }
-        case "vision": {
-          const imageBase64 =
-            typeof body.imageBase64 === "string" ? body.imageBase64 : "";
-          const mimeType =
-            typeof body.mimeType === "string" && body.mimeType !== ""
-              ? body.mimeType
-              : "application/octet-stream";
-          const name =
-            typeof body.name === "string" && body.name !== ""
-              ? body.name
-              : "image";
-          if (imageBase64 === "") {
-            throw new Error("imageBase64 is required for vision test");
-          }
-          return {
-            task: "vision" as const,
-            ...(await runTestVision({ imageBase64, mimeType, name })),
-          };
-        }
-        default:
-          throw new Error(
-            `unknown task: ${String((body as { task?: unknown }).task)}`,
-          );
-      }
-    } catch (err) {
-      throw status(400, asError(err));
-    }
-  }
-
-  /**
-   * Embed a hardcoded diagnostic string via the clicked catalog model
-   * and return the raw vector. Used by the per-model "Test embed"
-   * button on the providers page. Unlike the task-scoped tests, this
-   * does not require an embedding task assignment — it tests the model
-   * itself over its provider's saved connection.
+   * Embed a hardcoded diagnostic string via the clicked catalog model and
+   * return the raw vector. Used by the per-model "Test embed" button on
+   * the providers page. Tests the model itself over its provider's saved
+   * connection — no task assignment is required.
    */
   static async testEmbed(
-    body: ModelProvidersModel["testEmbedBody"],
-  ): Promise<ModelProvidersModel["testEmbedResponse"]> {
+    body: ModelProvidersModel["embedBody"],
+  ): Promise<ModelProvidersModel["embedResponse"]> {
     try {
       return await runTestEmbed("Why is the sky blue?", {
         modelId: body.modelId,
       });
     } catch (err) {
-      throw status(400, asError(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      throw status(400, { error: msg });
     }
   }
 }
