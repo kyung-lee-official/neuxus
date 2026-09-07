@@ -138,16 +138,29 @@ model KnowledgeImageDescription {
 }
 
 /// Model provider configuration (`app_model_provider_config`). Single row, id =
-/// `"default"`. JSON shapes are documented in `shared/models/config.ts`.
+/// `"default"`. Stores only raw per-provider connection overrides; the
+/// app-level task→model assignment lives in `app_model_task_config`.
 model AppModelProviderConfig {
     id String @id @default("default")
 
     /// Per-provider connection settings, keyed by catalog `providerId`.
     providerConnections Json? @map("provider_connections")
-    /// Active model for each task. Null when nothing configured.
-    tasks               Json?
 
     @@map("app_model_provider_config")
+}
+
+/// App-level task→model assignment (`app_model_task_config`). Single row,
+/// id = `"default"`. Maps each app task (`embedding`, `llm`, `vision`) to a
+/// catalog `modelId` (or null). Kept apart from `app_model_provider_config`
+/// because it is application wiring, not provider info; task definitions and
+/// their required capability live in code, not the DB.
+model AppModelTaskConfig {
+    id String @id @default("default")
+
+    /// Task → catalog `modelId` (or null). Keys: `embedding`, `llm`, `vision`.
+    tasks Json?
+
+    @@map("app_model_task_config")
 }
 
 /// Knowledge page (`kb_pages`). `body` is ingest-normalized. Apply via your own migrate.

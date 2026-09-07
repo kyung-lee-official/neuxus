@@ -2,9 +2,10 @@
  * Model registry: capability tags, model + provider shapes, and persisted
  * per-task slots.
  *
- * The catalog (`catalog.ts`) owns every supported model and provider —
- * the `app_model_provider_config` row only stores which `modelId` the user picked
- * for each task plus optional per-provider connection overrides.
+ * The catalog (`catalog.ts`) owns every supported model and provider. The
+ * DB stores only deployment wiring: `app_model_provider_config` holds
+ * per-provider connection overrides, and `app_model_task_config` holds
+ * which `modelId` the user picked for each task.
  */
 
 export type CapabilityTag = "embedding" | "llm" | "vision";
@@ -94,9 +95,11 @@ export type ResolvedModel = {
 };
 
 /**
- * Persisted shape of `app_model_provider_config`. `providerConnections` keys are
- * catalog `providerId`s; `tasks[tag]` is one of the catalog `modelId`s
- * (or null) that the provider entry must cover.
+ * Runtime shape of the persisted model config (two singleton rows):
+ * `providerConnections` keys are catalog `providerId`s (stored in
+ * `app_model_provider_config`); `tasks[tag]` is one of the catalog
+ * `modelId`s (or null) that the provider entry must cover (stored in
+ * `app_model_task_config`).
  */
 export type ModelConfig = {
   /** Keyed by catalog `providerId`. Empty object when nothing configured. */

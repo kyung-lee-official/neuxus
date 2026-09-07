@@ -1,15 +1,14 @@
 /**
- * DB-backed model registry (`app_model_provider_config`).
+ * DB-backed model config, split across two singleton rows (id = `"default"`):
+ *   - `app_model_provider_config` — `providerConnections`, a
+ *     `Record<providerId, ProviderConnection>`. Raw provider info only.
+ *   - `app_model_task_config`     — `tasks`, `{ embedding, llm, vision }`
+ *     modelId-or-null. App-level wiring: which catalog model serves each
+ *     task. Task definitions and their required capability live in code.
  *
- * Single row, id = `"default"`. Two JSON columns:
- *   - `providerConnections` — `Record<providerId, ProviderConnection>`.
- *     Connection settings are provider-level, not per-model — every
- *     model under one provider shares the same key, base URL, and port.
- *   - `tasks`               — `{ embedding, llm, vision }` modelId-or-null.
- *
- * `loadModelConfig` reads and validates the JSON, returning a fully
- * typed `ModelConfig`. `saveModelConfig` accepts the same shape but
- * runs two sanity passes before persisting:
+ * `loadModelConfig` reads and validates both rows, returning a fully typed
+ * `ModelConfig`. `saveModelConfig` accepts the same shape but runs two
+ * sanity passes before persisting:
  *   - Drop any `providerConnections` entry that's empty (no fields set).
  *   - Auto-null any `tasks[task]` whose target's provider isn't fully
  *     configured.
@@ -95,10 +94,16 @@ function readJsonField(
 }
 
 export async function loadModelConfig(): Promise<ModelConfig> {
-  const row = await getPrisma().appModelProviderConfig.findUnique({
-    where: { id: CONFIG_ID },
+  const [providerRow, taskRow] = await Promise.all([
+    getPrisma().appModelProviderConfig.findUnique({
+      where: { id: CONFIG_ID },
+    }),
+    getPrisma().appModelTaskConfig.findUnique({ where: { id: CONFIG_ID } }),
+  ]);
+  return parseModelConfig({
+    providerConnections: providerRow?.providerConnections ?? null,
+    tasks: taskRow?.tasks ?? null,
   });
-  return parseModelConfig(row);
 }
 
 export function parseModelConfig(
@@ -201,18 +206,29 @@ export async function saveModelConfig(
     }
   }
 
-  await getPrisma().appModelProviderConfig.upsert({
-    where: { id: CONFIG_ID },
-    create: {
-      id: CONFIG_ID,
-      providerConnections: mergedConns as unknown as Prisma.InputJsonValue,
-      tasks: mergedTasks as unknown as Prisma.InputJsonValue,
-    },
-    update: {
-      providerConnections: mergedConns as unknown as Prisma.InputJsonValue,
-      tasks: mergedTasks as unknown as Prisma.InputJsonValue,
-    },
-  });
+  const prisma = getPrisma();
+  await prisma.$transaction([
+    prisma.appModelProviderConfig.upsert({
+      where: { id: CONFIG_ID },
+      create: {
+        id: CONFIG_ID,
+        providerConnections: mergedConns as unknown as Prisma.InputJsonValue,
+      },
+      update: {
+        providerConnections: mergedConns as unknown as Prisma.InputJsonValue,
+      },
+    }),
+    prisma.appModelTaskConfig.upsert({
+      where: { id: CONFIG_ID },
+      create: {
+        id: CONFIG_ID,
+        tasks: mergedTasks as unknown as Prisma.InputJsonValue,
+      },
+      update: {
+        tasks: mergedTasks as unknown as Prisma.InputJsonValue,
+      },
+    }),
+  ]);
 
   return loadModelConfig();
 }
