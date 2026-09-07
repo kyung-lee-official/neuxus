@@ -9,7 +9,7 @@ import type {
   Provider,
   ProviderConnection,
 } from "../../../shared/models/types.ts";
-import { runTestEmbed } from "./diagnostics.ts";
+import { runTestChat, runTestEmbed } from "./diagnostics.ts";
 import type { ModelProvidersModel } from "./model.ts";
 
 function readConnection(value: unknown): ProviderConnection | null {
@@ -87,6 +87,22 @@ export abstract class ModelProviders {
       return await runTestEmbed("Why is the sky blue?", {
         modelId: body.modelId,
       });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw status(400, { error: msg });
+    }
+  }
+
+  /**
+   * Run a one-shot chat call on the clicked catalog model (sends the
+   * vendor's official sample request) over its provider's saved
+   * connection. Tests the model itself — no llm task assignment required.
+   */
+  static async testChat(
+    body: ModelProvidersModel["chatBody"],
+  ): Promise<ModelProvidersModel["chatResponse"]> {
+    try {
+      return await runTestChat({ modelId: body.modelId });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       throw status(400, { error: msg });

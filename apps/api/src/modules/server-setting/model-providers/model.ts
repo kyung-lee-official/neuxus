@@ -72,6 +72,17 @@ export const ModelProvidersModel = {
     dim: t.Integer({ minimum: 1 }),
     inputText: t.String(),
   }),
+
+  /** POST /model-providers/test/chat body: which catalog model to chat with. */
+  chatBody: t.Object({
+    modelId: t.String(),
+  }),
+
+  /** POST /model-providers/test/chat response. */
+  chatResponse: t.Object({
+    modelId: t.String(),
+    response: t.String(),
+  }),
 } as const;
 
 export type ModelProvidersModel = {
