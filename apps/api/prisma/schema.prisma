@@ -150,14 +150,15 @@ model AppModelProviderConfig {
 }
 
 /// App-level task→model assignment (`app_model_task_config`). Single row,
-/// id = `"default"`. Maps each app task (`embedding`, `llm`, `vision`) to a
-/// catalog `modelId` (or null). Kept apart from `app_model_provider_config`
+/// id = `"default"`. Maps each app task (`embedding`, `llm-synthesis`,
+/// `md-image-captioning`) to a catalog `modelId` (or null). Kept apart from
+/// `app_model_provider_config`
 /// because it is application wiring, not provider info; task definitions and
 /// their required capability live in code, not the DB.
 model AppModelTaskConfig {
     id String @id @default("default")
 
-    /// Task → catalog `modelId` (or null). Keys: `embedding`, `llm`, `vision`.
+    /// Task → catalog `modelId` (or null). Keys: `embedding`, `llm-synthesis`, `md-image-captioning`.
     tasks Json?
 
     @@map("app_model_task_config")
