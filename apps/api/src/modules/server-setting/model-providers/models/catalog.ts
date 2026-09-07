@@ -75,6 +75,13 @@ export const MODELS: readonly Model[] = [
     capabilities: { embedding: true },
     defaults: { embeddingDimensions: 768 },
   },
+  {
+    id: "embeddinggemma",
+    providerId: "ollama",
+    displayName: "embeddinggemma:latest",
+    capabilities: { embedding: true },
+    defaults: { embeddingDimensions: 768 },
+  },
 ] as const;
 
 export function getModelById(id: string): Model | null {
