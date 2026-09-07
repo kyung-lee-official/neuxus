@@ -57,9 +57,7 @@ export const ModelProvidersModel = {
 
   /** PUT /model-providers body: partial per-provider connections. */
   putBody: t.Object({
-    providerConnections: t.Optional(
-      t.Record(t.String(), t.Union([connectionSchema, t.Null()])),
-    ),
+    providerConnections: t.Optional(t.Record(t.String(), connectionSchema)),
   }),
 
   /** POST /model-providers/test/embed body: which catalog model to embed with. */

@@ -34,7 +34,7 @@ export const modelProviders = new Elysia({ prefix: "/model-providers" })
       ...modelProvidersDetail,
       summary: "Update provider connections",
       description:
-        "Partial update of `providerConnections`. Pass `null` for a connection to delete it. A task whose model's provider is no longer fully configured is auto-nulled (the task assignment row is updated in the same transaction).",
+        "Partial update of `providerConnections`. Pass an empty connection (`{ apiKey: null, baseUrl: null, port: null }`) to delete it. A task whose model's provider is no longer fully configured is auto-nulled (the task assignment row is updated in the same transaction).",
     },
   })
   .post("/test/embed", ({ body }) => ModelProviders.testEmbed(body), {
