@@ -7,6 +7,7 @@
  * saved connection parsed from the JSON (or `null` when absent).
  */
 
+import { Prisma } from "../../../generated/prisma/client.ts";
 import { getPrisma } from "../../../shared/db.ts";
 import { allModels } from "./models/catalog.ts";
 import type { CapabilityTag, Model } from "./types.ts";
@@ -78,6 +79,79 @@ export async function loadConfigByModelProviderId(
   }
   const map = row.providerConnections as Record<string, unknown>;
   return readConnection(map[providerId]);
+}
+
+function isConnectionEmpty(conn: ProviderConnection): boolean {
+  return (
+    (conn.apiKey ?? null) === null &&
+    (conn.baseUrl ?? null) === null &&
+    (conn.port ?? null) === null
+  );
+}
+
+function parseProviderConnections(
+  raw: unknown,
+): Record<string, ProviderConnection> {
+  if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const map: Record<string, ProviderConnection> = {};
+  for (const [providerId, value] of Object.entries(
+    raw as Record<string, unknown>,
+  )) {
+    const conn = readConnection(value);
+    if (!conn || isConnectionEmpty(conn)) continue;
+    map[providerId] = conn;
+  }
+  return map;
+}
+
+/** Every saved per-provider connection, keyed by `providerId`. */
+export async function loadProviderConnections(): Promise<
+  Record<string, ProviderConnection>
+> {
+  const row = await getPrisma().appModelProviderConfig.findUnique({
+    where: { id: CONFIG_ID },
+  });
+  return parseProviderConnections(row?.providerConnections);
+}
+
+/**
+ * Persist (partial) per-provider connections: `null` deletes an entry,
+ * empty entries are dropped, unspecified providers are kept. Writes only
+ * the `app_model_provider_config` row.
+ */
+export async function saveProviderConnections(
+  input: Record<string, ProviderConnection | null | undefined> | undefined,
+): Promise<Record<string, ProviderConnection>> {
+  const merged = await loadProviderConnections();
+  if (input) {
+    for (const [providerId, raw] of Object.entries(input)) {
+      if (raw == null) {
+        delete merged[providerId];
+      } else {
+        const conn: ProviderConnection = {
+          apiKey: raw.apiKey ?? null,
+          baseUrl: raw.baseUrl ?? null,
+          port: raw.port ?? null,
+        };
+        if (isConnectionEmpty(conn)) {
+          delete merged[providerId];
+        } else {
+          merged[providerId] = conn;
+        }
+      }
+    }
+  }
+  await getPrisma().appModelProviderConfig.upsert({
+    where: { id: CONFIG_ID },
+    create: {
+      id: CONFIG_ID,
+      providerConnections: merged as unknown as Prisma.InputJsonValue,
+    },
+    update: {
+      providerConnections: merged as unknown as Prisma.InputJsonValue,
+    },
+  });
+  return merged;
 }
 
 /**

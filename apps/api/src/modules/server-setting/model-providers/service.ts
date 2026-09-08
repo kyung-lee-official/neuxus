@@ -1,5 +1,6 @@
 import { status } from "elysia";
-import { loadModelConfig, saveModelConfig } from "../task-model-map/dal.ts";
+import { revalidateTaskAssignments } from "../task-model-map/dal.ts";
+import { loadProviderConnections, saveProviderConnections } from "./dal.ts";
 import { runTestChat, runTestEmbed } from "./diagnostics.ts";
 import type { ModelProvidersModel } from "./model.ts";
 import { allModels, PROVIDERS } from "./models/catalog.ts";
@@ -53,18 +54,19 @@ function providerResponse(config: {
 export abstract class ModelProviders {
   /** Read the saved per-provider connections plus the static catalog. */
   static async get(): Promise<ModelProvidersModel["response"]> {
-    const config = await loadModelConfig();
-    return providerResponse(config);
+    const providerConnections = await loadProviderConnections();
+    return providerResponse({ providerConnections });
   }
 
-  /** Update per-provider connections (partial). */
+  /** Update per-provider connections (partial); revalidate task assignments. */
   static async put(
     body: ModelProvidersModel["putBody"],
   ): Promise<ModelProvidersModel["response"]> {
-    const saved = await saveModelConfig({
-      providerConnections: readProviderConnections(body.providerConnections),
-    });
-    return providerResponse(saved);
+    const providerConnections = await saveProviderConnections(
+      readProviderConnections(body.providerConnections),
+    );
+    await revalidateTaskAssignments(providerConnections);
+    return providerResponse({ providerConnections });
   }
 
   /**
