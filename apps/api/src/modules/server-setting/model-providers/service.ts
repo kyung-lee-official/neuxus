@@ -3,7 +3,6 @@ import {
   loadModelConfig,
   saveModelConfig,
 } from "../../../shared/model-tasks/index.ts";
-import { MODELS, PROVIDERS } from "../../../shared/models/index.ts";
 import type {
   Model,
   Provider,
@@ -11,6 +10,8 @@ import type {
 } from "../../../shared/models/types.ts";
 import { runTestChat, runTestEmbed } from "./diagnostics.ts";
 import type { ModelProvidersModel } from "./model.ts";
+import { MODELS } from "./models/catalog.ts";
+import { PROVIDERS } from "./models/providers.ts";
 
 function readConnection(value: unknown): ProviderConnection | null {
   if (value == null || typeof value !== "object" || Array.isArray(value)) {
