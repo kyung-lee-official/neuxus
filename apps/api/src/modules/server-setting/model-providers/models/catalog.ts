@@ -17,7 +17,7 @@ import type { CapabilityTag, Model } from "../types.ts";
 
 export const MODELS: readonly Model[] = [
   {
-    id: "minimax-m3",
+    id: "MiniMax-M3",
     providerId: "minimax-default",
     displayName: "MiniMax-M3",
     capabilities: { llm: true, vision: true },
@@ -28,7 +28,7 @@ export const MODELS: readonly Model[] = [
     },
   },
   {
-    id: "minimax-m3-token-plan",
+    id: "MiniMax-M3",
     providerId: "minimax-token-plan",
     displayName: "MiniMax-M3 (Token Plan)",
     capabilities: { llm: true, vision: true },
