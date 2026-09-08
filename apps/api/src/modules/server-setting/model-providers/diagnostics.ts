@@ -13,7 +13,7 @@ import {
   textFromAnthropicResponse,
 } from "./adapters/anthropic-messages.ts";
 import { OllamaEmbeddingsClient } from "./adapters/ollama-embed.ts";
-import { loadConfigByModelProviderId } from "./config.ts";
+import { loadConfigByModelProviderId } from "./dal.ts";
 import { getModel } from "./models/catalog.ts";
 
 /** Uniquely identifies a catalog model: names are unique within a provider. */
