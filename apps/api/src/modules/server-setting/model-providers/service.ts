@@ -1,12 +1,9 @@
 import { status } from "elysia";
-import {
-  loadModelConfig,
-  saveModelConfig,
-} from "../../../shared/model-tasks/index.ts";
-import type { ProviderConnection } from "../../../shared/models/types.ts";
+import { loadModelConfig, saveModelConfig } from "../model-tasks/dal.ts";
 import { runTestChat, runTestEmbed } from "./diagnostics.ts";
 import type { ModelProvidersModel } from "./model.ts";
 import { allModels, PROVIDERS } from "./models/catalog.ts";
+import type { ProviderConnection } from "./types.ts";
 
 function readConnection(value: unknown): ProviderConnection | null {
   if (value == null || typeof value !== "object" || Array.isArray(value)) {
