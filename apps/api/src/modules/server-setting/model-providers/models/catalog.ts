@@ -84,8 +84,14 @@ export const MODELS: readonly Model[] = [
   },
 ] as const;
 
-export function getModelById(id: string): Model | null {
-  return MODELS.find((m) => m.id === id) ?? null;
+/**
+ * Find a catalog model by its unique (providerId, modelId) pair — model
+ * names are only unique *within* a provider.
+ */
+export function getModel(providerId: string, modelId: string): Model | null {
+  return (
+    MODELS.find((m) => m.providerId === providerId && m.id === modelId) ?? null
+  );
 }
 
 export function getModelsByCapability(tag: CapabilityTag): Model[] {
