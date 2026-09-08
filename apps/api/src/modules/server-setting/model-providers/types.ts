@@ -7,7 +7,17 @@
  * which app task — lives outside this registry (`shared/model-tasks`).
  */
 
-export type CapabilityTag = "embedding" | "llm" | "vision";
+import {
+  CAPABILITY_EMBEDDING,
+  CAPABILITY_TEXT,
+  CAPABILITY_VISION,
+} from "./dal.ts";
+
+/** Canonical capability tags — derived from the constants in `dal.ts`. */
+export type CapabilityTag =
+  | typeof CAPABILITY_EMBEDDING
+  | typeof CAPABILITY_TEXT
+  | typeof CAPABILITY_VISION;
 
 export type Capabilities = Partial<Record<CapabilityTag, true>>;
 

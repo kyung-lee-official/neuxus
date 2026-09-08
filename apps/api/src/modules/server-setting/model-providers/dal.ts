@@ -11,6 +11,11 @@ import { getPrisma } from "../../../shared/db.ts";
 import { allModels } from "./models/catalog.ts";
 import type { CapabilityTag, Model } from "./types.ts";
 
+/** Canonical capability tags — single source; use these, not literals. */
+export const CAPABILITY_EMBEDDING = "embedding";
+export const CAPABILITY_TEXT = "text";
+export const CAPABILITY_VISION = "vision";
+
 const CONFIG_ID = "default";
 
 export type ModelProviderConfigRow = {
