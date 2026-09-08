@@ -1,6 +1,13 @@
 import { type Static, t } from "elysia";
 
-const taskAssignmentSchema = t.Union([t.String(), t.Null()]);
+/** A selected catalog model: provider + model pair (or null = unassigned). */
+const taskAssignmentSchema = t.Union([
+  t.Object({
+    providerId: t.String(),
+    modelId: t.String(),
+  }),
+  t.Null(),
+]);
 
 const taskPointerSchema = t.Object({
   embedding: taskAssignmentSchema,
@@ -15,7 +22,7 @@ const taskPatchSchema = t.Object({
 });
 
 export const TaskModelMapModel = {
-  /** GET /task-model-map response: assigned catalog modelId per app task. */
+  /** GET /task-model-map response: assigned model (`{ providerId, modelId }`) per app task. */
   response: t.Object({
     tasks: taskPointerSchema,
   }),
