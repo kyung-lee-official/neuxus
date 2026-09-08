@@ -5,7 +5,7 @@
  * exercises the `text` capability. Each runs on an explicit catalog model
  * over its provider's saved connection (no task assignment). Task-scoped
  * diagnostics (embed search / synthesis / captioning of the *assigned*
- * models) live in the `model-tasks` admin module.
+ * models) live in the `task-model-map` admin module.
  */
 
 import {

@@ -4,7 +4,7 @@
  *
  * The catalog (`catalog.ts`) owns every supported model and provider.
  * Deployment wiring — saved per-provider connections and which model serves
- * which app task — lives outside this registry (`shared/model-tasks`).
+ * which app task — lives outside this registry (`shared/task-model-map`).
  */
 
 import {

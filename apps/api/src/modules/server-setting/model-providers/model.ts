@@ -45,7 +45,7 @@ export const ModelProvidersModel = {
   /**
    * GET /model-providers response: saved per-provider connections + the
    * static catalog. App task→model assignment is a separate resource
-   * (`/model-tasks`).
+   * (`/task-model-map`).
    */
   response: t.Object({
     config: t.Object({

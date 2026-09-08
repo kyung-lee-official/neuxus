@@ -12,7 +12,7 @@ const modelProvidersDetail = {
 /**
  * Provider model registry: saved per-provider connections + static catalog
  * + per-model diagnostics. Business-agnostic — app task→model assignment
- * is administered separately under `/model-tasks`.
+ * is administered separately under `/task-model-map`.
  */
 export const modelProviders = new Elysia({ prefix: "/model-providers" })
   .use(auth)
@@ -23,7 +23,7 @@ export const modelProviders = new Elysia({ prefix: "/model-providers" })
       ...modelProvidersDetail,
       summary: "Get model providers and their saved connections",
       description:
-        "Returns the persisted per-provider connection map (`providerConnections`, keyed by catalog `providerId`) plus the static catalog of providers and models. App task→model assignment lives under `/model-tasks`.",
+        "Returns the persisted per-provider connection map (`providerConnections`, keyed by catalog `providerId`) plus the static catalog of providers and models. App task→model assignment lives under `/task-model-map`.",
     },
   })
   .put("/", ({ body }) => ModelProviders.put(body), {

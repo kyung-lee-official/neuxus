@@ -1,5 +1,5 @@
 import { status } from "elysia";
-import { loadModelConfig, saveModelConfig } from "../model-tasks/dal.ts";
+import { loadModelConfig, saveModelConfig } from "../task-model-map/dal.ts";
 import { runTestChat, runTestEmbed } from "./diagnostics.ts";
 import type { ModelProvidersModel } from "./model.ts";
 import { allModels, PROVIDERS } from "./models/catalog.ts";
