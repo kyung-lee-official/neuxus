@@ -8,7 +8,7 @@
  * `synthesis ok` / `synthesis error` row format.
  */
 
-import { childLogger } from "../../log/index.ts";
+import { childLogger } from "../../../../shared/log/logger.ts";
 import {
   AnthropicMessagesClient,
   textFromAnthropicResponse,
