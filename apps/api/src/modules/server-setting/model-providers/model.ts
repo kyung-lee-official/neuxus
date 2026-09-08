@@ -62,6 +62,7 @@ export const ModelProvidersModel = {
 
   /** POST /model-providers/test/embed body: which catalog model to embed with. */
   embedBody: t.Object({
+    providerId: t.String(),
     modelId: t.String(),
   }),
 
@@ -75,6 +76,7 @@ export const ModelProvidersModel = {
 
   /** POST /model-providers/test/chat body: which catalog model to chat with. */
   chatBody: t.Object({
+    providerId: t.String(),
     modelId: t.String(),
   }),
 

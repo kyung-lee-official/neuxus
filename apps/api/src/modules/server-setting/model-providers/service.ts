@@ -85,6 +85,7 @@ export abstract class ModelProviders {
   ): Promise<ModelProvidersModel["embedResponse"]> {
     try {
       return await runTestEmbed("Why is the sky blue?", {
+        providerId: body.providerId,
         modelId: body.modelId,
       });
     } catch (err) {
@@ -102,7 +103,10 @@ export abstract class ModelProviders {
     body: ModelProvidersModel["chatBody"],
   ): Promise<ModelProvidersModel["chatResponse"]> {
     try {
-      return await runTestChat({ modelId: body.modelId });
+      return await runTestChat({
+        providerId: body.providerId,
+        modelId: body.modelId,
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       throw status(400, { error: msg });
