@@ -31,13 +31,13 @@ export type Provider = {
   headers?: Record<string, string>;
   /** Fields the admin UI must expose for this provider. */
   userInputs: UserInputField[];
+  /** Models this provider serves. The provider scopes model identity. */
+  models: Model[];
 };
 
 export type Model = {
-  /** Globally-unique model id used in the persisted config. */
+  /** Model id, unique *within its provider* (scoped by `Provider.id`). */
   id: string;
-  /** Foreign key into `PROVIDERS`. */
-  providerId: string;
   /** Human-readable name shown in the admin dropdown. */
   displayName: string;
   /** What this model can do. */
@@ -49,6 +49,11 @@ export type Model = {
     embeddingDimensions?: number;
     temperature?: number;
   };
+};
+
+/** Flat model view with its owning provider id attached (for APIs/consumers). */
+export type ProviderModel = Model & {
+  providerId: string;
 };
 
 /**

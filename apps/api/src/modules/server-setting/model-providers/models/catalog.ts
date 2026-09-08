@@ -1,99 +1,157 @@
 /**
- * Model catalog.
+ * Single source of truth for the model catalog: providers with their
+ * models nested underneath. Model identity is scoped by provider — the
+ * same model id may exist under different providers.
  *
- * Single source of truth for every supported model. The admin UI renders
- * the dropdown from `MODELS` (filtered by capability); the routing layer
- * (`routing.ts`) resolves a task's configured model id to a
- * `(Model, Provider)` pair via this catalog.
- *
- * To add a new model:
- *   1. Add a `Provider` entry in `providers.ts` if its wire format is new.
- *   2. Add a `Model` entry below.
- *   3. (Optionally) update the admin dropdown grouping in
- *      `server-settings-panel.tsx`.
+ * The admin UI renders the provider list from `PROVIDERS`; flat helpers
+ * (`allModels`, `getModel`, `getModelsByCapability`) feed consumers that
+ * need provider-independent views (APIs, diagnostics, dropdowns).
  */
 
-import type { CapabilityTag, Model } from "../types.ts";
+import type {
+  CapabilityTag,
+  Model,
+  Provider,
+  ProviderModel,
+} from "../types.ts";
 
-export const MODELS: readonly Model[] = [
+export const ANTHROPIC_VERSION = "2023-06-01";
+
+const anthropicHeaders = {
+  "anthropic-version": ANTHROPIC_VERSION,
+} as const;
+
+export const PROVIDERS: readonly Provider[] = [
   {
-    id: "MiniMax-M3",
-    providerId: "minimax-default",
-    displayName: "MiniMax-M3",
-    capabilities: { llm: true, vision: true },
-    defaults: {
-      contextWindowTokens: 1_000_000,
-      maxOutputTokens: 4096,
-      temperature: 1,
-    },
+    id: "minimax-default",
+    displayName: "Minimax",
+    baseUrl: "https://api.minimaxi.com/anthropic",
+    requestShape: "anthropic-messages",
+    headers: anthropicHeaders,
+    userInputs: ["apiKey"],
+    models: [
+      {
+        id: "MiniMax-M3",
+        displayName: "MiniMax-M3",
+        capabilities: { llm: true, vision: true },
+        defaults: {
+          contextWindowTokens: 1_000_000,
+          maxOutputTokens: 4096,
+          temperature: 1,
+        },
+      },
+    ],
   },
   {
-    id: "MiniMax-M3",
-    providerId: "minimax-token-plan",
-    displayName: "MiniMax-M3 (Token Plan)",
-    capabilities: { llm: true, vision: true },
-    defaults: {
-      contextWindowTokens: 1_000_000,
-      maxOutputTokens: 4096,
-      temperature: 1,
-    },
+    id: "minimax-token-plan",
+    displayName: "Minimax (Token Plan)",
+    baseUrl: "https://api.minimaxi.com/anthropic/v1/token-plan",
+    requestShape: "anthropic-messages",
+    headers: anthropicHeaders,
+    userInputs: ["apiKey"],
+    models: [
+      {
+        id: "MiniMax-M3",
+        displayName: "MiniMax-M3 (Token Plan)",
+        capabilities: { llm: true, vision: true },
+        defaults: {
+          contextWindowTokens: 1_000_000,
+          maxOutputTokens: 4096,
+          temperature: 1,
+        },
+      },
+    ],
   },
   {
-    id: "deepseek-v4-flash",
-    providerId: "deepseek",
-    displayName: "DeepSeek V4 Flash",
-    capabilities: { llm: true },
-    defaults: {
-      contextWindowTokens: 128_000,
-      maxOutputTokens: 8192,
-    },
+    id: "deepseek",
+    displayName: "DeepSeek",
+    baseUrl: "https://api.deepseek.com/anthropic",
+    requestShape: "anthropic-messages",
+    headers: anthropicHeaders,
+    userInputs: ["apiKey"],
+    models: [
+      {
+        id: "deepseek-v4-flash",
+        displayName: "DeepSeek V4 Flash",
+        capabilities: { llm: true },
+        defaults: {
+          contextWindowTokens: 128_000,
+          maxOutputTokens: 8192,
+        },
+      },
+      {
+        id: "deepseek-v4-pro",
+        displayName: "DeepSeek V4 Pro",
+        capabilities: { llm: true },
+        defaults: {
+          contextWindowTokens: 128_000,
+          maxOutputTokens: 8192,
+        },
+      },
+      {
+        id: "deepseek-v4-flash-vision-exp",
+        displayName: "DeepSeek V4 Flash Vision (Experimental)",
+        capabilities: { llm: true, vision: true },
+        defaults: {
+          contextWindowTokens: 128_000,
+          maxOutputTokens: 8192,
+        },
+      },
+    ],
   },
   {
-    id: "deepseek-v4-pro",
-    providerId: "deepseek",
-    displayName: "DeepSeek V4 Pro",
-    capabilities: { llm: true },
-    defaults: {
-      contextWindowTokens: 128_000,
-      maxOutputTokens: 8192,
-    },
-  },
-  {
-    id: "deepseek-v4-flash-vision-exp",
-    providerId: "deepseek",
-    displayName: "DeepSeek V4 Flash Vision (Experimental)",
-    capabilities: { llm: true, vision: true },
-    defaults: {
-      contextWindowTokens: 128_000,
-      maxOutputTokens: 8192,
-    },
-  },
-  {
-    id: "nomic-embed-text",
-    providerId: "ollama",
-    displayName: "nomic-embed-text:latest",
-    capabilities: { embedding: true },
-    defaults: { embeddingDimensions: 768 },
-  },
-  {
-    id: "embeddinggemma",
-    providerId: "ollama",
-    displayName: "embeddinggemma:latest",
-    capabilities: { embedding: true },
-    defaults: { embeddingDimensions: 768 },
+    id: "ollama",
+    displayName: "Ollama (local)",
+    baseUrl: "http://127.0.0.1:11434",
+    requestShape: "ollama-embed",
+    userInputs: ["baseUrl", "port"],
+    models: [
+      {
+        id: "nomic-embed-text",
+        displayName: "nomic-embed-text:latest",
+        capabilities: { embedding: true },
+        defaults: { embeddingDimensions: 768 },
+      },
+      {
+        id: "embeddinggemma",
+        displayName: "embeddinggemma:latest",
+        capabilities: { embedding: true },
+        defaults: { embeddingDimensions: 768 },
+      },
+    ],
   },
 ] as const;
 
-/**
- * Find a catalog model by its unique (providerId, modelId) pair — model
- * names are only unique *within* a provider.
- */
-export function getModel(providerId: string, modelId: string): Model | null {
-  return (
-    MODELS.find((m) => m.providerId === providerId && m.id === modelId) ?? null
-  );
+export function getProviderById(id: string): Provider | null {
+  return PROVIDERS.find((p) => p.id === id) ?? null;
 }
 
-export function getModelsByCapability(tag: CapabilityTag): Model[] {
-  return MODELS.filter((m) => m.capabilities[tag] === true);
+/** Flat list of every model, with its owning `providerId` attached. */
+export function allModels(): ProviderModel[] {
+  const out: ProviderModel[] = [];
+  for (const provider of PROVIDERS) {
+    for (const model of provider.models) {
+      out.push({ ...model, providerId: provider.id });
+    }
+  }
+  return out;
+}
+
+/**
+ * Find a model by its unique `(providerId, modelId)` pair — model ids are
+ * only unique *within* a provider.
+ */
+export function getModel(providerId: string, modelId: string): Model | null {
+  const provider = getProviderById(providerId);
+  if (!provider) return null;
+  return provider.models.find((m) => m.id === modelId) ?? null;
+}
+
+/** Flat models that declare **all** the given capability tags. */
+export function getModelsByCapability(
+  tags: readonly CapabilityTag[],
+): ProviderModel[] {
+  return allModels().filter((model) =>
+    tags.every((tag) => model.capabilities[tag] === true),
+  );
 }

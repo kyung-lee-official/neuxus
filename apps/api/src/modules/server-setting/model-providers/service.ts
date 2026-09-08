@@ -3,15 +3,10 @@ import {
   loadModelConfig,
   saveModelConfig,
 } from "../../../shared/model-tasks/index.ts";
-import type {
-  Model,
-  Provider,
-  ProviderConnection,
-} from "../../../shared/models/types.ts";
+import type { ProviderConnection } from "../../../shared/models/types.ts";
 import { runTestChat, runTestEmbed } from "./diagnostics.ts";
 import type { ModelProvidersModel } from "./model.ts";
-import { MODELS } from "./models/catalog.ts";
-import { PROVIDERS } from "./models/providers.ts";
+import { allModels, PROVIDERS } from "./models/catalog.ts";
 
 function readConnection(value: unknown): ProviderConnection | null {
   if (value == null || typeof value !== "object" || Array.isArray(value)) {
@@ -53,8 +48,8 @@ function providerResponse(config: {
 }): ModelProvidersModel["response"] {
   return {
     config: { providerConnections: config.providerConnections },
-    providers: [...PROVIDERS] as Provider[],
-    models: [...MODELS] as Model[],
+    providers: [...PROVIDERS],
+    models: allModels(),
   };
 }
 

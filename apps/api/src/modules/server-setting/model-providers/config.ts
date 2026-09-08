@@ -8,7 +8,7 @@
  */
 
 import { getPrisma } from "../../../shared/db.ts";
-import { MODELS } from "./models/catalog.ts";
+import { allModels } from "./models/catalog.ts";
 import type { CapabilityTag, Model } from "./types.ts";
 
 const CONFIG_ID = "default";
@@ -82,7 +82,7 @@ export async function loadConfigByModelProviderId(
 export function resolveCapabilityModel(
   tags: readonly CapabilityTag[],
 ): Model[] {
-  return MODELS.filter((model) =>
+  return allModels().filter((model) =>
     tags.every((tag) => model.capabilities[tag] === true),
   );
 }

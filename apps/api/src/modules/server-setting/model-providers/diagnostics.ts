@@ -53,10 +53,10 @@ export async function runTestEmbed(
       `Model ${target.providerId}/${target.modelId} does not support the embedding capability`,
     );
   }
-  const connection = await loadConfigByModelProviderId(model.providerId);
+  const connection = await loadConfigByModelProviderId(target.providerId);
   if (!connection) {
     throw new Error(
-      `No saved connection for provider ${model.providerId}. Save one under Server settings → Providers first.`,
+      `No saved connection for provider ${target.providerId}. Save one under Server settings → Providers first.`,
     );
   }
   const client = new OllamaEmbeddingsClient({
@@ -100,16 +100,16 @@ export async function runTestChat(
       `Model ${target.providerId}/${target.modelId} does not support the llm capability`,
     );
   }
-  const connection = await loadConfigByModelProviderId(model.providerId);
+  const connection = await loadConfigByModelProviderId(target.providerId);
   if (!connection) {
     throw new Error(
-      `No saved connection for provider ${model.providerId}. Save one under Server settings → Providers first.`,
+      `No saved connection for provider ${target.providerId}. Save one under Server settings → Providers first.`,
     );
   }
   const apiKey = connection.apiKey;
   if (!apiKey) {
     throw new Error(
-      `No API key saved for provider ${model.providerId}. Save one under Server settings → Providers first.`,
+      `No API key saved for provider ${target.providerId}. Save one under Server settings → Providers first.`,
     );
   }
   const client = new AnthropicMessagesClient({
