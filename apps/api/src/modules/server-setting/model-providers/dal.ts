@@ -1,6 +1,6 @@
 /**
- * Direct access to the `app_model_provider_config` singleton row for the
- * model-provider business.
+ * DAL for the model-providers business: direct access to the
+ * `app_model_provider_config` singleton row.
  *
  * Without a provider id: returns the whole row (id `"default"` + raw
  * `providerConnections`). With a provider id: returns that provider's
