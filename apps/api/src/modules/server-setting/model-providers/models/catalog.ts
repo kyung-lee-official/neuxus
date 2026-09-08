@@ -12,6 +12,7 @@ import type {
   CapabilityTag,
   Model,
   Provider,
+  ProviderConnection,
   ProviderModel,
 } from "../types.ts";
 
@@ -154,4 +155,21 @@ export function getModelsByCapability(
   return allModels().filter((model) =>
     tags.every((tag) => model.capabilities[tag] === true),
   );
+}
+
+/** Whether `conn` fills every field the provider declares in `userInputs`. */
+export function isFullyConfigured(
+  conn: ProviderConnection,
+  providerId: string,
+): { ok: true } | { ok: false; missing: string } {
+  const provider = getProviderById(providerId);
+  if (!provider) return { ok: false, missing: "catalog" };
+  for (const field of provider.userInputs) {
+    if (field === "apiKey" && !conn.apiKey)
+      return { ok: false, missing: "apiKey" };
+    if (field === "baseUrl" && !conn.baseUrl)
+      return { ok: false, missing: "baseUrl" };
+    if (field === "port" && !conn.port) return { ok: false, missing: "port" };
+  }
+  return { ok: true };
 }
