@@ -1,7 +1,4 @@
-import {
-  loadModelConfig,
-  saveModelConfig,
-} from "../../../shared/model-tasks/index.ts";
+import { loadModelConfig, saveModelConfig } from "./dal.ts";
 import type { ModelTasksModel } from "./model.ts";
 
 export abstract class ModelTasks {
