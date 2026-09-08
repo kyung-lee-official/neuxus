@@ -13,11 +13,14 @@ import {
   textFromAnthropicResponse,
 } from "./adapters/anthropic-messages.ts";
 import { OllamaEmbeddingsClient } from "./adapters/ollama-embed.ts";
-import {
-  loadConfigByModelProviderId,
-  resolveCapabilityModel,
-} from "./config.ts";
-import { getModelById } from "./models/catalog.ts";
+import { loadConfigByModelProviderId } from "./config.ts";
+import { getModel } from "./models/catalog.ts";
+
+/** Uniquely identifies a catalog model: names are unique within a provider. */
+export type ModelTarget = {
+  providerId: string;
+  modelId: string;
+};
 
 export type RunTestEmbedResult = {
   embedding: number[];
@@ -26,61 +29,52 @@ export type RunTestEmbedResult = {
   inputText: string;
 };
 
-export type RunTestEmbedOptions = {
-  /** Catalog model id to embed with (must declare the `embedding` capability). */
-  modelId: string;
-};
-
 /**
  * Run the chosen model's embedder on a single string and return the raw
- * vector (no cosine search). Resolution goes through
- * `resolveModelByModelId`, so it tests exactly the clicked model over its
- * provider's saved connection — no embedding-task assignment is required.
+ * vector (no cosine search). Looks the model up by its
+ * `(providerId, modelId)` pair, checks the `embedding` capability, and
+ * calls the Ollama adapter over the provider's saved connection — no
+ * embedding-task assignment is required.
  */
 export async function runTestEmbed(
   text: string,
-  options: RunTestEmbedOptions,
+  target: ModelTarget,
 ): Promise<RunTestEmbedResult> {
   const trimmed = text.trim();
   if (trimmed === "") {
     throw new Error("text is required");
   }
-  const model = getModelById(options.modelId);
+  const model = getModel(target.providerId, target.modelId);
   if (!model) {
-    throw new Error(`Unknown model id: ${options.modelId}`);
+    throw new Error(`Unknown model: ${target.providerId}/${target.modelId}`);
+  }
+  if (model.capabilities.embedding !== true) {
+    throw new Error(
+      `Model ${target.providerId}/${target.modelId} does not support the embedding capability`,
+    );
   }
   const connection = await loadConfigByModelProviderId(model.providerId);
-  const resolved = resolveCapabilityModel(
-    options.modelId,
-    "embedding",
-    connection ? { [model.providerId]: connection } : {},
-  );
-  if (resolved.provider.requestShape !== "ollama-embed") {
+  if (!connection) {
     throw new Error(
-      `Embed capability is not implemented for requestShape: ${resolved.provider.requestShape}`,
+      `No saved connection for provider ${model.providerId}. Save one under Server settings → Providers first.`,
     );
   }
   const client = new OllamaEmbeddingsClient({
-    baseUrl: resolved.connection.baseUrl,
-    apiKey: resolved.connection.apiKey,
+    baseUrl: connection.baseUrl ?? "",
+    apiKey: connection.apiKey,
   });
-  const vectors = await client.embed(resolved.model.id, [trimmed]);
+  const vectors = await client.embed(model.id, [trimmed]);
   const embedding = vectors[0];
   if (!embedding) {
     throw new Error("Embedder returned no vector");
   }
   return {
     embedding,
-    modelId: resolved.model.id,
+    modelId: model.id,
     dim: embedding.length,
     inputText: trimmed,
   };
 }
-
-export type RunTestChatOptions = {
-  /** Catalog model id to chat with (must declare the `llm` capability). */
-  modelId: string;
-};
 
 export type RunTestChatResult = {
   modelId: string;
@@ -89,43 +83,43 @@ export type RunTestChatResult = {
 
 /**
  * Run a one-shot chat call on the chosen model over its provider's saved
- * connection, sending the vendor's official sample request. Resolution
- * goes through `resolveCapabilityModel` (same validation as
- * `runTestEmbed`), so it tests exactly the clicked model — no llm task
- * assignment is required.
+ * connection, sending the vendor's official sample request. Looks the model
+ * up by its `(providerId, modelId)` pair, checks the `llm` capability, and
+ * calls the Anthropic-compatible adapter over the saved connection — no llm
+ * task assignment is required.
  */
 export async function runTestChat(
-  options: RunTestChatOptions,
+  target: ModelTarget,
 ): Promise<RunTestChatResult> {
-  const model = getModelById(options.modelId);
+  const model = getModel(target.providerId, target.modelId);
   if (!model) {
-    throw new Error(`Unknown model id: ${options.modelId}`);
+    throw new Error(`Unknown model: ${target.providerId}/${target.modelId}`);
   }
-  const connection = await loadConfigByModelProviderId(model.providerId);
-  const resolved = resolveCapabilityModel(
-    options.modelId,
-    "llm",
-    connection ? { [model.providerId]: connection } : {},
-  );
-  if (resolved.provider.requestShape !== "anthropic-messages") {
+  if (model.capabilities.llm !== true) {
     throw new Error(
-      `LLM chat is not implemented for requestShape: ${resolved.provider.requestShape}`,
+      `Model ${target.providerId}/${target.modelId} does not support the llm capability`,
     );
   }
-  const apiKey = resolved.connection.apiKey;
+  const connection = await loadConfigByModelProviderId(model.providerId);
+  if (!connection) {
+    throw new Error(
+      `No saved connection for provider ${model.providerId}. Save one under Server settings → Providers first.`,
+    );
+  }
+  const apiKey = connection.apiKey;
   if (!apiKey) {
     throw new Error(
-      `No API key saved for provider ${resolved.provider.id}. Save one under Server settings → Providers first.`,
+      `No API key saved for provider ${model.providerId}. Save one under Server settings → Providers first.`,
     );
   }
   const client = new AnthropicMessagesClient({
-    baseUrl: resolved.connection.baseUrl,
+    baseUrl: connection.baseUrl ?? "",
     apiKey,
   });
   const json = await client.sendMessage({
-    model: resolved.model.id,
-    max_tokens: resolved.model.defaults.maxOutputTokens ?? 4096,
-    temperature: resolved.model.defaults.temperature ?? 1,
+    model: model.id,
+    max_tokens: model.defaults.maxOutputTokens ?? 4096,
+    temperature: model.defaults.temperature ?? 1,
     system: "You are a helpful assistant.",
     messages: [
       {
@@ -138,5 +132,5 @@ export async function runTestChat(
   if (!response) {
     throw new Error(`${model.displayName} returned empty content`);
   }
-  return { modelId: resolved.model.id, response };
+  return { modelId: model.id, response };
 }
