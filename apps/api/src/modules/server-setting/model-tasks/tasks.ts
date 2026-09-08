@@ -7,13 +7,20 @@
  * (task → catalog `modelId`) are persisted in `app_model_task_config`,
  * apart from `app_model_provider_config` (raw provider connections).
  *
- * The model registry (`shared/models`) knows only capabilities; it never
- * sees these task ids.
+ * The model registry knows only capabilities; it never sees these task ids.
  */
 
 import type { CapabilityTag } from "../model-providers/types";
 
-export type ModelTaskId = "embedding" | "llm-synthesis" | "md-image-captioning";
+/** Single source of truth: every task with the capability it requires. */
+export const MODEL_TASKS = [
+  { id: "embedding", requiredCapability: "embedding" },
+  { id: "llm-synthesis", requiredCapability: "llm" },
+  { id: "md-image-captioning", requiredCapability: "vision" },
+] as const;
+
+/** Task id, derived from `MODEL_TASKS` (no separate literal list). */
+export type ModelTaskId = (typeof MODEL_TASKS)[number]["id"];
 
 export type ModelTask = {
   id: ModelTaskId;
@@ -21,22 +28,14 @@ export type ModelTask = {
   requiredCapability: CapabilityTag;
 };
 
-export const MODEL_TASK_IDS: readonly ModelTaskId[] = [
-  "embedding",
-  "llm-synthesis",
-  "md-image-captioning",
-] as const;
-
-export const MODEL_TASKS: readonly ModelTask[] = [
-  { id: "embedding", requiredCapability: "embedding" },
-  { id: "llm-synthesis", requiredCapability: "llm" },
-  { id: "md-image-captioning", requiredCapability: "vision" },
-];
+/** Id list, derived from `MODEL_TASKS` — not a second definition. */
+export const MODEL_TASK_IDS: readonly ModelTaskId[] = MODEL_TASKS.map(
+  (task) => task.id,
+);
 
 /** The capability a model must declare to serve `taskId`. */
 export function requiredCapabilityByTask(taskId: ModelTaskId): CapabilityTag {
-  const task = MODEL_TASKS.find((t) => t.id === taskId);
-  return task?.requiredCapability ?? "llm";
+  return MODEL_TASKS.find((task) => task.id === taskId)!.requiredCapability;
 }
 
 /** Narrow a runtime value to a known task id (e.g. parsed JSON keys). */
