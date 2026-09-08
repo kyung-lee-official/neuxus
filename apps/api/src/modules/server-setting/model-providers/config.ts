@@ -8,14 +8,8 @@
  */
 
 import { getPrisma } from "../../../shared/db.ts";
-import { getModelById } from "../../../shared/models/catalog.ts";
-import { isFullyConfigured } from "../../../shared/models/config.ts";
-import { resolveConnection } from "../../../shared/models/connection.ts";
-import { getProviderById } from "../../../shared/models/providers.ts";
-import type {
-  CapabilityTag,
-  ResolvedModel,
-} from "../../../shared/models/types.ts";
+import { MODELS } from "./models/catalog.ts";
+import type { CapabilityTag, Model } from "./types.ts";
 
 const CONFIG_ID = "default";
 
@@ -82,43 +76,13 @@ export async function loadConfigByModelProviderId(
 }
 
 /**
- * Shared resolution core: check `modelId` exists, is catalogued under a
- * known provider, declares the `capability`, and the provider has a
- * fully-configured saved connection. Returns the `(Model, Provider,
- * ResolvedConnection)` triple.
+ * Catalog models that declare **all** the given capability tags. Pure
+ * registry query — no provider connections or config involved.
  */
 export function resolveCapabilityModel(
-  modelId: string,
-  capability: CapabilityTag,
-  connections: Record<string, ProviderConnection>,
-): ResolvedModel {
-  const model = getModelById(modelId);
-  if (!model) {
-    throw new Error(`Unknown model id: ${modelId}`);
-  }
-  const provider = getProviderById(model.providerId);
-  if (!provider) {
-    throw new Error(
-      `Unknown provider id: ${model.providerId} (referenced by ${modelId})`,
-    );
-  }
-  if (model.capabilities[capability] !== true) {
-    throw new Error(
-      `Model ${modelId} does not support ${capability} capability`,
-    );
-  }
-  const rawConnection = connections[provider.id];
-  if (!rawConnection) {
-    throw new Error(
-      `Model ${modelId} provider ${provider.id} has no saved connection. Save one under Server settings → Providers first.`,
-    );
-  }
-  const check = isFullyConfigured(rawConnection, provider.id);
-  if (!check.ok) {
-    throw new Error(
-      `Model ${modelId} provider ${provider.id} is missing ${check.missing}. Finish configuration under Server settings → Providers first.`,
-    );
-  }
-  const connection = resolveConnection(provider, rawConnection);
-  return { task: capability, connection, model, provider };
+  tags: readonly CapabilityTag[],
+): Model[] {
+  return MODELS.filter((model) =>
+    tags.every((tag) => model.capabilities[tag] === true),
+  );
 }
