@@ -56,6 +56,6 @@ export const modelProviders = new Elysia({ prefix: "/model-providers" })
       ...modelProvidersDetail,
       summary: "Run a one-shot chat with a specific model",
       description:
-        "Sends the vendor's official sample chat request via the catalog model in `body.modelId` (under provider `body.providerId`) over that provider's saved connection, and returns the model's reply plus model id. Used by the per-model \"Test chat\" button on the providers page. Does not require an llm task to be assigned.",
+        "Sends the vendor's official sample chat request via the catalog model in `body.modelId` (under provider `body.providerId`) over that provider's saved connection, and returns the model's reply plus model id. Used by the per-model \"Test chat\" button on the providers page. Does not require an text task to be assigned.",
     },
   });

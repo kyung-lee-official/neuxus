@@ -90,7 +90,7 @@ export abstract class ModelProviders {
   /**
    * Run a one-shot chat call on the clicked catalog model (sends the
    * vendor's official sample request) over its provider's saved
-   * connection. Tests the model itself — no llm task assignment required.
+   * connection. Tests the model itself — no text task assignment required.
    */
   static async testChat(
     body: ModelProvidersModel["chatBody"],

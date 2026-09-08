@@ -30,7 +30,7 @@ const modelSchema = t.Object({
   displayName: t.String(),
   capabilities: t.Object({
     embedding: t.Optional(t.Literal(true)),
-    llm: t.Optional(t.Literal(true)),
+    text: t.Optional(t.Literal(true)),
     vision: t.Optional(t.Literal(true)),
   }),
   defaults: t.Object({

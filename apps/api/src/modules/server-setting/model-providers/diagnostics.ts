@@ -2,7 +2,7 @@
  * Per-model capability diagnostics for the providers page.
  *
  * `runTestEmbed` exercises the `embedding` capability; `runTestChat`
- * exercises the `llm` capability. Each runs on an explicit catalog model
+ * exercises the `text` capability. Each runs on an explicit catalog model
  * over its provider's saved connection (no task assignment). Task-scoped
  * diagnostics (embed search / synthesis / captioning of the *assigned*
  * models) live in the `model-tasks` admin module.
@@ -84,8 +84,8 @@ export type RunTestChatResult = {
 /**
  * Run a one-shot chat call on the chosen model over its provider's saved
  * connection, sending the vendor's official sample request. Looks the model
- * up by its `(providerId, modelId)` pair, checks the `llm` capability, and
- * calls the Anthropic-compatible adapter over the saved connection — no llm
+ * up by its `(providerId, modelId)` pair, checks the `text` capability, and
+ * calls the Anthropic-compatible adapter over the saved connection — no text
  * task assignment is required.
  */
 export async function runTestChat(
@@ -95,9 +95,9 @@ export async function runTestChat(
   if (!model) {
     throw new Error(`Unknown model: ${target.providerId}/${target.modelId}`);
   }
-  if (model.capabilities.llm !== true) {
+  if (model.capabilities.text !== true) {
     throw new Error(
-      `Model ${target.providerId}/${target.modelId} does not support the llm capability`,
+      `Model ${target.providerId}/${target.modelId} does not support the text capability`,
     );
   }
   const connection = await loadConfigByModelProviderId(target.providerId);

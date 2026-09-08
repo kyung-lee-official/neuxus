@@ -34,7 +34,7 @@ export const PROVIDERS: readonly Provider[] = [
       {
         id: "MiniMax-M3",
         displayName: "MiniMax-M3",
-        capabilities: { llm: true, vision: true },
+        capabilities: { text: true, vision: true },
         defaults: {
           contextWindowTokens: 1_000_000,
           maxOutputTokens: 4096,
@@ -54,7 +54,7 @@ export const PROVIDERS: readonly Provider[] = [
       {
         id: "MiniMax-M3",
         displayName: "MiniMax-M3 (Token Plan)",
-        capabilities: { llm: true, vision: true },
+        capabilities: { text: true, vision: true },
         defaults: {
           contextWindowTokens: 1_000_000,
           maxOutputTokens: 4096,
@@ -74,7 +74,7 @@ export const PROVIDERS: readonly Provider[] = [
       {
         id: "deepseek-v4-flash",
         displayName: "DeepSeek V4 Flash",
-        capabilities: { llm: true },
+        capabilities: { text: true },
         defaults: {
           contextWindowTokens: 128_000,
           maxOutputTokens: 8192,
@@ -83,7 +83,7 @@ export const PROVIDERS: readonly Provider[] = [
       {
         id: "deepseek-v4-pro",
         displayName: "DeepSeek V4 Pro",
-        capabilities: { llm: true },
+        capabilities: { text: true },
         defaults: {
           contextWindowTokens: 128_000,
           maxOutputTokens: 8192,
@@ -92,7 +92,7 @@ export const PROVIDERS: readonly Provider[] = [
       {
         id: "deepseek-v4-flash-vision-exp",
         displayName: "DeepSeek V4 Flash Vision (Experimental)",
-        capabilities: { llm: true, vision: true },
+        capabilities: { text: true, vision: true },
         defaults: {
           contextWindowTokens: 128_000,
           maxOutputTokens: 8192,
