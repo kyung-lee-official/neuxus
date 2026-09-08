@@ -9,7 +9,7 @@
 
 import { Prisma } from "../../../generated/prisma/client.ts";
 import { getPrisma } from "../../../shared/db.ts";
-import { allModels } from "./models/catalog.ts";
+import { allModels } from "./catalog.ts";
 import type { CapabilityTag, Model } from "./types.ts";
 
 /** Canonical capability tags — single source; use these, not literals. */

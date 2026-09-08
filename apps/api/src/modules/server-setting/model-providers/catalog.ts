@@ -14,7 +14,7 @@ import type {
   Provider,
   ProviderConnection,
   ProviderModel,
-} from "../types.ts";
+} from "./types.ts";
 
 export const ANTHROPIC_VERSION = "2023-06-01";
 

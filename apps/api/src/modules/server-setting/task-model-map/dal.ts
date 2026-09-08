@@ -8,6 +8,7 @@
 
 import { Prisma } from "../../../generated/prisma/client.ts";
 import { getPrisma } from "../../../shared/db.ts";
+import { getModel, isFullyConfigured } from "../model-providers/catalog.ts";
 import {
   CAPABILITY_EMBEDDING,
   CAPABILITY_TEXT,
@@ -15,10 +16,6 @@ import {
   loadProviderConnections,
   type ProviderConnection,
 } from "../model-providers/dal.ts";
-import {
-  getModel,
-  isFullyConfigured,
-} from "../model-providers/models/catalog.ts";
 import type { CapabilityTag } from "../model-providers/types.ts";
 import type { ModelTaskId } from "./type.ts";
 

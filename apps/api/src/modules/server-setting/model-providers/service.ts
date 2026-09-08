@@ -1,9 +1,9 @@
 import { status } from "elysia";
 import { revalidateTaskAssignments } from "../task-model-map/dal.ts";
+import { allModels, PROVIDERS } from "./catalog.ts";
 import { loadProviderConnections, saveProviderConnections } from "./dal.ts";
 import { runTestChat, runTestEmbed } from "./diagnostics.ts";
 import type { ModelProvidersModel } from "./model.ts";
-import { allModels, PROVIDERS } from "./models/catalog.ts";
 import type { ProviderConnection } from "./types.ts";
 
 function readConnection(value: unknown): ProviderConnection | null {
