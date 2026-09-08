@@ -1,9 +1,9 @@
 import { loadModelConfig, saveModelConfig } from "./dal.ts";
-import type { ModelTasksModel } from "./model.ts";
+import type { TaskModelMapModel } from "./model.ts";
 
-export abstract class ModelTasks {
+export abstract class TaskModelMap {
   /** Read which catalog model is assigned to each app task. */
-  static async get(): Promise<ModelTasksModel["response"]> {
+  static async get(): Promise<TaskModelMapModel["response"]> {
     const config = await loadModelConfig();
     return { tasks: config.tasks };
   }
@@ -14,8 +14,8 @@ export abstract class ModelTasks {
    * auto-nulled before write.
    */
   static async put(
-    body: ModelTasksModel["putBody"],
-  ): Promise<ModelTasksModel["response"]> {
+    body: TaskModelMapModel["putBody"],
+  ): Promise<TaskModelMapModel["response"]> {
     const saved = await saveModelConfig({ tasks: body.tasks });
     return { tasks: saved.tasks };
   }

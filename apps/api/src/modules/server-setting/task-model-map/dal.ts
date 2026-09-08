@@ -1,5 +1,6 @@
 /**
- * DAL for the model-tasks business: reads/writes the singleton config rows.
+ * DAL for the task-model-map business: reads/writes the singleton config rows
+ * and owns the task definitions (ids + required capabilities).
  *
  *   - `app_model_provider_config.providerConnections` — raw per-provider
  *     connection overrides.
@@ -7,20 +8,66 @@
  *     task. Keys are `ModelTaskId`s.
  *
  * Both rows are keyed `"default"` and are updated together in one
- * transaction. (Task id definitions still live in
- * `shared/model-tasks/tasks.ts` until they are moved into this module.)
+ * transaction.
  */
 
 import { Prisma } from "../../../generated/prisma/client.ts";
 import { getPrisma } from "../../../shared/db.ts";
 import {
-  isModelTaskId,
-  MODEL_TASK_IDS,
-  type ModelTaskId,
-} from "../../../shared/model-tasks/tasks.ts";
-import type { ProviderConnection } from "../../../shared/models/types.ts";
+  CAPABILITY_EMBEDDING,
+  CAPABILITY_TEXT,
+  CAPABILITY_VISION,
+} from "../model-providers/dal.ts";
+import {
+  getProviderById,
+  isFullyConfigured,
+} from "../model-providers/models/catalog.ts";
+import type {
+  CapabilityTag,
+  ProviderConnection,
+} from "../model-providers/types.ts";
+import type { ModelTaskId } from "./type.ts";
 
 const CONFIG_ID = "default";
+
+/** Canonical task ids — single source of truth. */
+export const TASK_EMBEDDING = "embedding";
+export const TASK_TEXT_SYNTHESIS = "text-synthesis";
+export const TASK_MD_IMAGE_CAPTIONING = "md-image-captioning";
+
+/** Task definitions: id + the capabilities it requires. */
+export const MODEL_TASKS = [
+  { id: TASK_EMBEDDING, requiredCapabilities: [CAPABILITY_EMBEDDING] },
+  { id: TASK_TEXT_SYNTHESIS, requiredCapabilities: [CAPABILITY_TEXT] },
+  {
+    id: TASK_MD_IMAGE_CAPTIONING,
+    // Describing images is generation over image input: text + vision.
+    requiredCapabilities: [CAPABILITY_TEXT, CAPABILITY_VISION],
+  },
+] as const;
+
+/** Id list, derived from `MODEL_TASKS` — not a second definition. */
+export const MODEL_TASK_IDS = [
+  TASK_EMBEDDING,
+  TASK_TEXT_SYNTHESIS,
+  TASK_MD_IMAGE_CAPTIONING,
+] as const;
+
+/** Capabilities a model must declare to serve `taskId`. */
+export function requiredCapabilitiesByTask(
+  taskId: ModelTaskId,
+): readonly CapabilityTag[] {
+  const task = MODEL_TASKS.find((t) => t.id === taskId);
+  if (!task) {
+    throw new Error(`Unknown task id: ${taskId}`);
+  }
+  return task.requiredCapabilities;
+}
+
+/** Narrow a runtime value to a known task id (e.g. parsed JSON keys). */
+export function isModelTaskId(value: unknown): value is ModelTaskId {
+  return MODEL_TASK_IDS.some((id) => id === value);
+}
 
 export type TaskAssignments = Record<ModelTaskId, string | null>;
 
@@ -166,25 +213,25 @@ export async function saveModelConfig(
   for (const taskId of MODEL_TASK_IDS) {
     const modelId = mergedTasks[taskId];
     if (modelId == null) continue;
-    // const model = getModelById(modelId);
-    // if (!model) {
-    //   mergedTasks[taskId] = null;
-    //   continue;
-    // }
-    // const required = requiredCapabilityByTask(taskId);
-    // if (model.capabilities[required] !== true) {
-    //   mergedTasks[taskId] = null;
-    //   continue;
-    // }
-    // const provider = getProviderById(model.providerId);
-    // if (!provider) {
-    //   mergedTasks[taskId] = null;
-    //   continue;
-    // }
-    // const conn = mergedConns[provider.id];
-    // if (!conn || !isFullyConfigured(conn, provider.id).ok) {
-    //   mergedTasks[taskId] = null;
-    // }
+    const model = getModelById(modelId);
+    if (!model) {
+      mergedTasks[taskId] = null;
+      continue;
+    }
+    const required = requiredCapabilitiesByTask(taskId);
+    if (!required.every((cap) => model.capabilities[cap] === true)) {
+      mergedTasks[taskId] = null;
+      continue;
+    }
+    const provider = getProviderById(model.providerId);
+    if (!provider) {
+      mergedTasks[taskId] = null;
+      continue;
+    }
+    const conn = mergedConns[provider.id];
+    if (!conn || !isFullyConfigured(conn, provider.id).ok) {
+      mergedTasks[taskId] = null;
+    }
   }
 
   const prisma = getPrisma();
