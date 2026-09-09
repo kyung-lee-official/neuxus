@@ -4,20 +4,7 @@
  * `providers/<providerId>.ts`.
  */
 
-import {
-  CAPABILITY_EMBEDDING,
-  CAPABILITY_TEXT,
-  CAPABILITY_VISION,
-} from "./dal.ts";
-import type { Model, Provider } from "./providers/types.ts";
-
-/** Canonical capability tags — derived from the constants in `dal.ts`. */
-export type CapabilityTag =
-  | typeof CAPABILITY_EMBEDDING
-  | typeof CAPABILITY_TEXT
-  | typeof CAPABILITY_VISION;
-
-export type Capabilities = Partial<Record<CapabilityTag, true>>;
+import type { CapabilityTag, Model, Provider } from "./providers/types.ts";
 
 /** Flat model view with its owning provider id attached (for APIs/consumers). */
 export type ProviderModel = Model & {

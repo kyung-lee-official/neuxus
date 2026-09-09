@@ -4,7 +4,7 @@
  * validation; this module composes them and offers flat lookups.
  */
 
-import type { CapabilityTag, ProviderModel } from "../types.ts";
+import type { ProviderModel } from "../types.ts";
 import { type DeepSeekConnection, provider as deepseek } from "./deepseek.ts";
 import {
   type MinimaxDefaultConnection,
@@ -15,7 +15,7 @@ import {
   provider as minimaxTokenPlan,
 } from "./minimax-token-plan.ts";
 import { type OllamaConnection, provider as ollama } from "./ollama.ts";
-import type { Model } from "./types.ts";
+import type { CapabilityTag, Model } from "./types.ts";
 
 /** Any concrete provider singleton — exposes `validateConnection`. */
 export type AnyProvider =

@@ -3,8 +3,6 @@
  * `Model` (models are scoped within their provider).
  */
 
-import type { CapabilityTag } from "../types.ts";
-
 /** Canonical provider ids — single source; import these, don't use literals. */
 export const PROVIDER_MINIMAX_DEFAULT = "minimax-default";
 export const PROVIDER_MINIMAX_TOKEN_PLAN = "minimax-token-plan";
@@ -17,13 +15,25 @@ export type ProviderId =
   | typeof PROVIDER_DEEPSEEK
   | typeof PROVIDER_OLLAMA;
 
+/** Canonical capability tags — single source; use these, not literals. */
+export const CAPABILITY_EMBEDDING = "embedding";
+export const CAPABILITY_TEXT = "text";
+export const CAPABILITY_VISION = "vision";
+
+export type CapabilityTag =
+  | typeof CAPABILITY_EMBEDDING
+  | typeof CAPABILITY_TEXT
+  | typeof CAPABILITY_VISION;
+
+export type Capabilities = Partial<Record<CapabilityTag, true>>;
+
 export type Model = {
   /** Model id, unique *within its provider* (scoped by `Provider.id`). */
   id: string;
   /** Human-readable name shown in the admin dropdown. */
   displayName: string;
   /** What this model can do. */
-  capabilities: Partial<Record<CapabilityTag, true>>;
+  capabilities: Capabilities;
   /** Hardcoded per-model defaults (catalog owns the wire params). */
   defaults: {
     contextWindowTokens?: number;
