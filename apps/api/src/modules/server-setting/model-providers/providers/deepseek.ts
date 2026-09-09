@@ -3,6 +3,7 @@
  * Self-contained: owns its models, connection type, and validation.
  */
 
+import { loadProviderConnection, saveProviderConnection } from "../dal.ts";
 import { type ConnectionResult, ModelProvider } from "./provider.ts";
 import type { Model } from "./types.ts";
 import { PROVIDER_DEEPSEEK } from "./types.ts";
@@ -66,6 +67,19 @@ export class DeepSeekProvider extends ModelProvider<DeepSeekConnection> {
       };
     }
     return { ok: true, connection: { apiKey } };
+  }
+
+  override async loadConnection(): Promise<DeepSeekConnection | null> {
+    return (await loadProviderConnection(
+      this.id,
+    )) as unknown as DeepSeekConnection | null;
+  }
+
+  override async saveConnection(raw: unknown): Promise<DeepSeekConnection> {
+    return (await saveProviderConnection(
+      this.id,
+      raw,
+    )) as unknown as DeepSeekConnection;
   }
 }
 

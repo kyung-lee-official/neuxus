@@ -3,6 +3,7 @@
  * Self-contained: owns its models, connection type, and validation.
  */
 
+import { loadProviderConnection, saveProviderConnection } from "../dal.ts";
 import { type ConnectionResult, ModelProvider } from "./provider.ts";
 import type { Model } from "./types.ts";
 import { PROVIDER_OLLAMA } from "./types.ts";
@@ -51,6 +52,19 @@ export class OllamaProvider extends ModelProvider<OllamaConnection> {
       return { ok: false, error: "port must be a positive integer" };
     }
     return { ok: true, connection: { baseUrl, port } };
+  }
+
+  override async loadConnection(): Promise<OllamaConnection | null> {
+    return (await loadProviderConnection(
+      this.id,
+    )) as unknown as OllamaConnection | null;
+  }
+
+  override async saveConnection(raw: unknown): Promise<OllamaConnection> {
+    return (await saveProviderConnection(
+      this.id,
+      raw,
+    )) as unknown as OllamaConnection;
   }
 }
 

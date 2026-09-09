@@ -1,7 +1,8 @@
 /**
  * Abstract base for a self-contained provider. Each provider is a
  * stateless singleton: pure data (id, display name, models, fixed base
- * URL/headers) plus per-provider connection validation.
+ * URL/headers), per-provider connection validation, and config I/O that
+ * each concrete provider implements through the connection DAL.
  */
 
 import type { Model, Provider } from "./types.ts";
@@ -18,4 +19,10 @@ export abstract class ModelProvider<C extends {}> implements Provider {
   abstract readonly models: Model[];
 
   abstract validateConnection(raw: unknown): ConnectionResult<C>;
+
+  /** Read this provider's saved connection payload, or null. */
+  abstract loadConnection(): Promise<C | null>;
+
+  /** Save this provider's connection payload. */
+  abstract saveConnection(raw: unknown): Promise<C>;
 }

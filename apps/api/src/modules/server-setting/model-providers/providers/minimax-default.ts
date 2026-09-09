@@ -3,6 +3,7 @@
  * Self-contained: owns its models, connection type, and validation.
  */
 
+import { loadProviderConnection, saveProviderConnection } from "../dal.ts";
 import { type ConnectionResult, ModelProvider } from "./provider.ts";
 import type { Model } from "./types.ts";
 import { PROVIDER_MINIMAX_DEFAULT } from "./types.ts";
@@ -49,6 +50,21 @@ export class MinimaxDefaultProvider extends ModelProvider<MinimaxDefaultConnecti
       };
     }
     return { ok: true, connection: { apiKey } };
+  }
+
+  override async loadConnection(): Promise<MinimaxDefaultConnection | null> {
+    return (await loadProviderConnection(
+      this.id,
+    )) as unknown as MinimaxDefaultConnection | null;
+  }
+
+  override async saveConnection(
+    raw: unknown,
+  ): Promise<MinimaxDefaultConnection> {
+    return (await saveProviderConnection(
+      this.id,
+      raw,
+    )) as unknown as MinimaxDefaultConnection;
   }
 }
 
