@@ -54,3 +54,8 @@ export type Provider = {
   /** Models this provider serves. The provider scopes model identity. */
   models: Model[];
 };
+
+/** Flat model view with its owning provider id attached (for APIs/consumers). */
+export type ProviderModel = Model & {
+  providerId: string;
+};
