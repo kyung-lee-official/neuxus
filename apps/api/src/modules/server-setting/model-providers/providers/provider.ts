@@ -4,8 +4,7 @@
  * URL/headers) plus per-provider connection validation.
  */
 
-import type { Model } from "../types.ts";
-import type { Provider } from "./types.ts";
+import type { Model, Provider } from "./types.ts";
 
 export type ConnectionResult<C> =
   | { ok: true; connection: C }

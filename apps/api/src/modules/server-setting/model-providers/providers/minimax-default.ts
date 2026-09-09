@@ -3,8 +3,8 @@
  * Self-contained: owns its models, connection type, and validation.
  */
 
-import type { Model } from "../types.ts";
 import { type ConnectionResult, ModelProvider } from "./provider.ts";
+import type { Model } from "./types.ts";
 import { PROVIDER_MINIMAX_DEFAULT } from "./types.ts";
 
 export type MinimaxDefaultConnection = { apiKey: string };
