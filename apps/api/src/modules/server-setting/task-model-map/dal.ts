@@ -1,19 +1,13 @@
 /**
- * DAL for the task-model-map business: owns the task definitions and the
- * `app_model_task_config` singleton row (task → `{ providerId, modelId }`).
- *
- * Provider connections live in `app_model_provider_config`, owned by
- * `model-providers/dal.ts`.
+ * DAL for the task-model-map business. Its only job: which business task
+ * uses which catalog model. Assignments (`app_model_task_config`) map a
+ * task id to a `{ providerId, modelId }` pair; the pair must resolve in
+ * the `model-providers` catalog and cover the task's required capabilities.
  */
 
 import { Prisma } from "../../../generated/prisma/client.ts";
 import { getPrisma } from "../../../shared/db.ts";
-import {
-  getModel,
-  type ProviderConnection,
-  validateProviderConnection,
-} from "../model-providers/core/catalog.ts";
-import { loadProviderConnections } from "../model-providers/core/dal.ts";
+import { getModel } from "../model-providers/core/catalog.ts";
 import {
   CAPABILITY_EMBEDDING,
   CAPABILITY_TEXT,
@@ -139,41 +133,10 @@ function pickTaskAssignments(
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-/** Null any assignment whose provider has no fully-configured saved connection. */
-function nullBroken(
-  assignments: TaskAssignments,
-  connections: Record<string, ProviderConnection>,
-): boolean {
-  let changed = false;
-  for (const taskId of MODEL_TASK_IDS) {
-    const pointer = assignments[taskId];
-    if (pointer == null) continue;
-    const conn = connections[pointer.providerId];
-    if (!conn || !validateProviderConnection(pointer.providerId, conn).ok) {
-      assignments[taskId] = null;
-      changed = true;
-    }
-  }
-  return changed;
-}
-
-async function writeAssignments(assignments: TaskAssignments): Promise<void> {
-  await getPrisma().appModelTaskConfig.upsert({
-    where: { id: CONFIG_ID },
-    create: {
-      id: CONFIG_ID,
-      tasks: assignments as unknown as Prisma.InputJsonValue,
-    },
-    update: {
-      tasks: assignments as unknown as Prisma.InputJsonValue,
-    },
-  });
-}
-
 /**
  * Save a partial assignments patch. The pair must resolve in the catalog
- * (throws otherwise); assignments whose provider connection isn't fully
- * configured are nulled. Writes only the `app_model_task_config` row.
+ * and cover the task's required capabilities (throws otherwise). Writes
+ * only the `app_model_task_config` row.
  */
 export async function saveAssignments(
   input: Record<string, unknown> | undefined,
@@ -183,22 +146,15 @@ export async function saveAssignments(
     ...existing,
     ...pickTaskAssignments(input),
   };
-  nullBroken(merged, await loadProviderConnections());
-  await writeAssignments(merged);
+  await getPrisma().appModelTaskConfig.upsert({
+    where: { id: CONFIG_ID },
+    create: {
+      id: CONFIG_ID,
+      tasks: merged as unknown as Prisma.InputJsonValue,
+    },
+    update: {
+      tasks: merged as unknown as Prisma.InputJsonValue,
+    },
+  });
   return merged;
-}
-
-/**
- * Re-run the connection check after provider connections changed, nulling
- * any task whose provider is no longer fully configured. Writes only when
- * something changed.
- */
-export async function revalidateTaskAssignments(
-  connections: Record<string, ProviderConnection>,
-): Promise<TaskAssignments> {
-  const assignments = await loadAssignments();
-  if (nullBroken(assignments, connections)) {
-    await writeAssignments(assignments);
-  }
-  return assignments;
 }
