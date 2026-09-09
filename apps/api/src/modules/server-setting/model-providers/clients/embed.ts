@@ -1,12 +1,12 @@
 /**
  * Embedding capability client.
  *
- * Single provider today: Ollama (`requestShape: "ollama-embed"`).
- * The adapter is injected so a future OpenAI-compatible provider can
- * reuse the same client shape.
+ * Single standard today: Ollama. The adapter is injected so a future
+ * OpenAI-compatible provider can reuse the same client shape.
  */
 
 import { OllamaEmbeddingsClient } from "../adapters/ollama-embed.ts";
+import { PROVIDER_OLLAMA } from "../providers/ids.ts";
 import type {
   Embedder,
   Model,
@@ -29,9 +29,9 @@ export const createEmbedClient: CreateEmbedClient = ({
   provider,
   connection,
 }) => {
-  if (provider.requestShape !== "ollama-embed") {
+  if (provider.id !== PROVIDER_OLLAMA) {
     throw new Error(
-      `Embed capability is not implemented for requestShape: ${provider.requestShape}`,
+      `Embed capability is not implemented for provider: ${provider.id}`,
     );
   }
   const client = new OllamaEmbeddingsClient({
