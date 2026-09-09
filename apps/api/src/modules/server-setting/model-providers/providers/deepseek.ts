@@ -89,11 +89,9 @@ export class DeepSeekProvider extends ModelProvider<DeepSeekConnection> {
     )) as unknown as DeepSeekConnection;
   }
 
-  /** Wire call for this provider: Anthropic Messages API (`POST {baseUrl}/v1/messages`). */
-  private async postMessages(
-    modelId: string,
-    content: MessageContentBlock[],
-  ): Promise<string> {
+  override async chat(modelId: string, prompt: string): Promise<string> {
+    const content: MessageContentBlock[] = [{ type: "text", text: prompt }];
+
     const conn = await this.loadConnection();
     if (!conn || !("apiKey" in conn) || typeof conn.apiKey !== "string")
       throw new Error(`No api key saved for provider ${this.id}`);
@@ -142,15 +140,13 @@ export class DeepSeekProvider extends ModelProvider<DeepSeekConnection> {
     if (parts.length === 0) throw new Error("Model returned empty content");
     return parts.join("\n\n");
   }
-  override async chat(modelId: string, prompt: string): Promise<string> {
-    return this.postMessages(modelId, [{ type: "text", text: prompt }]);
-  }
 
-  override async describeImage(
+  override async chatWithImage(
     modelId: string,
+    prompt: string,
     image: { bytes: Buffer; mimeType: string },
   ): Promise<string> {
-    return this.postMessages(modelId, [
+    const content: MessageContentBlock[] = [
       {
         type: "image",
         source: {
@@ -159,8 +155,56 @@ export class DeepSeekProvider extends ModelProvider<DeepSeekConnection> {
           data: image.bytes.toString("base64"),
         },
       },
-      { type: "text", text: "Describe this image in one concise paragraph." },
-    ]);
+      { type: "text", text: prompt },
+    ];
+
+    const conn = await this.loadConnection();
+    if (!conn || !("apiKey" in conn) || typeof conn.apiKey !== "string")
+      throw new Error(`No api key saved for provider ${this.id}`);
+    const apiKey = conn.apiKey;
+    if (!this.baseUrl) throw new Error(`No base URL for provider ${this.id}`);
+    const res = await fetch(`${this.baseUrl.replace(/\/$/, "")}/v1/messages`, {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "Content-Type": "application/json",
+        ...(this.headers ?? {}),
+      },
+      body: JSON.stringify({
+        model: modelId,
+        max_tokens: 4096,
+        temperature: 1,
+        system: "You are a helpful assistant.",
+        messages: [{ role: "user", content }],
+      }),
+    });
+    const raw = await res.text();
+    if (!res.ok) {
+      let msg: string | null = null;
+      try {
+        const j = JSON.parse(raw) as { error?: { message?: string } };
+        msg = j.error?.message?.trim() ?? null;
+      } catch {
+        /* ignore */
+      }
+      throw new Error(
+        msg || raw.trim() || `Request failed with status ${res.status}`,
+      );
+    }
+    let json: { content?: Array<{ type?: string; text?: string }> };
+    try {
+      json = JSON.parse(raw);
+    } catch {
+      throw new Error("Anthropic-compatible provider returned non-JSON");
+    }
+    const parts = (json.content ?? [])
+      .filter(
+        (b) =>
+          b.type === "text" && typeof b.text === "string" && b.text!.trim(),
+      )
+      .map((b) => b.text!.trim());
+    if (parts.length === 0) throw new Error("Model returned empty content");
+    return parts.join("\n\n");
   }
 }
 
