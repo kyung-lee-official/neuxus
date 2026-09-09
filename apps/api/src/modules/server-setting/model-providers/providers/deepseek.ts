@@ -88,12 +88,16 @@ export class DeepSeekProvider extends ModelProvider<DeepSeekConnection> {
       raw,
     )) as unknown as DeepSeekConnection;
   }
+
   /** Wire call for this provider: Anthropic Messages API (`POST {baseUrl}/v1/messages`). */
   private async postMessages(
     modelId: string,
-    apiKey: string,
     content: MessageContentBlock[],
   ): Promise<string> {
+    const conn = await this.loadConnection();
+    if (!conn || !("apiKey" in conn) || typeof conn.apiKey !== "string")
+      throw new Error(`No api key saved for provider ${this.id}`);
+    const apiKey = conn.apiKey;
     if (!this.baseUrl) throw new Error(`No base URL for provider ${this.id}`);
     const res = await fetch(`${this.baseUrl.replace(/\/$/, "")}/v1/messages`, {
       method: "POST",
@@ -139,24 +143,14 @@ export class DeepSeekProvider extends ModelProvider<DeepSeekConnection> {
     return parts.join("\n\n");
   }
   override async chat(modelId: string, prompt: string): Promise<string> {
-    const conn = await this.loadConnection();
-    if (!conn || !("apiKey" in conn))
-      throw new Error(`No api key saved for provider ${this.id}`);
-    if (!this.baseUrl) throw new Error(`No base URL for provider ${this.id}`);
-    return this.postMessages(modelId, (conn as { apiKey: string }).apiKey, [
-      { type: "text", text: prompt },
-    ]);
+    return this.postMessages(modelId, [{ type: "text", text: prompt }]);
   }
 
   override async describeImage(
     modelId: string,
     image: { bytes: Buffer; mimeType: string },
   ): Promise<string> {
-    const conn = await this.loadConnection();
-    if (!conn || !("apiKey" in conn))
-      throw new Error(`No api key saved for provider ${this.id}`);
-    if (!this.baseUrl) throw new Error(`No base URL for provider ${this.id}`);
-    return this.postMessages(modelId, (conn as { apiKey: string }).apiKey, [
+    return this.postMessages(modelId, [
       {
         type: "image",
         source: {
