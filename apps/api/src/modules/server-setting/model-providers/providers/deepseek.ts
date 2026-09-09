@@ -133,10 +133,12 @@ export class DeepSeekProvider extends ModelProvider<DeepSeekConnection> {
     }
     const parts = (json.content ?? [])
       .filter(
-        (b) =>
-          b.type === "text" && typeof b.text === "string" && b.text!.trim(),
+        (b): b is { type: "text"; text: string } =>
+          b.type === "text" &&
+          typeof b.text === "string" &&
+          b.text.trim() !== "",
       )
-      .map((b) => b.text!.trim());
+      .map((b) => b.text.trim());
     if (parts.length === 0) throw new Error("Model returned empty content");
     return parts.join("\n\n");
   }
@@ -199,10 +201,12 @@ export class DeepSeekProvider extends ModelProvider<DeepSeekConnection> {
     }
     const parts = (json.content ?? [])
       .filter(
-        (b) =>
-          b.type === "text" && typeof b.text === "string" && b.text!.trim(),
+        (b): b is { type: "text"; text: string } =>
+          b.type === "text" &&
+          typeof b.text === "string" &&
+          b.text.trim() !== "",
       )
-      .map((b) => b.text!.trim());
+      .map((b) => b.text.trim());
     if (parts.length === 0) throw new Error("Model returned empty content");
     return parts.join("\n\n");
   }
