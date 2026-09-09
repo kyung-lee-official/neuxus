@@ -14,7 +14,7 @@ import {
   CAPABILITY_VISION,
   type CapabilityTag,
 } from "../model-providers/core/types.ts";
-import type { ModelTaskId } from "./type.ts";
+import type { TaskId } from "./type.ts";
 
 const CONFIG_ID = "default";
 
@@ -24,7 +24,7 @@ export const TASK_TEXT_SYNTHESIS = "text-synthesis";
 export const TASK_MD_IMAGE_CAPTIONING = "md-image-captioning";
 
 /** Task definitions: id + the capabilities it requires. */
-export const MODEL_TASKS = [
+export const TASKS = [
   { id: TASK_EMBEDDING, requiredCapabilities: [CAPABILITY_EMBEDDING] },
   { id: TASK_TEXT_SYNTHESIS, requiredCapabilities: [CAPABILITY_TEXT] },
   {
@@ -34,8 +34,8 @@ export const MODEL_TASKS = [
   },
 ] as const;
 
-/** Id list, derived from `MODEL_TASKS` — not a second definition. */
-export const MODEL_TASK_IDS = [
+/** Id list, derived from `TASKS` — not a second definition. */
+export const TASK_IDS = [
   TASK_EMBEDDING,
   TASK_TEXT_SYNTHESIS,
   TASK_MD_IMAGE_CAPTIONING,
@@ -43,18 +43,13 @@ export const MODEL_TASK_IDS = [
 
 /** Capabilities a model must declare to serve `taskId`. */
 export function requiredCapabilitiesByTask(
-  taskId: ModelTaskId,
+  taskId: TaskId,
 ): readonly CapabilityTag[] {
-  const task = MODEL_TASKS.find((t) => t.id === taskId);
+  const task = TASKS.find((t) => t.id === taskId);
   if (!task) {
     throw new Error(`Unknown task id: ${taskId}`);
   }
   return task.requiredCapabilities;
-}
-
-/** Narrow a runtime value to a known task id (e.g. parsed JSON keys). */
-export function isModelTaskId(value: unknown): value is ModelTaskId {
-  return MODEL_TASK_IDS.some((id) => id === value);
 }
 
 /** A selected catalog model, identified by its provider + model pair. */
@@ -63,12 +58,12 @@ export type ModelPointer = {
   modelId: string;
 };
 
-export type TaskAssignments = Record<ModelTaskId, ModelPointer | null>;
+export type TaskAssignments = Record<TaskId, ModelPointer | null>;
 
 /** Strictly parse one task value: `null` = unassigned; else the pair must resolve in the catalog. */
 function parseModelPointer(
   value: unknown,
-  taskId: ModelTaskId,
+  taskId: TaskId,
 ): ModelPointer | null {
   if (value == null) return null;
   if (typeof value !== "object" || Array.isArray(value)) {
@@ -99,7 +94,7 @@ function parseModelPointer(
 
 function parseTaskAssignments(raw: Record<string, unknown>): TaskAssignments {
   const assignments = {} as TaskAssignments;
-  for (const taskId of MODEL_TASK_IDS) {
+  for (const taskId of TASK_IDS) {
     assignments[taskId] = parseModelPointer(raw[taskId], taskId);
   }
   return assignments;
@@ -127,8 +122,9 @@ function pickTaskAssignments(
   if (raw == null) return undefined;
   const out: Partial<TaskAssignments> = {};
   for (const [key, value] of Object.entries(raw)) {
-    if (!isModelTaskId(key)) continue;
-    out[key] = parseModelPointer(value, key);
+    if (!(TASK_IDS as readonly string[]).includes(key)) continue;
+    const taskId = key as TaskId;
+    out[taskId] = parseModelPointer(value, taskId);
   }
   return Object.keys(out).length > 0 ? out : undefined;
 }

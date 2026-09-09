@@ -5,7 +5,7 @@ import {
 } from "./dal.ts";
 
 /** Task id — derived from the canonical constants in `dal.ts`. */
-export type ModelTaskId =
+export type TaskId =
   | typeof TASK_EMBEDDING
   | typeof TASK_TEXT_SYNTHESIS
   | typeof TASK_MD_IMAGE_CAPTIONING;
