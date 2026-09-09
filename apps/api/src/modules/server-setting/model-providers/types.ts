@@ -9,6 +9,7 @@ import {
   CAPABILITY_TEXT,
   CAPABILITY_VISION,
 } from "./dal.ts";
+import type { Provider } from "./providers/types.ts";
 
 /** Canonical capability tags — derived from the constants in `dal.ts`. */
 export type CapabilityTag =
@@ -17,17 +18,6 @@ export type CapabilityTag =
   | typeof CAPABILITY_VISION;
 
 export type Capabilities = Partial<Record<CapabilityTag, true>>;
-
-export type Provider = {
-  id: string;
-  displayName: string;
-  /** Fixed upstream endpoint, when the provider's connection has no base URL. */
-  baseUrl?: string;
-  /** Extra headers always sent (e.g. `anthropic-version`). */
-  headers?: Record<string, string>;
-  /** Models this provider serves. The provider scopes model identity. */
-  models: Model[];
-};
 
 export type Model = {
   /** Model id, unique *within its provider* (scoped by `Provider.id`). */
