@@ -1,14 +1,14 @@
 /**
- * Provider: DeepSeek. Anthropic-compatible.
+ * Provider: Minimax (token plan). Anthropic-compatible.
  * Self-contained: owns its models, connection type, and validation.
  */
 
-import { loadProviderConnection, saveProviderConnection } from "../dal.ts";
+import { loadProviderConnection, saveProviderConnection } from "./dal.ts";
 import { type ConnectionResult, ModelProvider } from "./provider.ts";
 import type { Model } from "./types.ts";
-import { PROVIDER_DEEPSEEK } from "./types.ts";
+import { PROVIDER_MINIMAX_TOKEN_PLAN } from "./types.ts";
 
-export type DeepSeekConnection = { apiKey: string };
+export type MinimaxTokenPlanConnection = { apiKey: string };
 
 type MessageContentBlock =
   | { type: "text"; text: string }
@@ -17,44 +17,28 @@ type MessageContentBlock =
       source: { type: "base64"; media_type: string; data: string };
     };
 
-export class DeepSeekProvider extends ModelProvider<DeepSeekConnection> {
-  override readonly id = PROVIDER_DEEPSEEK;
-  override readonly displayName = "DeepSeek";
-  override readonly baseUrl = "https://api.deepseek.com/anthropic";
+export class MinimaxTokenPlanProvider extends ModelProvider<MinimaxTokenPlanConnection> {
+  override readonly id = PROVIDER_MINIMAX_TOKEN_PLAN;
+  override readonly displayName = "Minimax (Token Plan)";
+  override readonly baseUrl =
+    "https://api.minimaxi.com/anthropic/v1/token-plan";
   override readonly headers = { "anthropic-version": "2023-06-01" };
   override readonly models: Model[] = [
     {
-      id: "deepseek-v4-flash",
-      displayName: "DeepSeek V4 Flash",
-      capabilities: { text: true },
-      defaults: {
-        contextWindowTokens: 128_000,
-        maxOutputTokens: 8192,
-      },
-    },
-    {
-      id: "deepseek-v4-pro",
-      displayName: "DeepSeek V4 Pro",
-      capabilities: { text: true },
-      defaults: {
-        contextWindowTokens: 128_000,
-        maxOutputTokens: 8192,
-      },
-    },
-    {
-      id: "deepseek-v4-flash-vision-exp",
-      displayName: "DeepSeek V4 Flash Vision (Experimental)",
+      id: "MiniMax-M3",
+      displayName: "MiniMax-M3 (Token Plan)",
       capabilities: { text: true, vision: true },
       defaults: {
-        contextWindowTokens: 128_000,
-        maxOutputTokens: 8192,
+        contextWindowTokens: 1_000_000,
+        maxOutputTokens: 4096,
+        temperature: 1,
       },
     },
   ];
 
   override validateConnection(
     raw: unknown,
-  ): ConnectionResult<DeepSeekConnection> {
+  ): ConnectionResult<MinimaxTokenPlanConnection> {
     if (raw == null || typeof raw !== "object" || Array.isArray(raw)) {
       return { ok: false, error: "must be an object with apiKey" };
     }
@@ -76,17 +60,19 @@ export class DeepSeekProvider extends ModelProvider<DeepSeekConnection> {
     return { ok: true, connection: { apiKey } };
   }
 
-  override async loadConnection(): Promise<DeepSeekConnection | null> {
+  override async loadConnection(): Promise<MinimaxTokenPlanConnection | null> {
     return (await loadProviderConnection(
       this.id,
-    )) as unknown as DeepSeekConnection | null;
+    )) as unknown as MinimaxTokenPlanConnection | null;
   }
 
-  override async saveConnection(raw: unknown): Promise<DeepSeekConnection> {
+  override async saveConnection(
+    raw: unknown,
+  ): Promise<MinimaxTokenPlanConnection> {
     return (await saveProviderConnection(
       this.id,
       raw,
-    )) as unknown as DeepSeekConnection;
+    )) as unknown as MinimaxTokenPlanConnection;
   }
 
   override async chat(modelId: string, prompt: string): Promise<string> {
@@ -212,4 +198,4 @@ export class DeepSeekProvider extends ModelProvider<DeepSeekConnection> {
   }
 }
 
-export const provider = new DeepSeekProvider();
+export const provider = new MinimaxTokenPlanProvider();

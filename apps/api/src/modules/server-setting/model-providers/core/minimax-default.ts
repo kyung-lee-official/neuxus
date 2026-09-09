@@ -3,7 +3,7 @@
  * Self-contained: owns its models, connection type, and validation.
  */
 
-import { loadProviderConnection, saveProviderConnection } from "../dal.ts";
+import { loadProviderConnection, saveProviderConnection } from "./dal.ts";
 import { type ConnectionResult, ModelProvider } from "./provider.ts";
 import type { Model } from "./types.ts";
 import { PROVIDER_MINIMAX_DEFAULT } from "./types.ts";

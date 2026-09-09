@@ -4,7 +4,7 @@
  * `providers/<providerId>.ts`.
  */
 
-import type { CapabilityTag, Model, Provider } from "./providers/types.ts";
+import type { CapabilityTag, Model, Provider } from "./core/types.ts";
 
 /** Flat model view with its owning provider id attached (for APIs/consumers). */
 export type ProviderModel = Model & {

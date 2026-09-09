@@ -4,12 +4,12 @@
  * writes through a serialized read→recompose→write. No registry logic.
  */
 
-import { Prisma } from "../../../generated/prisma/client.ts";
-import { getPrisma } from "../../../shared/db.ts";
+import { Prisma } from "../../../../generated/prisma/client.ts";
+import { getPrisma } from "../../../../shared/db.ts";
 import {
   type ProviderConnection,
   validateProviderConnection,
-} from "./providers/catalog.ts";
+} from "./catalog.ts";
 
 const CONFIG_ID = "default";
 
