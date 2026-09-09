@@ -1,43 +1,29 @@
 /**
- * Model catalog: aggregates the self-contained providers under
+ * Model catalog: aggregates the self-contained provider singletons under
  * `providers/`. Each provider owns its models, connection type, and
- * validation; this module just composes them and offers flat lookups.
+ * validation; this module composes them and offers flat lookups.
  */
 
-import type {
-  CapabilityTag,
-  Model,
-  Provider,
-  ProviderModel,
-} from "../types.ts";
-import {
-  type DeepSeekConnection,
-  provider as deepseek,
-  validateConnection as validateDeepSeek,
-} from "./deepseek.ts";
-import {
-  PROVIDER_DEEPSEEK,
-  PROVIDER_MINIMAX_DEFAULT,
-  PROVIDER_MINIMAX_TOKEN_PLAN,
-  PROVIDER_OLLAMA,
-} from "./ids.ts";
+import type { CapabilityTag, Model, ProviderModel } from "../types.ts";
+import { type DeepSeekConnection, provider as deepseek } from "./deepseek.ts";
 import {
   type MinimaxDefaultConnection,
   provider as minimaxDefault,
-  validateConnection as validateMinimaxDefault,
 } from "./minimax-default.ts";
 import {
   type MinimaxTokenPlanConnection,
   provider as minimaxTokenPlan,
-  validateConnection as validateMinimaxTokenPlan,
 } from "./minimax-token-plan.ts";
-import {
-  type OllamaConnection,
-  provider as ollama,
-  validateConnection as validateOllama,
-} from "./ollama.ts";
+import { type OllamaConnection, provider as ollama } from "./ollama.ts";
 
-export const PROVIDERS: readonly Provider[] = [
+/** Any concrete provider singleton — exposes `validateConnection`. */
+export type AnyProvider =
+  | typeof minimaxDefault
+  | typeof minimaxTokenPlan
+  | typeof deepseek
+  | typeof ollama;
+
+export const PROVIDERS: readonly AnyProvider[] = [
   minimaxDefault,
   minimaxTokenPlan,
   deepseek,
@@ -51,7 +37,7 @@ export type ProviderConnection =
   | DeepSeekConnection
   | OllamaConnection;
 
-export function getProviderById(id: string): Provider | null {
+export function getProviderById(id: string): AnyProvider | null {
   return PROVIDERS.find((p) => p.id === id) ?? null;
 }
 
@@ -82,21 +68,17 @@ export function getModelsByCapability(
   );
 }
 
-/** Validate a raw payload against the named provider's own connection type. */
+/**
+ * Validate a raw payload against the named provider's own connection type.
+ * Dispatches through the provider instance (no central switch).
+ */
 export function validateProviderConnection(
   providerId: string,
   value: unknown,
 ): { ok: true; connection: ProviderConnection } | { ok: false; error: string } {
-  switch (providerId) {
-    case PROVIDER_MINIMAX_DEFAULT:
-      return validateMinimaxDefault(value);
-    case PROVIDER_MINIMAX_TOKEN_PLAN:
-      return validateMinimaxTokenPlan(value);
-    case PROVIDER_DEEPSEEK:
-      return validateDeepSeek(value);
-    case PROVIDER_OLLAMA:
-      return validateOllama(value);
-    default:
-      return { ok: false, error: `Unknown provider: ${providerId}` };
+  const provider = getProviderById(providerId);
+  if (!provider) {
+    return { ok: false, error: `Unknown provider: ${providerId}` };
   }
+  return provider.validateConnection(value);
 }

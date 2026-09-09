@@ -3,63 +3,55 @@
  * Self-contained: owns its models, connection type, and validation.
  */
 
-import type { Model, Provider } from "../types.ts";
-import { PROVIDER_OLLAMA } from "./ids.ts";
+import type { Model } from "../types.ts";
+import { type ConnectionResult, ModelProvider } from "./provider.ts";
+import { PROVIDER_OLLAMA } from "./types.ts";
 
 export type OllamaConnection = { baseUrl: string; port: number };
 
-const models: Model[] = [
-  {
-    id: "nomic-embed-text",
-    displayName: "nomic-embed-text:latest",
-    capabilities: { embedding: true },
-    defaults: { embeddingDimensions: 768 },
-  },
-  {
-    id: "embeddinggemma",
-    displayName: "embeddinggemma:latest",
-    capabilities: { embedding: true },
-    defaults: { embeddingDimensions: 768 },
-  },
-];
+export class OllamaProvider extends ModelProvider<OllamaConnection> {
+  override readonly id = PROVIDER_OLLAMA;
+  override readonly displayName = "Ollama (local)";
+  override readonly models: Model[] = [
+    {
+      id: "nomic-embed-text",
+      displayName: "nomic-embed-text:latest",
+      capabilities: { embedding: true },
+      defaults: { embeddingDimensions: 768 },
+    },
+    {
+      id: "embeddinggemma",
+      displayName: "embeddinggemma:latest",
+      capabilities: { embedding: true },
+      defaults: { embeddingDimensions: 768 },
+    },
+  ];
 
-export const provider: Provider = {
-  id: PROVIDER_OLLAMA,
-  displayName: "Ollama (local)",
-  models,
-};
-
-function isValidUri(value: unknown): value is string {
-  if (typeof value !== "string" || value === "") return false;
-  try {
-    new URL(value);
-    return true;
-  } catch {
-    return false;
+  override validateConnection(
+    raw: unknown,
+  ): ConnectionResult<OllamaConnection> {
+    if (raw == null || typeof raw !== "object" || Array.isArray(raw)) {
+      return { ok: false, error: "must be an object with baseUrl and port" };
+    }
+    const keys = Object.keys(raw as Record<string, unknown>);
+    if (!keys.every((k) => k === "baseUrl" || k === "port")) {
+      return { ok: false, error: "only baseUrl and port are allowed" };
+    }
+    const baseUrl = (raw as Record<string, unknown>).baseUrl;
+    if (typeof baseUrl !== "string" || baseUrl === "") {
+      return { ok: false, error: "baseUrl must be a valid URI" };
+    }
+    try {
+      new URL(baseUrl);
+    } catch {
+      return { ok: false, error: "baseUrl must be a valid URI" };
+    }
+    const port = (raw as Record<string, unknown>).port;
+    if (typeof port !== "number" || !Number.isInteger(port) || port <= 0) {
+      return { ok: false, error: "port must be a positive integer" };
+    }
+    return { ok: true, connection: { baseUrl, port } };
   }
 }
 
-function isPositiveInt(value: unknown): value is number {
-  return typeof value === "number" && Number.isInteger(value) && value > 0;
-}
-
-export function validateConnection(
-  value: unknown,
-): { ok: true; connection: OllamaConnection } | { ok: false; error: string } {
-  if (value == null || typeof value !== "object" || Array.isArray(value)) {
-    return { ok: false, error: "must be an object with baseUrl and port" };
-  }
-  const keys = Object.keys(value as Record<string, unknown>);
-  if (!keys.every((k) => k === "baseUrl" || k === "port")) {
-    return { ok: false, error: "only baseUrl and port are allowed" };
-  }
-  const baseUrl = (value as Record<string, unknown>).baseUrl;
-  const port = (value as Record<string, unknown>).port;
-  if (!isValidUri(baseUrl)) {
-    return { ok: false, error: "baseUrl must be a valid URI" };
-  }
-  if (!isPositiveInt(port)) {
-    return { ok: false, error: "port must be a positive integer" };
-  }
-  return { ok: true, connection: { baseUrl, port } };
-}
+export const provider = new OllamaProvider();
