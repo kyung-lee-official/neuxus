@@ -13,20 +13,6 @@ import {
 
 const CONFIG_ID = "default";
 
-function asConnectionMap(raw: unknown): Record<string, ProviderConnection> {
-  if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return {};
-  const map: Record<string, ProviderConnection> = {};
-  for (const [providerId, value] of Object.entries(
-    raw as Record<string, unknown>,
-  )) {
-    if (value == null || typeof value !== "object" || Array.isArray(value)) {
-      continue;
-    }
-    map[providerId] = value as ProviderConnection;
-  }
-  return map;
-}
-
 /** True when a payload is meant to clear the provider (empty or all-null). */
 function isClearPayload(value: unknown): boolean {
   if (value == null) return true;
@@ -42,7 +28,11 @@ export async function loadProviderConnections(): Promise<
   const row = await getPrisma().appModelProviderConfig.findUnique({
     where: { id: CONFIG_ID },
   });
-  return asConnectionMap(row?.providerConnections);
+  const raw = row?.providerConnections;
+  if (raw == null || typeof raw !== "object" || Array.isArray(raw)) {
+    return {};
+  }
+  return raw as Record<string, ProviderConnection>;
 }
 
 /** The saved connection payload for one provider, or null. */
