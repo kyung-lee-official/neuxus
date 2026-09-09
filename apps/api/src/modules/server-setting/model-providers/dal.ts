@@ -1,15 +1,21 @@
 /**
- * DAL for the model-providers business: direct access to the
- * `app_model_provider_config` singleton row.
+ * DAL for the model-providers business: owns `app_model_provider_config`.
  *
- * Without a provider id: returns the whole row (id `"default"` + raw
- * `providerConnections`). With a provider id: returns that provider's
- * saved connection parsed from the JSON (or `null` when absent).
+ * Each provider's saved connection is an opaque per-provider JSON payload.
+ * Allowed keys/kinds are declared by the provider's `connectionFields`
+ * (see `catalog.ts`); the DAL stores payloads as-is after validating them.
  */
 
 import { Prisma } from "../../../generated/prisma/client.ts";
 import { getPrisma } from "../../../shared/db.ts";
-import { allModels } from "./catalog.ts";
+import {
+  allModels,
+  type ProviderConnection,
+  validateProviderConnection,
+} from "./providers/catalog.ts";
+
+export type { ProviderConnection };
+
 import type { CapabilityTag, Model } from "./types.ts";
 
 /** Canonical capability tags — single source; use these, not literals. */
@@ -24,36 +30,31 @@ export type ModelProviderConfigRow = {
   providerConnections: unknown;
 };
 
-export type ProviderConnection = {
-  apiKey: string | null;
-  baseUrl: string | null;
-  port: number | null;
-};
-
-function readConnection(value: unknown): ProviderConnection | null {
-  if (value == null || typeof value !== "object" || Array.isArray(value)) {
-    return null;
+function asConnectionMap(raw: unknown): Record<string, ProviderConnection> {
+  if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const map: Record<string, ProviderConnection> = {};
+  for (const [providerId, value] of Object.entries(
+    raw as Record<string, unknown>,
+  )) {
+    if (value == null || typeof value !== "object" || Array.isArray(value)) {
+      continue;
+    }
+    map[providerId] = value as ProviderConnection;
   }
-  const v = value as Record<string, unknown>;
-  return {
-    apiKey:
-      typeof v.apiKey === "string" && v.apiKey.trim() !== ""
-        ? v.apiKey.trim()
-        : null,
-    baseUrl:
-      typeof v.baseUrl === "string" && v.baseUrl.trim() !== ""
-        ? v.baseUrl.trim()
-        : null,
-    port:
-      typeof v.port === "number" && Number.isInteger(v.port) && v.port > 0
-        ? v.port
-        : null,
-  };
+  return map;
+}
+
+/** True when a payload is meant to clear the provider (empty or all-null). */
+function isClearPayload(value: unknown): boolean {
+  if (value == null) return true;
+  if (typeof value !== "object" || Array.isArray(value)) return false;
+  const entries = Object.values(value as Record<string, unknown>);
+  return entries.length === 0 || entries.every((v) => v == null);
 }
 
 /** Full content of `app_model_provider_config` (id `"default"`), or null. */
 export async function loadConfigByModelProviderId(): Promise<ModelProviderConfigRow | null>;
-/** Saved connection for `providerId`, parsed from the JSON, or null. */
+/** Saved connection payload for `providerId`, or null when absent. */
 export async function loadConfigByModelProviderId(
   providerId: string,
 ): Promise<ProviderConnection | null>;
@@ -78,67 +79,44 @@ export async function loadConfigByModelProviderId(
     return null;
   }
   const map = row.providerConnections as Record<string, unknown>;
-  return readConnection(map[providerId]);
-}
-
-function isConnectionEmpty(conn: ProviderConnection): boolean {
-  return (
-    (conn.apiKey ?? null) === null &&
-    (conn.baseUrl ?? null) === null &&
-    (conn.port ?? null) === null
-  );
-}
-
-function parseProviderConnections(
-  raw: unknown,
-): Record<string, ProviderConnection> {
-  if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return {};
-  const map: Record<string, ProviderConnection> = {};
-  for (const [providerId, value] of Object.entries(
-    raw as Record<string, unknown>,
-  )) {
-    const conn = readConnection(value);
-    if (!conn || isConnectionEmpty(conn)) continue;
-    map[providerId] = conn;
+  const value = map[providerId];
+  if (value == null || typeof value !== "object" || Array.isArray(value)) {
+    return null;
   }
-  return map;
+  return value as ProviderConnection;
 }
 
-/** Every saved per-provider connection, keyed by `providerId`. */
+/** Every saved per-provider connection payload, keyed by `providerId`. */
 export async function loadProviderConnections(): Promise<
   Record<string, ProviderConnection>
 > {
   const row = await getPrisma().appModelProviderConfig.findUnique({
     where: { id: CONFIG_ID },
   });
-  return parseProviderConnections(row?.providerConnections);
+  return asConnectionMap(row?.providerConnections);
 }
 
 /**
- * Persist (partial) per-provider connections: `null` deletes an entry,
- * empty entries are dropped, unspecified providers are kept. Writes only
+ * Persist (partial) per-provider connections. `null` (or an empty/all-null
+ * payload) deletes a provider's entry; other payloads are validated against
+ * the provider's declared `connectionFields` before storing. Writes only
  * the `app_model_provider_config` row.
  */
 export async function saveProviderConnections(
-  input: Record<string, ProviderConnection | null | undefined> | undefined,
+  input: Record<string, unknown> | undefined,
 ): Promise<Record<string, ProviderConnection>> {
   const merged = await loadProviderConnections();
   if (input) {
     for (const [providerId, raw] of Object.entries(input)) {
-      if (raw == null) {
+      if (isClearPayload(raw)) {
         delete merged[providerId];
-      } else {
-        const conn: ProviderConnection = {
-          apiKey: raw.apiKey ?? null,
-          baseUrl: raw.baseUrl ?? null,
-          port: raw.port ?? null,
-        };
-        if (isConnectionEmpty(conn)) {
-          delete merged[providerId];
-        } else {
-          merged[providerId] = conn;
-        }
+        continue;
       }
+      const check = validateProviderConnection(providerId, raw);
+      if (!check.ok) {
+        throw new Error(`${providerId}: ${check.error}`);
+      }
+      merged[providerId] = check.connection;
     }
   }
   await getPrisma().appModelProviderConfig.upsert({

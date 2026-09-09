@@ -4,27 +4,38 @@
  * validation; this module just composes them and offers flat lookups.
  */
 
+import type {
+  CapabilityTag,
+  Model,
+  Provider,
+  ProviderModel,
+} from "../types.ts";
 import {
   type DeepSeekConnection,
   provider as deepseek,
   validateConnection as validateDeepSeek,
-} from "./providers/deepseek.ts";
+} from "./deepseek.ts";
+import {
+  PROVIDER_DEEPSEEK,
+  PROVIDER_MINIMAX_DEFAULT,
+  PROVIDER_MINIMAX_TOKEN_PLAN,
+  PROVIDER_OLLAMA,
+} from "./ids.ts";
 import {
   type MinimaxDefaultConnection,
   provider as minimaxDefault,
   validateConnection as validateMinimaxDefault,
-} from "./providers/minimax-default.ts";
+} from "./minimax-default.ts";
 import {
   type MinimaxTokenPlanConnection,
   provider as minimaxTokenPlan,
   validateConnection as validateMinimaxTokenPlan,
-} from "./providers/minimax-token-plan.ts";
+} from "./minimax-token-plan.ts";
 import {
   type OllamaConnection,
   provider as ollama,
   validateConnection as validateOllama,
-} from "./providers/ollama.ts";
-import type { CapabilityTag, Model, Provider, ProviderModel } from "./types.ts";
+} from "./ollama.ts";
 
 export const PROVIDERS: readonly Provider[] = [
   minimaxDefault,
@@ -77,13 +88,13 @@ export function validateProviderConnection(
   value: unknown,
 ): { ok: true; connection: ProviderConnection } | { ok: false; error: string } {
   switch (providerId) {
-    case "minimax-default":
+    case PROVIDER_MINIMAX_DEFAULT:
       return validateMinimaxDefault(value);
-    case "minimax-token-plan":
+    case PROVIDER_MINIMAX_TOKEN_PLAN:
       return validateMinimaxTokenPlan(value);
-    case "deepseek":
+    case PROVIDER_DEEPSEEK:
       return validateDeepSeek(value);
-    case "ollama":
+    case PROVIDER_OLLAMA:
       return validateOllama(value);
     default:
       return { ok: false, error: `Unknown provider: ${providerId}` };
