@@ -7,13 +7,13 @@
  * diagnostics live in the `task-model-map` admin module.
  */
 
-import { getModel, getProviderById } from "./providers/catalog.ts";
+import { getModel, getProviderById } from "./core/catalog.ts";
 import {
   PROVIDER_DEEPSEEK,
   PROVIDER_MINIMAX_DEFAULT,
   PROVIDER_MINIMAX_TOKEN_PLAN,
   PROVIDER_OLLAMA,
-} from "./providers/types.ts";
+} from "./core/types.ts";
 
 /** Uniquely identifies a catalog model: names are unique within a provider. */
 export type ModelTarget = {

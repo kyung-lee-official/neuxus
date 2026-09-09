@@ -1,13 +1,16 @@
 import { status } from "elysia";
 import { revalidateTaskAssignments } from "../task-model-map/dal.ts";
-import { loadProviderConnections, saveProviderConnections } from "./dal.ts";
-import { runTestChat, runTestEmbed } from "./diagnostics.ts";
-import type { ModelProvidersModel } from "./model.ts";
 import {
   allModels,
   PROVIDERS,
   type ProviderConnection,
-} from "./providers/catalog.ts";
+} from "./core/catalog.ts";
+import {
+  loadProviderConnections,
+  saveProviderConnections,
+} from "./core/dal.ts";
+import { runTestChat, runTestEmbed } from "./diagnostics.ts";
+import type { ModelProvidersModel } from "./model.ts";
 
 function providerResponse(config: {
   providerConnections: Record<string, ProviderConnection>;

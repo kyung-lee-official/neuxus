@@ -9,17 +9,17 @@
 import { Prisma } from "../../../generated/prisma/client.ts";
 import { getPrisma } from "../../../shared/db.ts";
 import {
+  getModel,
+  type ProviderConnection,
+  validateProviderConnection,
+} from "../model-providers/core/catalog.ts";
+import { loadProviderConnections } from "../model-providers/core/dal.ts";
+import {
   CAPABILITY_EMBEDDING,
   CAPABILITY_TEXT,
   CAPABILITY_VISION,
-  loadProviderConnections,
-  type ProviderConnection,
-} from "../model-providers/dal.ts";
-import {
-  getModel,
-  validateProviderConnection,
-} from "../model-providers/providers/catalog.ts";
-import type { CapabilityTag } from "../model-providers/types.ts";
+  type CapabilityTag,
+} from "../model-providers/core/types.ts";
 import type { ModelTaskId } from "./type.ts";
 
 const CONFIG_ID = "default";
