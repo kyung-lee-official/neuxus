@@ -1,34 +1,17 @@
 /**
- * DAL for the model-providers business: owns `app_model_provider_config`.
- *
- * Each provider's saved connection is an opaque per-provider JSON payload.
- * Allowed keys/kinds are declared by the provider's `connectionFields`
- * (see `catalog.ts`); the DAL stores payloads as-is after validating them.
+ * DAL for `app_model_provider_config` — a pure middle layer for provider
+ * connections. Reads a provider's payload (or the whole map) and persists
+ * writes through a serialized read→recompose→write. No registry logic.
  */
 
 import { Prisma } from "../../../generated/prisma/client.ts";
 import { getPrisma } from "../../../shared/db.ts";
 import {
-  allModels,
   type ProviderConnection,
   validateProviderConnection,
 } from "./providers/catalog.ts";
 
-export type { ProviderConnection };
-
-import type { CapabilityTag, Model } from "./types.ts";
-
-/** Canonical capability tags — single source; use these, not literals. */
-export const CAPABILITY_EMBEDDING = "embedding";
-export const CAPABILITY_TEXT = "text";
-export const CAPABILITY_VISION = "vision";
-
 const CONFIG_ID = "default";
-
-export type ModelProviderConfigRow = {
-  id: string;
-  providerConnections: unknown;
-};
 
 function asConnectionMap(raw: unknown): Record<string, ProviderConnection> {
   if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return {};
@@ -52,40 +35,6 @@ function isClearPayload(value: unknown): boolean {
   return entries.length === 0 || entries.every((v) => v == null);
 }
 
-/** Full content of `app_model_provider_config` (id `"default"`), or null. */
-export async function loadConfigByModelProviderId(): Promise<ModelProviderConfigRow | null>;
-/** Saved connection payload for `providerId`, or null when absent. */
-export async function loadConfigByModelProviderId(
-  providerId: string,
-): Promise<ProviderConnection | null>;
-export async function loadConfigByModelProviderId(
-  providerId?: string,
-): Promise<ModelProviderConfigRow | ProviderConnection | null> {
-  const row = await getPrisma().appModelProviderConfig.findUnique({
-    where: { id: CONFIG_ID },
-  });
-
-  if (providerId === undefined) {
-    return row
-      ? { id: row.id, providerConnections: row.providerConnections }
-      : null;
-  }
-
-  if (
-    row?.providerConnections == null ||
-    typeof row.providerConnections !== "object" ||
-    Array.isArray(row.providerConnections)
-  ) {
-    return null;
-  }
-  const map = row.providerConnections as Record<string, unknown>;
-  const value = map[providerId];
-  if (value == null || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-  return value as ProviderConnection;
-}
-
 /** Every saved per-provider connection payload, keyed by `providerId`. */
 export async function loadProviderConnections(): Promise<
   Record<string, ProviderConnection>
@@ -96,28 +45,48 @@ export async function loadProviderConnections(): Promise<
   return asConnectionMap(row?.providerConnections);
 }
 
+/** The saved connection payload for one provider, or null. */
+export async function loadProviderConnection(
+  providerId: string,
+): Promise<ProviderConnection | null> {
+  const map = await loadProviderConnections();
+  return map[providerId] ?? null;
+}
+
 /**
- * Persist (partial) per-provider connections. `null` (or an empty/all-null
- * payload) deletes a provider's entry; other payloads are validated against
- * the provider's declared `connectionFields` before storing. Writes only
- * the `app_model_provider_config` row.
+ * Serializes all writes on this process. Single Bun process → a
+ * promise-chain lock is enough to make read→modify→write safe against
+ * concurrent requests.
  */
-export async function saveProviderConnections(
-  input: Record<string, unknown> | undefined,
+let writeLock: Promise<void> = Promise.resolve();
+
+function locked<T>(fn: () => Promise<T>): Promise<T> {
+  const run = writeLock.then(fn, fn);
+  writeLock = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+/**
+ * Core read→recompose→write: load the full row, apply the partial input
+ * (validating each payload), then write the row once.
+ */
+async function mutateProviderConnections(
+  input: Record<string, unknown>,
 ): Promise<Record<string, ProviderConnection>> {
   const merged = await loadProviderConnections();
-  if (input) {
-    for (const [providerId, raw] of Object.entries(input)) {
-      if (isClearPayload(raw)) {
-        delete merged[providerId];
-        continue;
-      }
-      const check = validateProviderConnection(providerId, raw);
-      if (!check.ok) {
-        throw new Error(`${providerId}: ${check.error}`);
-      }
-      merged[providerId] = check.connection;
+  for (const [providerId, raw] of Object.entries(input)) {
+    if (isClearPayload(raw)) {
+      delete merged[providerId];
+      continue;
     }
+    const check = validateProviderConnection(providerId, raw);
+    if (!check.ok) {
+      throw new Error(`${providerId}: ${check.error}`);
+    }
+    merged[providerId] = check.connection;
   }
   await getPrisma().appModelProviderConfig.upsert({
     where: { id: CONFIG_ID },
@@ -133,13 +102,26 @@ export async function saveProviderConnections(
 }
 
 /**
- * Catalog models that declare **all** the given capability tags. Pure
- * registry query — no provider connections or config involved.
+ * Persist (partial) per-provider connections under an in-process write
+ * lock. `null` (or an empty/all-null payload) deletes a provider's entry.
  */
-export function resolveCapabilityModel(
-  tags: readonly CapabilityTag[],
-): Model[] {
-  return allModels().filter((model) =>
-    tags.every((tag) => model.capabilities[tag] === true),
-  );
+export function saveProviderConnections(
+  input: Record<string, unknown> | undefined,
+): Promise<Record<string, ProviderConnection>> {
+  return locked(async () => mutateProviderConnections(input ?? {}));
+}
+
+/** Persist one provider's connection payload under the same write lock. */
+export function saveProviderConnection(
+  providerId: string,
+  raw: unknown,
+): Promise<ProviderConnection> {
+  return locked(async () => {
+    const merged = await mutateProviderConnections({ [providerId]: raw });
+    const conn = merged[providerId];
+    if (!conn) {
+      throw new Error(`No connection stored for provider: ${providerId}`);
+    }
+    return conn;
+  });
 }
