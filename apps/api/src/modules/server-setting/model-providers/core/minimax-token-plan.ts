@@ -75,7 +75,7 @@ export class MinimaxTokenPlanProvider extends ModelProvider<MinimaxTokenPlanConn
     )) as unknown as MinimaxTokenPlanConnection;
   }
 
-  override async chat(modelId: string, prompt: string): Promise<string> {
+  override async textChat(modelId: string, prompt: string): Promise<string> {
     const content: MessageContentBlock[] = [{ type: "text", text: prompt }];
 
     const conn = await this.loadConnection();
@@ -129,7 +129,7 @@ export class MinimaxTokenPlanProvider extends ModelProvider<MinimaxTokenPlanConn
     return parts.join("\n\n");
   }
 
-  override async chatWithImage(
+  override async imageChat(
     modelId: string,
     prompt: string,
     image: { bytes: Buffer; mimeType: string },

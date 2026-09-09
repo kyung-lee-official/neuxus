@@ -32,16 +32,16 @@ export abstract class ModelProvider<C extends {}> implements Provider {
   }
 
   /** Chat (text in, text out). Providers without this capability throw. */
-  async chat(modelId: string, prompt: string): Promise<string> {
-    throw new Error(`chat is not supported by provider ${this.id}`);
+  async textChat(modelId: string, prompt: string): Promise<string> {
+    throw new Error(`textChat is not supported by provider ${this.id}`);
   }
 
   /** Chat with an image (image in, text out). Providers without this capability throw. */
-  async chatWithImage(
+  async imageChat(
     modelId: string,
     prompt: string,
     image: { bytes: Buffer; mimeType: string },
   ): Promise<string> {
-    throw new Error(`chatWithImage is not supported by provider ${this.id}`);
+    throw new Error(`imageChat is not supported by provider ${this.id}`);
   }
 }

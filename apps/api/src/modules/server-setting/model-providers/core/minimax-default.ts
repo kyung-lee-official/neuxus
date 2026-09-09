@@ -74,7 +74,7 @@ export class MinimaxDefaultProvider extends ModelProvider<MinimaxDefaultConnecti
     )) as unknown as MinimaxDefaultConnection;
   }
 
-  override async chat(modelId: string, prompt: string): Promise<string> {
+  override async textChat(modelId: string, prompt: string): Promise<string> {
     const content: MessageContentBlock[] = [{ type: "text", text: prompt }];
 
     const conn = await this.loadConnection();
@@ -128,7 +128,7 @@ export class MinimaxDefaultProvider extends ModelProvider<MinimaxDefaultConnecti
     return parts.join("\n\n");
   }
 
-  override async chatWithImage(
+  override async imageChat(
     modelId: string,
     prompt: string,
     image: { bytes: Buffer; mimeType: string },

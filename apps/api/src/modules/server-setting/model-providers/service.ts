@@ -115,7 +115,7 @@ export abstract class ModelProviders {
     }
   }
 
-  /** One-shot chat test against an explicit model on its provider. */
+  /** One-shot textChat test against an explicit model on its provider. */
   static async testChat(
     providerId: string,
     body: ModelProvidersModel["chatTestBody"],
@@ -123,7 +123,7 @@ export abstract class ModelProviders {
     const provider = getProvider(providerId);
     const model = requireModel(providerId, body.modelId, "text");
     try {
-      const response = await provider.chat(model.id, body.prompt);
+      const response = await provider.textChat(model.id, body.prompt);
       return { modelId: model.id, response };
     } catch (err) {
       throw status(400, asError(err));
@@ -139,7 +139,7 @@ export abstract class ModelProviders {
     const model = requireModel(providerId, body.modelId, "vision");
     const bytes = Buffer.from(body.image.data, "base64");
     try {
-      const response = await provider.chatWithImage(model.id, body.prompt, {
+      const response = await provider.imageChat(model.id, body.prompt, {
         bytes,
         mimeType: body.image.mimeType,
       });
