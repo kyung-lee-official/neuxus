@@ -25,4 +25,22 @@ export abstract class ModelProvider<C extends {}> implements Provider {
 
   /** Save this provider's connection payload. */
   abstract saveConnection(raw: unknown): Promise<C>;
+
+  /** Embed texts → vectors. Providers without this capability throw. */
+  async embed(modelId: string, texts: string[]): Promise<number[][]> {
+    throw new Error(`embed is not supported by provider ${this.id}`);
+  }
+
+  /** Chat (text in, text out). Providers without this capability throw. */
+  async chat(modelId: string, prompt: string): Promise<string> {
+    throw new Error(`chat is not supported by provider ${this.id}`);
+  }
+
+  /** Describe an image. Providers without this capability throw. */
+  async describeImage(
+    modelId: string,
+    image: { bytes: Buffer; mimeType: string },
+  ): Promise<string> {
+    throw new Error(`describeImage is not supported by provider ${this.id}`);
+  }
 }

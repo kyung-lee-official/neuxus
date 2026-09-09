@@ -66,6 +66,57 @@ export class OllamaProvider extends ModelProvider<OllamaConnection> {
       raw,
     )) as unknown as OllamaConnection;
   }
+
+  /** Wire call for this provider: Ollama `/api/embed`. */
+  private async requestEmbedding(
+    modelId: string,
+    texts: string[],
+  ): Promise<number[][]> {
+    const conn = await this.loadConnection();
+    if (!conn || !("baseUrl" in conn) || typeof conn.baseUrl !== "string")
+      throw new Error(`No connection for provider ${this.id}`);
+    const res = await fetch(`${conn.baseUrl.replace(/\/$/, "")}/api/embed`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: modelId,
+        input: texts.length === 1 ? texts[0] : texts,
+      }),
+    });
+    const raw = await res.text();
+    if (!res.ok)
+      throw new Error(raw.trim() || `Ollama embed failed (${res.status})`);
+    let json: { embeddings?: unknown; embedding?: unknown };
+    try {
+      json = JSON.parse(raw);
+    } catch {
+      throw new Error("Ollama embed returned non-JSON");
+    }
+    const rows = Array.isArray(json.embeddings)
+      ? json.embeddings
+      : json.embedding
+        ? [json.embedding]
+        : [];
+    const vectors = rows.map((row) => {
+      if (!Array.isArray(row))
+        throw new Error("Ollama embeddings: row not a number vector");
+      return row.map((n) => {
+        if (typeof n !== "number" || !Number.isFinite(n))
+          throw new Error("Ollama embeddings: row not a number vector");
+        return n;
+      });
+    });
+    if (vectors.length !== texts.length)
+      throw new Error("Ollama embeddings count mismatch");
+    return vectors;
+  }
+
+  override async embed(modelId: string, texts: string[]): Promise<number[][]> {
+    const conn = await this.loadConnection();
+    if (!conn || !("baseUrl" in conn) || typeof conn.baseUrl !== "string")
+      throw new Error(`No connection for provider ${this.id}`);
+    return this.requestEmbedding(modelId, texts);
+  }
 }
 
 export const provider = new OllamaProvider();

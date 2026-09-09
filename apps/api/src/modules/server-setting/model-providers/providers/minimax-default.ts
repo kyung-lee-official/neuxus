@@ -10,6 +10,13 @@ import { PROVIDER_MINIMAX_DEFAULT } from "./types.ts";
 
 export type MinimaxDefaultConnection = { apiKey: string };
 
+type MessageContentBlock =
+  | { type: "text"; text: string }
+  | {
+      type: "image";
+      source: { type: "base64"; media_type: string; data: string };
+    };
+
 export class MinimaxDefaultProvider extends ModelProvider<MinimaxDefaultConnection> {
   override readonly id = PROVIDER_MINIMAX_DEFAULT;
   override readonly displayName = "Minimax";
@@ -65,6 +72,86 @@ export class MinimaxDefaultProvider extends ModelProvider<MinimaxDefaultConnecti
       this.id,
       raw,
     )) as unknown as MinimaxDefaultConnection;
+  }
+  /** Wire call for this provider: Anthropic Messages API (`POST {baseUrl}/v1/messages`). */
+  private async postMessages(
+    modelId: string,
+    apiKey: string,
+    content: MessageContentBlock[],
+  ): Promise<string> {
+    if (!this.baseUrl) throw new Error(`No base URL for provider ${this.id}`);
+    const res = await fetch(`${this.baseUrl.replace(/\/$/, "")}/v1/messages`, {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "Content-Type": "application/json",
+        ...(this.headers ?? {}),
+      },
+      body: JSON.stringify({
+        model: modelId,
+        max_tokens: 4096,
+        temperature: 1,
+        system: "You are a helpful assistant.",
+        messages: [{ role: "user", content }],
+      }),
+    });
+    const raw = await res.text();
+    if (!res.ok) {
+      let msg: string | null = null;
+      try {
+        const j = JSON.parse(raw) as { error?: { message?: string } };
+        msg = j.error?.message?.trim() ?? null;
+      } catch {
+        /* ignore */
+      }
+      throw new Error(
+        msg || raw.trim() || `Request failed with status ${res.status}`,
+      );
+    }
+    let json: { content?: Array<{ type?: string; text?: string }> };
+    try {
+      json = JSON.parse(raw);
+    } catch {
+      throw new Error("Anthropic-compatible provider returned non-JSON");
+    }
+    const parts = (json.content ?? [])
+      .filter(
+        (b) =>
+          b.type === "text" && typeof b.text === "string" && b.text!.trim(),
+      )
+      .map((b) => b.text!.trim());
+    if (parts.length === 0) throw new Error("Model returned empty content");
+    return parts.join("\n\n");
+  }
+  override async chat(modelId: string, prompt: string): Promise<string> {
+    const conn = await this.loadConnection();
+    if (!conn || !("apiKey" in conn))
+      throw new Error(`No api key saved for provider ${this.id}`);
+    if (!this.baseUrl) throw new Error(`No base URL for provider ${this.id}`);
+    return this.postMessages(modelId, (conn as { apiKey: string }).apiKey, [
+      { type: "text", text: prompt },
+    ]);
+  }
+
+  override async describeImage(
+    modelId: string,
+    image: { bytes: Buffer; mimeType: string },
+  ): Promise<string> {
+    const conn = await this.loadConnection();
+    if (!conn || !("apiKey" in conn))
+      throw new Error(`No api key saved for provider ${this.id}`);
+    if (!this.baseUrl) throw new Error(`No base URL for provider ${this.id}`);
+    return this.postMessages(modelId, (conn as { apiKey: string }).apiKey, [
+      {
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: image.mimeType,
+          data: image.bytes.toString("base64"),
+        },
+      },
+      { type: "text", text: "Describe this image in one concise paragraph." },
+    ]);
   }
 }
 
