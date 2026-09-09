@@ -1,83 +1,168 @@
+/**
+ * Model-providers business layer.
+ *
+ * Providers and their connections are resources backed by the locked
+ * `core` module. Every operation resolves a provider singleton from the
+ * catalog and delegates through it (its own validation + connection
+ * load/save + capability calls).
+ */
+
 import { status } from "elysia";
-import { revalidateTaskAssignments } from "../task-model-map/dal.ts";
 import {
-  allModels,
+  type AnyProvider,
+  getModel,
+  getProviderById,
   PROVIDERS,
-  type ProviderConnection,
 } from "./core/catalog.ts";
-import {
-  loadProviderConnections,
-  saveProviderConnections,
-} from "./core/dal.ts";
-import { runTestChat, runTestEmbed } from "./diagnostics.ts";
+import { saveProviderConnections } from "./core/dal.ts";
 import type { ModelProvidersModel } from "./model.ts";
 
-function providerResponse(config: {
-  providerConnections: Record<string, ProviderConnection>;
-}): ModelProvidersModel["response"] {
+function unknownProvider(providerId: string): never {
+  throw status(404, { error: `Unknown provider: ${providerId}` });
+}
+
+function asError(err: unknown): { error: string } {
+  const msg = err instanceof Error ? err.message : String(err);
+  return { error: msg };
+}
+
+/** Serialize a provider singleton to its catalog view (data only). */
+function toProviderView(
+  provider: AnyProvider,
+): ModelProvidersModel["providersResponse"]["providers"][number] {
   return {
-    config: { providerConnections: config.providerConnections },
-    providers: [
-      ...PROVIDERS,
-    ] as unknown as ModelProvidersModel["response"]["providers"],
-    models: allModels(),
+    id: provider.id,
+    displayName: provider.displayName,
+    ...(provider.baseUrl ? { baseUrl: provider.baseUrl } : {}),
+    ...(provider.headers ? { headers: provider.headers } : {}),
+    models: provider.models.map((model) => ({ ...model })),
   };
 }
 
+function getProvider(providerId: string): AnyProvider {
+  const provider = getProviderById(providerId);
+  if (!provider) unknownProvider(providerId);
+  return provider;
+}
+
 export abstract class ModelProviders {
-  /** Read the saved per-provider connections plus the static catalog. */
-  static async get(): Promise<ModelProvidersModel["response"]> {
-    const providerConnections = await loadProviderConnections();
-    return providerResponse({ providerConnections });
+  /** Static catalog: providers with their models nested. */
+  static async getProviders(): Promise<
+    ModelProvidersModel["providersResponse"]
+  > {
+    return { providers: PROVIDERS.map((p) => toProviderView(p)) };
   }
 
-  /** Update per-provider connections (partial); revalidate task assignments. */
-  static async put(
-    body: ModelProvidersModel["putBody"],
-  ): Promise<ModelProvidersModel["response"]> {
-    const providerConnections = await saveProviderConnections(
-      body.providerConnections as Record<string, unknown> | undefined,
-    );
-    await revalidateTaskAssignments(providerConnections);
-    return providerResponse({ providerConnections });
+  /** Read one provider's saved connection payload (or null). */
+  static async getConnection(
+    providerId: string,
+  ): Promise<ModelProvidersModel["connectionResponse"]> {
+    const provider = getProvider(providerId);
+    const connection = await provider.loadConnection();
+    return { providerId, connection };
   }
 
-  /**
-   * Embed a hardcoded diagnostic string via the clicked catalog model and
-   * return the raw vector. Used by the per-model "Test embed" button on
-   * the providers page. Tests the model itself over its provider's saved
-   * connection — no task assignment is required.
-   */
+  /** Save one provider's connection payload (validated by the provider). */
+  static async putConnection(
+    providerId: string,
+    body: ModelProvidersModel["connectionBody"],
+  ): Promise<ModelProvidersModel["connectionResponse"]> {
+    const provider = getProvider(providerId);
+    if (
+      body.connection == null ||
+      typeof body.connection !== "object" ||
+      Array.isArray(body.connection)
+    ) {
+      throw status(400, { error: "connection must be an object" });
+    }
+    try {
+      const connection = await provider.saveConnection(body.connection);
+      return { providerId, connection };
+    } catch (err) {
+      throw status(400, asError(err));
+    }
+  }
+
+  /** Clear one provider's saved connection. */
+  static async deleteConnection(
+    providerId: string,
+  ): Promise<ModelProvidersModel["deleteResponse"]> {
+    getProvider(providerId);
+    await saveProviderConnections({ [providerId]: null });
+    return { providerId, deleted: true };
+  }
+
+  /** One-shot embed test against an explicit model on its provider. */
   static async testEmbed(
-    body: ModelProvidersModel["embedBody"],
-  ): Promise<ModelProvidersModel["embedResponse"]> {
+    providerId: string,
+    body: ModelProvidersModel["embedTestBody"],
+  ): Promise<ModelProvidersModel["embedTestResponse"]> {
+    const provider = getProvider(providerId);
+    const model = requireModel(providerId, body.modelId, "embedding");
+    const text = body.text?.trim() || "Why is the sky blue?";
     try {
-      return await runTestEmbed("Why is the sky blue?", {
-        providerId: body.providerId,
-        modelId: body.modelId,
-      });
+      const vectors = await provider.embed(model.id, [text]);
+      const embedding = vectors[0];
+      if (!embedding) throw new Error("Embedder returned no vector");
+      return {
+        embedding,
+        modelId: model.id,
+        dim: embedding.length,
+        inputText: text,
+      };
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      throw status(400, { error: msg });
+      throw status(400, asError(err));
     }
   }
 
-  /**
-   * Run a one-shot chat call on the clicked catalog model (sends the
-   * vendor's official sample request) over its provider's saved
-   * connection. Tests the model itself — no text task assignment required.
-   */
+  /** One-shot chat test against an explicit model on its provider. */
   static async testChat(
-    body: ModelProvidersModel["chatBody"],
-  ): Promise<ModelProvidersModel["chatResponse"]> {
+    providerId: string,
+    body: ModelProvidersModel["chatTestBody"],
+  ): Promise<ModelProvidersModel["textTestResponse"]> {
+    const provider = getProvider(providerId);
+    const model = requireModel(providerId, body.modelId, "text");
     try {
-      return await runTestChat({
-        providerId: body.providerId,
-        modelId: body.modelId,
-      });
+      const response = await provider.chat(model.id, body.prompt);
+      return { modelId: model.id, response };
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      throw status(400, { error: msg });
+      throw status(400, asError(err));
     }
   }
+
+  /** One-shot image test against an explicit model on its provider. */
+  static async testImage(
+    providerId: string,
+    body: ModelProvidersModel["imageTestBody"],
+  ): Promise<ModelProvidersModel["textTestResponse"]> {
+    const provider = getProvider(providerId);
+    const model = requireModel(providerId, body.modelId, "vision");
+    const bytes = Buffer.from(body.image.data, "base64");
+    try {
+      const response = await provider.chatWithImage(model.id, body.prompt, {
+        bytes,
+        mimeType: body.image.mimeType,
+      });
+      return { modelId: model.id, response };
+    } catch (err) {
+      throw status(400, asError(err));
+    }
+  }
+}
+
+function requireModel(
+  providerId: string,
+  modelId: string,
+  capability: "embedding" | "text" | "vision",
+): NonNullable<ReturnType<typeof getModel>> {
+  const model = getModel(providerId, modelId);
+  if (!model) {
+    throw status(404, { error: `Unknown model: ${providerId}/${modelId}` });
+  }
+  if (model.capabilities[capability] !== true) {
+    throw status(400, {
+      error: `Model ${providerId}/${modelId} does not support the ${capability} capability`,
+    });
+  }
+  return model;
 }

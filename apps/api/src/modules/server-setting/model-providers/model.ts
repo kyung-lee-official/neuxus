@@ -1,18 +1,10 @@
 import { type Static, t } from "elysia";
 
-/** A provider connection payload is provider-specific; validated per provider in the DAL/catalog. */
+/** A provider connection payload is provider-specific; validated per provider in core. */
 const connectionValueSchema = t.Any();
-
-const providerSchema = t.Object({
-  id: t.String(),
-  displayName: t.String(),
-  baseUrl: t.Optional(t.String({ format: "uri" })),
-  headers: t.Optional(t.Record(t.String(), t.String())),
-});
 
 const modelSchema = t.Object({
   id: t.String(),
-  providerId: t.String(),
   displayName: t.String(),
   capabilities: t.Object({
     embedding: t.Optional(t.Literal(true)),
@@ -27,49 +19,74 @@ const modelSchema = t.Object({
   }),
 });
 
+const providerSchema = t.Object({
+  id: t.String(),
+  displayName: t.String(),
+  baseUrl: t.Optional(t.String({ format: "uri" })),
+  headers: t.Optional(t.Record(t.String(), t.String())),
+  models: t.Array(modelSchema),
+});
+
+const providerIdParams = t.Object({
+  providerId: t.String(),
+});
+
 export const ModelProvidersModel = {
-  /**
-   * GET /model-providers response: saved per-provider connections + the
-   * static catalog. App task→model assignment is a separate resource
-   * (`/task-model-map`).
-   */
-  response: t.Object({
-    config: t.Object({
-      providerConnections: t.Record(t.String(), connectionValueSchema),
-    }),
+  /** GET /model-providers/providers: the static catalog, providers with nested models. */
+  providersResponse: t.Object({
     providers: t.Array(providerSchema),
-    models: t.Array(modelSchema),
   }),
 
-  /** PUT /model-providers body: partial per-provider connections. */
-  putBody: t.Object({
-    providerConnections: t.Optional(
-      t.Record(t.String(), connectionValueSchema),
-    ),
-  }),
-
-  /** POST /model-providers/test/embed body: which catalog model to embed with. */
-  embedBody: t.Object({
+  /** GET/PUT .../providers/:providerId/connection response. */
+  connectionResponse: t.Object({
     providerId: t.String(),
-    modelId: t.String(),
+    connection: connectionValueSchema,
   }),
 
-  /** POST /model-providers/test/embed response: raw vector from the embedder. */
-  embedResponse: t.Object({
+  /** PUT .../providers/:providerId/connection body. */
+  connectionBody: t.Object({
+    connection: connectionValueSchema,
+  }),
+
+  /** DELETE .../providers/:providerId/connection response. */
+  deleteResponse: t.Object({
+    providerId: t.String(),
+    deleted: t.Literal(true),
+  }),
+
+  /** POST .../providers/:providerId/test/embed body. */
+  embedTestBody: t.Object({
+    modelId: t.String(),
+    text: t.Optional(t.String()),
+  }),
+
+  /** POST .../providers/:providerId/test/embed response. */
+  embedTestResponse: t.Object({
     embedding: t.Array(t.Number()),
     modelId: t.String(),
     dim: t.Integer({ minimum: 1 }),
     inputText: t.String(),
   }),
 
-  /** POST /model-providers/test/chat body: which catalog model to chat with. */
-  chatBody: t.Object({
-    providerId: t.String(),
+  /** POST .../providers/:providerId/test/chat body. */
+  chatTestBody: t.Object({
     modelId: t.String(),
+    prompt: t.String(),
   }),
 
-  /** POST /model-providers/test/chat response. */
-  chatResponse: t.Object({
+  /** POST .../providers/:providerId/test/image body. */
+  imageTestBody: t.Object({
+    modelId: t.String(),
+    prompt: t.String(),
+    image: t.Object({
+      mimeType: t.String(),
+      /** Base64 image bytes (no `data:` prefix). */
+      data: t.String(),
+    }),
+  }),
+
+  /** POST .../providers/:providerId/test/{chat,image} response. */
+  textTestResponse: t.Object({
     modelId: t.String(),
     response: t.String(),
   }),
@@ -80,3 +97,5 @@ export type ModelProvidersModel = {
     (typeof ModelProvidersModel)[K]
   >;
 };
+
+export { providerIdParams };
