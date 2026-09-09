@@ -9,7 +9,7 @@ import {
   CAPABILITY_TEXT,
   CAPABILITY_VISION,
 } from "./dal.ts";
-import type { Provider } from "./providers/types.ts";
+import type { Model, Provider } from "./providers/types.ts";
 
 /** Canonical capability tags — derived from the constants in `dal.ts`. */
 export type CapabilityTag =
@@ -18,22 +18,6 @@ export type CapabilityTag =
   | typeof CAPABILITY_VISION;
 
 export type Capabilities = Partial<Record<CapabilityTag, true>>;
-
-export type Model = {
-  /** Model id, unique *within its provider* (scoped by `Provider.id`). */
-  id: string;
-  /** Human-readable name shown in the admin dropdown. */
-  displayName: string;
-  /** What this model can do. */
-  capabilities: Capabilities;
-  /** Hardcoded per-model defaults (catalog owns the wire params). */
-  defaults: {
-    contextWindowTokens?: number;
-    maxOutputTokens?: number;
-    embeddingDimensions?: number;
-    temperature?: number;
-  };
-};
 
 /** Flat model view with its owning provider id attached (for APIs/consumers). */
 export type ProviderModel = Model & {
