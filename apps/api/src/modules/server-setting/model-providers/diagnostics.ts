@@ -13,8 +13,15 @@ import {
   textFromAnthropicResponse,
 } from "./adapters/anthropic-messages.ts";
 import { OllamaEmbeddingsClient } from "./adapters/ollama-embed.ts";
-import { getModel } from "./catalog.ts";
 import { loadConfigByModelProviderId } from "./dal.ts";
+import { getModel, getProviderById } from "./providers/catalog.ts";
+import {
+  PROVIDER_DEEPSEEK,
+  PROVIDER_MINIMAX_DEFAULT,
+  PROVIDER_MINIMAX_TOKEN_PLAN,
+  PROVIDER_OLLAMA,
+} from "./providers/ids.ts";
+import type { OllamaConnection } from "./providers/ollama.ts";
 
 /** Uniquely identifies a catalog model: names are unique within a provider. */
 export type ModelTarget = {
@@ -59,9 +66,21 @@ export async function runTestEmbed(
       `No saved connection for provider ${target.providerId}. Save one under Server settings → Providers first.`,
     );
   }
+  const provider = getProviderById(target.providerId);
+  if (!provider) {
+    throw new Error(`Unknown provider: ${target.providerId}`);
+  }
+  if (provider.id !== PROVIDER_OLLAMA) {
+    throw new Error(
+      `Embed test is not implemented for provider: ${provider.id}`,
+    );
+  }
+  if (!("baseUrl" in connection)) {
+    throw new Error(`Invalid ollama connection for ${target.providerId}`);
+  }
   const client = new OllamaEmbeddingsClient({
-    baseUrl: connection.baseUrl ?? "",
-    apiKey: connection.apiKey,
+    baseUrl: (connection as OllamaConnection).baseUrl,
+    apiKey: null,
   });
   const vectors = await client.embed(model.id, [trimmed]);
   const embedding = vectors[0];
@@ -106,15 +125,32 @@ export async function runTestChat(
       `No saved connection for provider ${target.providerId}. Save one under Server settings → Providers first.`,
     );
   }
-  const apiKey = connection.apiKey;
-  if (!apiKey) {
+  const provider = getProviderById(target.providerId);
+  if (!provider) {
+    throw new Error(`Unknown provider: ${target.providerId}`);
+  }
+  const anthropicLike = new Set([
+    PROVIDER_MINIMAX_DEFAULT,
+    PROVIDER_MINIMAX_TOKEN_PLAN,
+    PROVIDER_DEEPSEEK,
+  ]);
+  if (!anthropicLike.has(provider.id)) {
+    throw new Error(
+      `Chat test is not implemented for provider: ${provider.id}`,
+    );
+  }
+  if (!("apiKey" in connection) || typeof connection.apiKey !== "string") {
     throw new Error(
       `No API key saved for provider ${target.providerId}. Save one under Server settings → Providers first.`,
     );
   }
+  const baseUrl = provider.baseUrl;
+  if (!baseUrl) {
+    throw new Error(`No base URL for provider ${target.providerId}`);
+  }
   const client = new AnthropicMessagesClient({
-    baseUrl: connection.baseUrl ?? "",
-    apiKey,
+    baseUrl,
+    apiKey: connection.apiKey,
   });
   const json = await client.sendMessage({
     model: model.id,

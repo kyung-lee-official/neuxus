@@ -1,52 +1,22 @@
 import { status } from "elysia";
 import { revalidateTaskAssignments } from "../task-model-map/dal.ts";
-import { allModels, PROVIDERS } from "./catalog.ts";
 import { loadProviderConnections, saveProviderConnections } from "./dal.ts";
 import { runTestChat, runTestEmbed } from "./diagnostics.ts";
 import type { ModelProvidersModel } from "./model.ts";
-import type { ProviderConnection } from "./types.ts";
-
-function readConnection(value: unknown): ProviderConnection | null {
-  if (value == null || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-  const v = value as Record<string, unknown>;
-  return {
-    apiKey:
-      typeof v.apiKey === "string" && v.apiKey.trim() !== ""
-        ? v.apiKey.trim()
-        : null,
-    baseUrl:
-      typeof v.baseUrl === "string" && v.baseUrl.trim() !== ""
-        ? v.baseUrl.trim()
-        : null,
-    port:
-      typeof v.port === "number" && Number.isInteger(v.port) && v.port > 0
-        ? v.port
-        : null,
-  };
-}
-
-function readProviderConnections(
-  raw: unknown,
-): Record<string, ProviderConnection | null> | undefined {
-  if (raw == null || typeof raw !== "object" || Array.isArray(raw))
-    return undefined;
-  const out: Record<string, ProviderConnection | null> = {};
-  for (const [providerId, value] of Object.entries(
-    raw as Record<string, unknown>,
-  )) {
-    out[providerId] = readConnection(value);
-  }
-  return out;
-}
+import {
+  allModels,
+  PROVIDERS,
+  type ProviderConnection,
+} from "./providers/catalog.ts";
 
 function providerResponse(config: {
   providerConnections: Record<string, ProviderConnection>;
 }): ModelProvidersModel["response"] {
   return {
     config: { providerConnections: config.providerConnections },
-    providers: [...PROVIDERS],
+    providers: [
+      ...PROVIDERS,
+    ] as unknown as ModelProvidersModel["response"]["providers"],
     models: allModels(),
   };
 }
@@ -63,7 +33,7 @@ export abstract class ModelProviders {
     body: ModelProvidersModel["putBody"],
   ): Promise<ModelProvidersModel["response"]> {
     const providerConnections = await saveProviderConnections(
-      readProviderConnections(body.providerConnections),
+      body.providerConnections as Record<string, unknown> | undefined,
     );
     await revalidateTaskAssignments(providerConnections);
     return providerResponse({ providerConnections });

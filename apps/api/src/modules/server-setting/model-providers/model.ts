@@ -1,27 +1,13 @@
 import { type Static, t } from "elysia";
 
-/** One persisted per-provider connection (`app_model_provider_config.providerConnections`). */
-const connectionSchema = t.Object({
-  apiKey: t.Union([t.String(), t.Null()]),
-  baseUrl: t.Union([t.String({ format: "uri" }), t.Null()], {
-    error: "baseUrl must be a valid URI",
-  }),
-  port: t.Union([t.Integer({ minimum: 1, maximum: 65535 }), t.Null()]),
-});
+/** A provider connection payload is provider-specific; validated per provider in the DAL/catalog. */
+const connectionValueSchema = t.Any();
 
 const providerSchema = t.Object({
   id: t.String(),
   displayName: t.String(),
-  baseUrl: t.String(),
-  requestShape: t.Union([
-    t.Literal("anthropic-messages"),
-    t.Literal("openai-embeddings"),
-    t.Literal("ollama-embed"),
-  ]),
+  baseUrl: t.Optional(t.String({ format: "uri" })),
   headers: t.Optional(t.Record(t.String(), t.String())),
-  userInputs: t.Array(
-    t.Union([t.Literal("apiKey"), t.Literal("baseUrl"), t.Literal("port")]),
-  ),
 });
 
 const modelSchema = t.Object({
@@ -49,7 +35,7 @@ export const ModelProvidersModel = {
    */
   response: t.Object({
     config: t.Object({
-      providerConnections: t.Record(t.String(), connectionSchema),
+      providerConnections: t.Record(t.String(), connectionValueSchema),
     }),
     providers: t.Array(providerSchema),
     models: t.Array(modelSchema),
@@ -57,7 +43,9 @@ export const ModelProvidersModel = {
 
   /** PUT /model-providers body: partial per-provider connections. */
   putBody: t.Object({
-    providerConnections: t.Optional(t.Record(t.String(), connectionSchema)),
+    providerConnections: t.Optional(
+      t.Record(t.String(), connectionValueSchema),
+    ),
   }),
 
   /** POST /model-providers/test/embed body: which catalog model to embed with. */
