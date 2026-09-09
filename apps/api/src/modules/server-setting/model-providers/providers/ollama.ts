@@ -68,10 +68,7 @@ export class OllamaProvider extends ModelProvider<OllamaConnection> {
   }
 
   /** Wire call for this provider: Ollama `/api/embed`. */
-  private async requestEmbedding(
-    modelId: string,
-    texts: string[],
-  ): Promise<number[][]> {
+  override async embed(modelId: string, texts: string[]): Promise<number[][]> {
     const conn = await this.loadConnection();
     if (!conn || !("baseUrl" in conn) || typeof conn.baseUrl !== "string")
       throw new Error(`No connection for provider ${this.id}`);
@@ -109,13 +106,6 @@ export class OllamaProvider extends ModelProvider<OllamaConnection> {
     if (vectors.length !== texts.length)
       throw new Error("Ollama embeddings count mismatch");
     return vectors;
-  }
-
-  override async embed(modelId: string, texts: string[]): Promise<number[][]> {
-    const conn = await this.loadConnection();
-    if (!conn || !("baseUrl" in conn) || typeof conn.baseUrl !== "string")
-      throw new Error(`No connection for provider ${this.id}`);
-    return this.requestEmbedding(modelId, texts);
   }
 }
 
