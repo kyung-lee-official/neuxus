@@ -1,10 +1,7 @@
 /**
- * Model registry: capability tags, model + provider shapes, and resolved
- * connections.
- *
- * The catalog (`catalog.ts`) owns every supported model and provider.
- * Deployment wiring — saved per-provider connections and which model serves
- * which app task — lives outside this registry (`shared/task-model-map`).
+ * Model registry base types: capability tags, provider + model shapes.
+ * Provider-specific connection types live with each provider module under
+ * `providers/<providerId>.ts`.
  */
 
 import {
@@ -21,26 +18,13 @@ export type CapabilityTag =
 
 export type Capabilities = Partial<Record<CapabilityTag, true>>;
 
-/**
- * User-overridable fields the catalog supports. The UI renders only the
- * fields declared by the chosen model's provider.
- */
-export type UserInputField = "apiKey" | "baseUrl" | "port";
-
-export type RequestShape =
-  | "anthropic-messages"
-  | "openai-embeddings"
-  | "ollama-embed";
-
 export type Provider = {
   id: string;
   displayName: string;
-  baseUrl: string;
-  requestShape: RequestShape;
+  /** Fixed upstream endpoint, when the provider's connection has no base URL. */
+  baseUrl?: string;
   /** Extra headers always sent (e.g. `anthropic-version`). */
   headers?: Record<string, string>;
-  /** Fields the admin UI must expose for this provider. */
-  userInputs: UserInputField[];
   /** Models this provider serves. The provider scopes model identity. */
   models: Model[];
 };
@@ -67,29 +51,8 @@ export type ProviderModel = Model & {
 };
 
 /**
- * Per-provider connection settings (one row in the
- * `providerConnections` map on `app_model_provider_config`). Connection fields
- * are provider-level — every model under one provider shares the same
- * key, base URL, and port — so the map is keyed by `providerId`, not
- * `modelId`. Each field is always defined (may be `null`) so the JSON
- * shape round-trips cleanly.
- */
-export type ProviderConnection = {
-  /** API key sent on every request to this provider. Required when the
-   * provider's `userInputs` contains `"apiKey"`; otherwise leave null. */
-  apiKey: string | null;
-  /** Base URL override (e.g. local Ollama). Replaces the provider's
-   * catalog `baseUrl` entirely when set. */
-  baseUrl: string | null;
-  /** Port override. Replaces the port of the (provider default or
-   * overridden) base URL when set. */
-  port: number | null;
-};
-
-/**
- * Connection merged with the provider's catalog defaults — what
- * adapters actually use to reach the upstream API. `baseUrl` is the
- * post-override URL; `apiKey` is the post-default null value.
+ * Connection merged with the provider's catalog defaults — what adapter
+ * clients actually use to reach the upstream API.
  */
 export type ResolvedConnection = {
   baseUrl: string;
@@ -98,8 +61,6 @@ export type ResolvedConnection = {
 
 /**
  * Resolved at runtime: catalog entry + provider + resolved connection.
- * Callers can hand `connection` straight to adapter clients — clients
- * no longer recompute the baseUrl / apiKey from `Provider`.
  */
 export type ResolvedModel = {
   task: CapabilityTag;

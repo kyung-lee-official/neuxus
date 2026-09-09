@@ -1,127 +1,44 @@
 /**
- * Single source of truth for the model catalog: providers with their
- * models nested underneath. Model identity is scoped by provider — the
- * same model id may exist under different providers.
- *
- * The admin UI renders the provider list from `PROVIDERS`; flat helpers
- * (`allModels`, `getModel`, `getModelsByCapability`) feed consumers that
- * need provider-independent views (APIs, diagnostics, dropdowns).
+ * Model catalog: aggregates the self-contained providers under
+ * `providers/`. Each provider owns its models, connection type, and
+ * validation; this module just composes them and offers flat lookups.
  */
 
-import type {
-  CapabilityTag,
-  Model,
-  Provider,
-  ProviderConnection,
-  ProviderModel,
-} from "./types.ts";
-
-export const ANTHROPIC_VERSION = "2023-06-01";
-
-const anthropicHeaders = {
-  "anthropic-version": ANTHROPIC_VERSION,
-} as const;
+import {
+  type DeepSeekConnection,
+  provider as deepseek,
+  validateConnection as validateDeepSeek,
+} from "./providers/deepseek.ts";
+import {
+  type MinimaxDefaultConnection,
+  provider as minimaxDefault,
+  validateConnection as validateMinimaxDefault,
+} from "./providers/minimax-default.ts";
+import {
+  type MinimaxTokenPlanConnection,
+  provider as minimaxTokenPlan,
+  validateConnection as validateMinimaxTokenPlan,
+} from "./providers/minimax-token-plan.ts";
+import {
+  type OllamaConnection,
+  provider as ollama,
+  validateConnection as validateOllama,
+} from "./providers/ollama.ts";
+import type { CapabilityTag, Model, Provider, ProviderModel } from "./types.ts";
 
 export const PROVIDERS: readonly Provider[] = [
-  {
-    id: "minimax-default",
-    displayName: "Minimax",
-    baseUrl: "https://api.minimaxi.com/anthropic",
-    requestShape: "anthropic-messages",
-    headers: anthropicHeaders,
-    userInputs: ["apiKey"],
-    models: [
-      {
-        id: "MiniMax-M3",
-        displayName: "MiniMax-M3",
-        capabilities: { text: true, vision: true },
-        defaults: {
-          contextWindowTokens: 1_000_000,
-          maxOutputTokens: 4096,
-          temperature: 1,
-        },
-      },
-    ],
-  },
-  {
-    id: "minimax-token-plan",
-    displayName: "Minimax (Token Plan)",
-    baseUrl: "https://api.minimaxi.com/anthropic/v1/token-plan",
-    requestShape: "anthropic-messages",
-    headers: anthropicHeaders,
-    userInputs: ["apiKey"],
-    models: [
-      {
-        id: "MiniMax-M3",
-        displayName: "MiniMax-M3 (Token Plan)",
-        capabilities: { text: true, vision: true },
-        defaults: {
-          contextWindowTokens: 1_000_000,
-          maxOutputTokens: 4096,
-          temperature: 1,
-        },
-      },
-    ],
-  },
-  {
-    id: "deepseek",
-    displayName: "DeepSeek",
-    baseUrl: "https://api.deepseek.com/anthropic",
-    requestShape: "anthropic-messages",
-    headers: anthropicHeaders,
-    userInputs: ["apiKey"],
-    models: [
-      {
-        id: "deepseek-v4-flash",
-        displayName: "DeepSeek V4 Flash",
-        capabilities: { text: true },
-        defaults: {
-          contextWindowTokens: 128_000,
-          maxOutputTokens: 8192,
-        },
-      },
-      {
-        id: "deepseek-v4-pro",
-        displayName: "DeepSeek V4 Pro",
-        capabilities: { text: true },
-        defaults: {
-          contextWindowTokens: 128_000,
-          maxOutputTokens: 8192,
-        },
-      },
-      {
-        id: "deepseek-v4-flash-vision-exp",
-        displayName: "DeepSeek V4 Flash Vision (Experimental)",
-        capabilities: { text: true, vision: true },
-        defaults: {
-          contextWindowTokens: 128_000,
-          maxOutputTokens: 8192,
-        },
-      },
-    ],
-  },
-  {
-    id: "ollama",
-    displayName: "Ollama (local)",
-    baseUrl: "http://127.0.0.1:11434",
-    requestShape: "ollama-embed",
-    userInputs: ["baseUrl", "port"],
-    models: [
-      {
-        id: "nomic-embed-text",
-        displayName: "nomic-embed-text:latest",
-        capabilities: { embedding: true },
-        defaults: { embeddingDimensions: 768 },
-      },
-      {
-        id: "embeddinggemma",
-        displayName: "embeddinggemma:latest",
-        capabilities: { embedding: true },
-        defaults: { embeddingDimensions: 768 },
-      },
-    ],
-  },
-] as const;
+  minimaxDefault,
+  minimaxTokenPlan,
+  deepseek,
+  ollama,
+];
+
+/** Saved connection payload for one provider — union of each provider's own type. */
+export type ProviderConnection =
+  | MinimaxDefaultConnection
+  | MinimaxTokenPlanConnection
+  | DeepSeekConnection
+  | OllamaConnection;
 
 export function getProviderById(id: string): Provider | null {
   return PROVIDERS.find((p) => p.id === id) ?? null;
@@ -138,10 +55,7 @@ export function allModels(): ProviderModel[] {
   return out;
 }
 
-/**
- * Find a model by its unique `(providerId, modelId)` pair — model ids are
- * only unique *within* a provider.
- */
+/** Find a model by its `(providerId, modelId)` pair. */
 export function getModel(providerId: string, modelId: string): Model | null {
   const provider = getProviderById(providerId);
   if (!provider) return null;
@@ -157,19 +71,21 @@ export function getModelsByCapability(
   );
 }
 
-/** Whether `conn` fills every field the provider declares in `userInputs`. */
-export function isFullyConfigured(
-  conn: ProviderConnection,
+/** Validate a raw payload against the named provider's own connection type. */
+export function validateProviderConnection(
   providerId: string,
-): { ok: true } | { ok: false; missing: string } {
-  const provider = getProviderById(providerId);
-  if (!provider) return { ok: false, missing: "catalog" };
-  for (const field of provider.userInputs) {
-    if (field === "apiKey" && !conn.apiKey)
-      return { ok: false, missing: "apiKey" };
-    if (field === "baseUrl" && !conn.baseUrl)
-      return { ok: false, missing: "baseUrl" };
-    if (field === "port" && !conn.port) return { ok: false, missing: "port" };
+  value: unknown,
+): { ok: true; connection: ProviderConnection } | { ok: false; error: string } {
+  switch (providerId) {
+    case "minimax-default":
+      return validateMinimaxDefault(value);
+    case "minimax-token-plan":
+      return validateMinimaxTokenPlan(value);
+    case "deepseek":
+      return validateDeepSeek(value);
+    case "ollama":
+      return validateOllama(value);
+    default:
+      return { ok: false, error: `Unknown provider: ${providerId}` };
   }
-  return { ok: true };
 }
