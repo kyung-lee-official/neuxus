@@ -1,10 +1,9 @@
 /**
  * Anthropic Messages protocol adapter.
  *
- * Covers all `requestShape: "anthropic-messages"` providers in
- * `providers.ts` — Minimax (default + token plan) and DeepSeek. Each
- * provider supplies its own `baseUrl` + headers; this module only
- * defines the wire contract.
+ * Covers all `anthropic`-standard providers in the catalog — Minimax
+ * (default + token plan) and DeepSeek. Each provider supplies its own
+ * `baseUrl` + headers; this module only defines the wire contract.
  *
  * MiniMax-M3's Anthropic-compatible endpoint accepts image content
  * blocks: `{ type: "image", source: { type: "base64", media_type, data } }`
