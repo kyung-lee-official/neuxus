@@ -20,8 +20,7 @@ type MessageContentBlock =
 export class MinimaxTokenPlanProvider extends ModelProvider<MinimaxTokenPlanConnection> {
   override readonly id = PROVIDER_MINIMAX_TOKEN_PLAN;
   override readonly displayName = "Minimax (Token Plan)";
-  override readonly baseUrl =
-    "https://api.minimaxi.com/anthropic/v1/token-plan";
+  override readonly baseUrl = "https://api.minimax.cn/anthropic";
   override readonly headers = { "anthropic-version": "2023-06-01" };
   override readonly models: Model[] = [
     {

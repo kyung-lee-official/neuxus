@@ -20,7 +20,7 @@ type MessageContentBlock =
 export class MinimaxDefaultProvider extends ModelProvider<MinimaxDefaultConnection> {
   override readonly id = PROVIDER_MINIMAX_DEFAULT;
   override readonly displayName = "Minimax";
-  override readonly baseUrl = "https://api.minimaxi.com/anthropic";
+  override readonly baseUrl = "https://api.minimax.cn/anthropic";
   override readonly headers = { "anthropic-version": "2023-06-01" };
   override readonly models: Model[] = [
     {
