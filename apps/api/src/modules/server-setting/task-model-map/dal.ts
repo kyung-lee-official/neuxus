@@ -55,32 +55,35 @@ export function requiredCapabilitiesByTask(
 /** Task assignments: task id → catalog model `identifier` (or null). */
 export type TaskAssignments = Record<TaskId, string | null>;
 
-/** Strictly parse one task value: `null` = unassigned; else a catalog model identifier. */
-function parseModelIdentifier(value: unknown, taskId: TaskId): string | null {
-  if (value == null) return null;
-  if (typeof value !== "string") {
-    throw new Error(`Invalid task assignment for ${taskId}`);
-  }
-  if (value !== value.trim() || value !== value.toLowerCase()) {
-    throw new Error(
-      `Task assignment for ${taskId} must be a lowercase, untrimmed identifier`,
-    );
-  }
-  const model = getModelByIdentifier(value);
+/** Validate a task→model link identifier (lowercase, resolves in catalog, can serve the task). */
+function validateTaskModelLink(
+  modelIdentifier: string,
+  taskId: TaskId,
+): string {
+  const model = getModelByIdentifier(modelIdentifier);
   if (!model) {
-    throw new Error(`Unknown model identifier for task ${taskId}: ${value}`);
+    throw new Error(
+      `Unknown model identifier for task ${taskId}: ${modelIdentifier}`,
+    );
   }
   const required = requiredCapabilitiesByTask(taskId);
   if (!required.every((cap) => model.capabilities[cap] === true)) {
-    throw new Error(`Model ${value} cannot serve task ${taskId}`);
+    throw new Error(`Model ${modelIdentifier} cannot serve task ${taskId}`);
   }
-  return value;
+  return modelIdentifier;
 }
 
 function parseTaskAssignments(raw: Record<string, unknown>): TaskAssignments {
   const assignments = {} as TaskAssignments;
   for (const taskId of TASK_IDS) {
-    assignments[taskId] = parseModelIdentifier(raw[taskId], taskId);
+    const value = raw[taskId];
+    if (value == null) {
+      assignments[taskId] = null;
+    } else if (typeof value !== "string") {
+      throw new Error(`Invalid task assignment for ${taskId}`);
+    } else {
+      assignments[taskId] = validateTaskModelLink(value, taskId);
+    }
   }
   return assignments;
 }
@@ -100,33 +103,28 @@ export async function loadAssignments(): Promise<TaskAssignments> {
   return parseTaskAssignments(readJsonField(row?.tasks));
 }
 
-/** Keep only known task ids when a raw body supplies assignments. */
-function pickTaskAssignments(
-  raw: Record<string, unknown> | undefined,
-): Partial<TaskAssignments> | undefined {
-  if (raw == null) return undefined;
-  const out: Partial<TaskAssignments> = {};
-  for (const [key, value] of Object.entries(raw)) {
-    if (!(TASK_IDS as readonly string[]).includes(key)) continue;
-    const taskId = key as TaskId;
-    out[taskId] = parseModelIdentifier(value, taskId);
-  }
-  return Object.keys(out).length > 0 ? out : undefined;
-}
-
 /**
- * Save a partial assignments patch. The pair must resolve in the catalog
- * and cover the task's required capabilities (throws otherwise). Writes
- * only the `app_model_task_config` row.
+ * Save task assignment links. Every supplied key must be a known task id
+ * and every value a catalog model identifier that can serve it — otherwise
+ * this throws. Writes only the `app_model_task_config` row.
  */
 export async function saveAssignments(
-  input: Record<string, unknown> | undefined,
+  input: Record<string, unknown>,
 ): Promise<TaskAssignments> {
-  const existing = await loadAssignments();
-  const merged: TaskAssignments = {
-    ...existing,
-    ...pickTaskAssignments(input),
-  };
+  const merged = await loadAssignments();
+  for (const [key, value] of Object.entries(input)) {
+    if (!(TASK_IDS as readonly string[]).includes(key)) {
+      throw new Error(`Unknown task: ${key}`);
+    }
+    const taskId = key as TaskId;
+    if (value == null) {
+      merged[taskId] = null;
+    } else if (typeof value !== "string") {
+      throw new Error(`Invalid task assignment for ${taskId}`);
+    } else {
+      merged[taskId] = validateTaskModelLink(value, taskId);
+    }
+  }
   await getPrisma().appModelTaskConfig.upsert({
     where: { id: CONFIG_ID },
     create: {
