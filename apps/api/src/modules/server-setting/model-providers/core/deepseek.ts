@@ -24,10 +24,10 @@ export class DeepSeekProvider extends ModelProvider<DeepSeekConnection> {
   override readonly headers = { "anthropic-version": "2023-06-01" };
   override readonly models: Model[] = [
     {
-      identifier: "deepseek::deepseek-v4-flash",
-      modelId: "deepseek-v4-flash",
-      displayName: "DeepSeek V4 Flash",
-      capabilities: { text: true },
+      identifier: "deepseek::deepseek-flash",
+      modelId: "deepseek-flash",
+      displayName: "DeepSeek Flash",
+      capabilities: { text: true, vision: true },
       defaults: {
         contextWindowTokens: 128_000,
         maxOutputTokens: 8192,
@@ -38,16 +38,6 @@ export class DeepSeekProvider extends ModelProvider<DeepSeekConnection> {
       modelId: "deepseek-v4-pro",
       displayName: "DeepSeek V4 Pro",
       capabilities: { text: true },
-      defaults: {
-        contextWindowTokens: 128_000,
-        maxOutputTokens: 8192,
-      },
-    },
-    {
-      identifier: "deepseek::deepseek-v4-flash-vision-exp",
-      modelId: "deepseek-v4-flash-vision-exp",
-      displayName: "DeepSeek V4 Flash Vision (Experimental)",
-      capabilities: { text: true, vision: true },
       defaults: {
         contextWindowTokens: 128_000,
         maxOutputTokens: 8192,
