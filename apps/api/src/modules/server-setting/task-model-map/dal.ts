@@ -42,9 +42,7 @@ export const TASK_IDS = [
 ] as const;
 
 /** Capabilities a model must declare to serve `taskId`. */
-export function requiredCapabilitiesByTask(
-  taskId: TaskId,
-): readonly CapabilityTag[] {
+function requiredCapabilitiesByTask(taskId: TaskId): readonly CapabilityTag[] {
   const task = TASKS.find((t) => t.id === taskId);
   if (!task) {
     throw new Error(`Unknown task id: ${taskId}`);
@@ -73,7 +71,16 @@ function validateTaskModelLink(
   return modelIdentifier;
 }
 
-function parseTaskAssignments(raw: Record<string, unknown>): TaskAssignments {
+/** Read the persisted task assignments. Unknown JSON keys are ignored. */
+export async function loadAssignments(): Promise<TaskAssignments> {
+  const row = await getPrisma().appModelTaskConfig.findUnique({
+    where: { id: CONFIG_ID },
+  });
+  const stored = row?.tasks;
+  const raw: Record<string, unknown> =
+    stored == null || typeof stored !== "object" || Array.isArray(stored)
+      ? {}
+      : (stored as Record<string, unknown>);
   const assignments = {} as TaskAssignments;
   for (const taskId of TASK_IDS) {
     const value = raw[taskId];
@@ -86,21 +93,6 @@ function parseTaskAssignments(raw: Record<string, unknown>): TaskAssignments {
     }
   }
   return assignments;
-}
-
-function readJsonField(
-  raw: Prisma.JsonValue | null | undefined,
-): Record<string, unknown> {
-  if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return {};
-  return raw as Record<string, unknown>;
-}
-
-/** Read the persisted task assignments. Unknown JSON keys are ignored. */
-export async function loadAssignments(): Promise<TaskAssignments> {
-  const row = await getPrisma().appModelTaskConfig.findUnique({
-    where: { id: CONFIG_ID },
-  });
-  return parseTaskAssignments(readJsonField(row?.tasks));
 }
 
 /**
