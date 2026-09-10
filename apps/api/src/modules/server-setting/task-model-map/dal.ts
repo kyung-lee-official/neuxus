@@ -7,16 +7,26 @@
 
 import { Prisma } from "../../../generated/prisma/client.ts";
 import { getPrisma } from "../../../shared/db.ts";
-import { getModelByIdentifier } from "../model-providers/core/catalog.ts";
+import {
+  type AnyProvider,
+  getModelByIdentifier,
+  getProviderById,
+} from "../model-providers/core/catalog.ts";
 import {
   CAPABILITY_EMBEDDING,
   CAPABILITY_TEXT,
   CAPABILITY_VISION,
   type CapabilityTag,
+  MODEL_IDENTIFIER_DELIMITER,
+  type Model,
 } from "../model-providers/core/types.ts";
-import type { TaskId } from "./type.ts";
 
 const CONFIG_ID = "default";
+
+type TaskId =
+  | typeof TASK_EMBEDDING
+  | typeof TASK_TEXT_SYNTHESIS
+  | typeof TASK_MD_IMAGE_CAPTIONING;
 
 /** Canonical task ids — single source of truth. */
 export const TASK_EMBEDDING = "embedding";
@@ -128,4 +138,35 @@ export async function saveAssignments(
     },
   });
   return merged;
+}
+
+/** A resolved task→model link: the catalog model and the provider that serves it. */
+export type ResolvedTaskModel = {
+  provider: AnyProvider;
+  model: Model;
+};
+
+/**
+ * Resolve the model linked to `taskId` to its catalog `Model` and provider
+ * singleton, or `null` when the task is unassigned.
+ */
+export async function resolveTaskModelLink(
+  taskId: TaskId,
+): Promise<ResolvedTaskModel | null> {
+  const assignments = await loadAssignments();
+  const identifier = assignments[taskId];
+  if (identifier == null) return null;
+
+  const model = getModelByIdentifier(identifier);
+  if (!model) {
+    throw new Error(
+      `Unknown model identifier for task ${taskId}: ${identifier}`,
+    );
+  }
+  const providerId = identifier.split(MODEL_IDENTIFIER_DELIMITER)[0] ?? "";
+  const provider = getProviderById(providerId);
+  if (!provider) {
+    throw new Error(`Unknown provider for task ${taskId}: ${providerId}`);
+  }
+  return { provider, model };
 }
