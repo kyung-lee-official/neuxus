@@ -1,0 +1,1 @@
+apps/api/src/modules/server-setting/model-providers/assets/test-image-chat.jpg filter=lfs diff=lfs merge=lfs -text
