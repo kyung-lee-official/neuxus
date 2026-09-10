@@ -7,7 +7,7 @@
 
 import { Prisma } from "../../../generated/prisma/client.ts";
 import { getPrisma } from "../../../shared/db.ts";
-import { getModel } from "../model-providers/core/catalog.ts";
+import { getModelByIdentifier } from "../model-providers/core/catalog.ts";
 import {
   CAPABILITY_EMBEDDING,
   CAPABILITY_TEXT,
@@ -52,50 +52,35 @@ export function requiredCapabilitiesByTask(
   return task.requiredCapabilities;
 }
 
-/** A selected catalog model, identified by its provider + model pair. */
-export type ModelPointer = {
-  providerId: string;
-  modelId: string;
-};
+/** Task assignments: task id → catalog model `identifier` (or null). */
+export type TaskAssignments = Record<TaskId, string | null>;
 
-export type TaskAssignments = Record<TaskId, ModelPointer | null>;
-
-/** Strictly parse one task value: `null` = unassigned; else the pair must resolve in the catalog. */
-function parseModelPointer(
-  value: unknown,
-  taskId: TaskId,
-): ModelPointer | null {
+/** Strictly parse one task value: `null` = unassigned; else a catalog model identifier. */
+function parseModelIdentifier(value: unknown, taskId: TaskId): string | null {
   if (value == null) return null;
-  if (typeof value !== "object" || Array.isArray(value)) {
+  if (typeof value !== "string") {
     throw new Error(`Invalid task assignment for ${taskId}`);
   }
-  const v = value as Record<string, unknown>;
-  const providerId = typeof v.providerId === "string" ? v.providerId : "";
-  const modelId = typeof v.modelId === "string" ? v.modelId : "";
-  if (providerId !== providerId.trim() || modelId !== modelId.trim()) {
+  if (value !== value.trim() || value !== value.toLowerCase()) {
     throw new Error(
-      `Task assignment for ${taskId} must not have leading/trailing whitespace`,
+      `Task assignment for ${taskId} must be a lowercase, untrimmed identifier`,
     );
   }
-  const model = getModel(providerId, modelId);
+  const model = getModelByIdentifier(value);
   if (!model) {
-    throw new Error(
-      `Unknown model for task ${taskId}: ${providerId}/${modelId}`,
-    );
+    throw new Error(`Unknown model identifier for task ${taskId}: ${value}`);
   }
   const required = requiredCapabilitiesByTask(taskId);
   if (!required.every((cap) => model.capabilities[cap] === true)) {
-    throw new Error(
-      `Model ${providerId}/${modelId} cannot serve task ${taskId}`,
-    );
+    throw new Error(`Model ${value} cannot serve task ${taskId}`);
   }
-  return { providerId, modelId };
+  return value;
 }
 
 function parseTaskAssignments(raw: Record<string, unknown>): TaskAssignments {
   const assignments = {} as TaskAssignments;
   for (const taskId of TASK_IDS) {
-    assignments[taskId] = parseModelPointer(raw[taskId], taskId);
+    assignments[taskId] = parseModelIdentifier(raw[taskId], taskId);
   }
   return assignments;
 }
@@ -124,7 +109,7 @@ function pickTaskAssignments(
   for (const [key, value] of Object.entries(raw)) {
     if (!(TASK_IDS as readonly string[]).includes(key)) continue;
     const taskId = key as TaskId;
-    out[taskId] = parseModelPointer(value, taskId);
+    out[taskId] = parseModelIdentifier(value, taskId);
   }
   return Object.keys(out).length > 0 ? out : undefined;
 }
