@@ -10,11 +10,6 @@ import { buildSynthesisPrompt, stripMarkdownImageLines } from "./context.ts";
 
 const synthesisLog = childLogger({ module: "synthesis" }, "synthesis");
 
-export type AnswerFromContextOptions = {
-  /** Stamps the `app_log` synthesis rows with this user. */
-  userId?: string;
-};
-
 /**
  * Trim the prompt so estimated tokens + `maxTokens` fit the model window.
  * Keeps the end (current question).
@@ -40,14 +35,14 @@ export async function answerFromContext(
   userMessage: string,
   personalMemories: AppMemory[],
   parents: RetrievedParent[] = [],
-  options?: AnswerFromContextOptions,
+  /** Stamps the `app_log` synthesis rows with this user. */
+  userId?: string,
 ): Promise<string> {
   const link = await resolveTaskModelLink(TASK_TEXT_SYNTHESIS);
   if (!link) {
     throw new Error("No model is linked to the text-synthesis task");
   }
   const { provider, model } = link;
-  const userId = options?.userId;
   const maxTokens = model.defaults.maxOutputTokens ?? 4096;
 
   const prompt = fitPromptToWindow(
