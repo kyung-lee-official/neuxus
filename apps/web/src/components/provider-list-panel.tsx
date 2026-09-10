@@ -4,9 +4,9 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useMemo } from "react";
 import {
-  getModelConfig,
-  type ModelConfig,
-  type ModelInfo,
+  getProviderConnections,
+  getProviders,
+  getTaskModelMap,
   type ProviderConnection,
   type ProviderInfo,
   UserQueryKey,
@@ -15,43 +15,67 @@ import { useAdminUser } from "./admin-shell";
 
 const CAPABILITY_LABEL = {
   embedding: "Embedding",
-  llm: "LLM",
+  text: "Text",
   vision: "Vision",
 } as const;
 
+/** Required connection fields per provider id (mirrors the server's provider schema). */
+function requiredFields(providerId: string): string[] {
+  return providerId === "ollama" ? ["baseUrl", "port"] : ["apiKey"];
+}
+
 function isFullyConfiguredClient(
-  conn: ProviderConnection | undefined,
-  required: ProviderInfo["userInputs"],
+  conn: ProviderConnection | null | undefined,
+  providerId: string,
 ): boolean {
   if (!conn) return false;
-  if (required.includes("apiKey") && !conn.apiKey) return false;
-  if (required.includes("baseUrl") && !conn.baseUrl) return false;
-  if (required.includes("port") && !conn.port) return false;
-  return true;
+  return requiredFields(providerId).every((field) => {
+    const value = conn[field];
+    return value !== null && value !== undefined && value !== "";
+  });
 }
 
 /**
  * `/server-settings/providers` — list every catalog provider as a
  * navigation entry. Each row links to `/server-settings/providers/[providerId]`
- * where the user configures that provider's connection. Every model
- * under a fully-configured provider becomes selectable in the task
- * dropdowns on the Server settings page.
+ * where the user configures that provider's connection.
  */
 export function ProviderListPanel() {
   const user = useAdminUser();
 
-  const configQuery = useQuery({
+  const providersQuery = useQuery({
     queryKey: UserQueryKey.ModelConfig,
-    queryFn: () => getModelConfig(user.apiKey),
+    queryFn: () => getProviders(user.apiKey),
+  });
+  const tasksQuery = useQuery({
+    queryKey: UserQueryKey.TaskModelMap,
+    queryFn: () => getTaskModelMap(user.apiKey),
   });
 
-  const providers = configQuery.data?.providers ?? [];
-  const models = configQuery.data?.models ?? [];
-  const config = configQuery.data?.config;
+  const providers = providersQuery.data?.providers ?? [];
+  const assigned = useMemo(
+    () => new Set(Object.values(tasksQuery.data?.tasks ?? {}).filter(Boolean)),
+    [tasksQuery.data],
+  );
+
+  const connectionsQuery = useQuery({
+    queryKey: [
+      "server-setting",
+      "provider-connections",
+      providers.map((p) => p.id),
+    ],
+    queryFn: () =>
+      getProviderConnections(
+        user.apiKey,
+        providers.map((p) => p.id),
+      ),
+    enabled: providers.length > 0,
+  });
+  const connections = connectionsQuery.data ?? {};
 
   const rows = useMemo(
-    () => buildRows(providers, models, config),
-    [providers, models, config],
+    () => buildRows(providers, connections, assigned),
+    [providers, connections, assigned],
   );
 
   return (
@@ -65,7 +89,7 @@ export function ProviderListPanel() {
         </p>
       </section>
 
-      {configQuery.isLoading ? (
+      {providersQuery.isLoading ? (
         <p className="m-0 text-muted text-sm">Loading providers…</p>
       ) : (
         <div className="flex flex-col gap-3">
@@ -88,26 +112,16 @@ type ProviderRow = {
 
 function buildRows(
   providers: ProviderInfo[],
-  models: ModelInfo[],
-  config: ModelConfig | undefined,
+  connections: Record<string, ProviderConnection | null>,
+  assigned: Set<string | null>,
 ): ProviderRow[] {
   return providers.map((provider) => {
-    const providerModels = models.filter((m) => m.providerId === provider.id);
-    const conn = config?.providerConnections[provider.id];
-    const configured = isFullyConfiguredClient(conn, provider.userInputs);
-
-    let anyInUse = false;
-    if (config) {
-      for (const m of providerModels) {
-        for (const id of Object.values(config.tasks)) {
-          if (id === m.id) {
-            anyInUse = true;
-            break;
-          }
-        }
-        if (anyInUse) break;
-      }
-    }
+    const providerModels = provider.models;
+    const configured = isFullyConfiguredClient(
+      connections[provider.id],
+      provider.id,
+    );
+    const anyInUse = providerModels.some((m) => assigned.has(m.identifier));
 
     const caps = new Set<string>();
     for (const m of providerModels) {
@@ -141,8 +155,12 @@ function ProviderRow({ row }: { row: ProviderRow }) {
           </h2>
           <p className="m-0 text-muted text-xs">
             <span className="font-mono">{provider.id}</span>
-            {" · "}
-            <span className="font-mono">{provider.baseUrl}</span>
+            {provider.baseUrl ? (
+              <>
+                {" · "}
+                <span className="font-mono">{provider.baseUrl}</span>
+              </>
+            ) : null}
           </p>
           <p className="m-0 text-muted text-xs">
             Capabilities:{" "}

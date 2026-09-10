@@ -5,17 +5,21 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   ApiError,
-  type EmbedTestResult,
-  getModelConfig,
-  type ModelConfig,
+  getProviderConnection,
+  getProviders,
+  getTaskModelMap,
   type ModelInfo,
   type ProviderConnection,
   type ProviderInfo,
-  putModelConfig,
-  testEmbed,
+  putProviderConnection,
   UserQueryKey,
 } from "@/lib/api";
 import { useAdminUser } from "./admin-shell";
+import {
+  EmbeddingTester,
+  ImageChatTester,
+  TextChatTester,
+} from "./model-testers";
 
 function errorMessage(err: unknown): string {
   if (err instanceof ApiError) return err.message;
@@ -23,73 +27,66 @@ function errorMessage(err: unknown): string {
   return String(err);
 }
 
-/** Mirrors `isFullyConfigured` in `shared/models/config.ts`. */
-function checkConfigured(
-  conn: ProviderConnection,
-  provider: ProviderInfo,
-): { ok: true } | { ok: false; missing: string } {
-  for (const field of provider.userInputs) {
-    if (field === "apiKey" && !conn.apiKey)
-      return { ok: false, missing: "api key" };
-    if (field === "baseUrl" && !conn.baseUrl)
-      return { ok: false, missing: "base URL" };
-    if (field === "port" && !conn.port) return { ok: false, missing: "port" };
-  }
-  return { ok: true };
+/** Connection fields per provider id (mirrors the server's provider schema). */
+function connectionFields(providerId: string): string[] {
+  return providerId === "ollama" ? ["baseUrl", "port"] : ["apiKey"];
 }
 
-const CAPABILITY_LABEL = {
-  embedding: "Embedding",
-  llm: "LLM",
-  vision: "Vision",
-} as const;
+const FIELD_LABEL: Record<string, string> = {
+  apiKey: "API key",
+  baseUrl: "Base URL",
+  port: "Port",
+};
 
 /**
  * `/server-settings/providers/[providerId]` — edit the connection for
- * `providerId` and read-only list the catalog models that resolve to it.
- *
- * Connection settings are provider-level: every model under this
- * provider shares the same key, base URL, and port. Configuring the
- * provider once enables every model that points at it.
+ * `providerId` and list the catalog models it serves.
  */
 export function ProviderModelsPanel({ providerId }: { providerId: string }) {
   const user = useAdminUser();
   const queryClient = useQueryClient();
 
-  const configQuery = useQuery({
+  const providersQuery = useQuery({
     queryKey: UserQueryKey.ModelConfig,
-    queryFn: () => getModelConfig(user.apiKey),
+    queryFn: () => getProviders(user.apiKey),
+  });
+  const tasksQuery = useQuery({
+    queryKey: UserQueryKey.TaskModelMap,
+    queryFn: () => getTaskModelMap(user.apiKey),
+  });
+  const connectionQuery = useQuery({
+    queryKey: ["server-setting", "provider-connection", providerId],
+    queryFn: () => getProviderConnection(user.apiKey, providerId),
   });
 
-  const providers = configQuery.data?.providers ?? [];
+  const providers = providersQuery.data?.providers ?? [];
   const provider = providers.find((p) => p.id === providerId);
-  const allModels = configQuery.data?.models ?? [];
-  const models = useMemo(
-    () => allModels.filter((m) => m.providerId === providerId),
-    [allModels, providerId],
+  const models = provider?.models ?? [];
+  const connection = connectionQuery.data?.connection ?? null;
+
+  const assigned = useMemo(
+    () => new Set(Object.values(tasksQuery.data?.tasks ?? {}).filter(Boolean)),
+    [tasksQuery.data],
   );
-  const config = configQuery.data?.config;
 
   const saveMutation = useMutation({
-    mutationFn: (patch: {
-      providerConnections?: Record<string, ProviderConnection | null>;
-    }) => putModelConfig({ apiKey: user.apiKey, patch }),
+    mutationFn: (next: ProviderConnection) =>
+      putProviderConnection({
+        apiKey: user.apiKey,
+        providerId,
+        connection: next,
+      }),
     onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["server-setting", "provider-connection", providerId],
+      });
       await queryClient.invalidateQueries({
         queryKey: UserQueryKey.ModelConfig,
       });
     },
   });
 
-  function persist(providerId: string, next: ProviderConnection | null) {
-    saveMutation.mutate({
-      providerConnections: { [providerId]: next },
-    });
-  }
-
-  // Loading state — wait until the catalog arrives so we can decide
-  // whether `providerId` is valid before showing the "not found" UI.
-  if (configQuery.isLoading) {
+  if (providersQuery.isLoading) {
     return <p className="m-0 text-muted text-sm">Loading provider…</p>;
   }
 
@@ -116,15 +113,6 @@ export function ProviderModelsPanel({ providerId }: { providerId: string }) {
     );
   }
 
-  // The per-model "Test embed" runs against the *saved* provider
-  // connection, so it only makes sense once a fully-configured
-  // connection for this provider is persisted (the card above may hold
-  // an unsaved draft).
-  const savedConnection = config?.providerConnections[provider.id];
-  const canTestEmbed = Boolean(
-    config && savedConnection && checkConfigured(savedConnection, provider).ok,
-  );
-
   return (
     <div className="flex w-full flex-col gap-4">
       <Breadcrumb providerLabel={provider.displayName} />
@@ -135,23 +123,20 @@ export function ProviderModelsPanel({ providerId }: { providerId: string }) {
         </h1>
         <p className="m-0 text-muted text-xs">
           <span className="font-mono">{provider.id}</span>
-          {" · "}
-          <span className="font-mono">{provider.baseUrl}</span>
-          {" · "}
-          <span>{describeRequestShape(provider.requestShape)}</span>
-        </p>
-        <p className="m-0 text-muted text-sm">
-          Connection settings apply to every model under this provider. Save
-          once; fully-configured models become selectable on the Server settings
-          page.
+          {provider.baseUrl ? (
+            <>
+              {" · "}
+              <span className="font-mono">{provider.baseUrl}</span>
+            </>
+          ) : null}
         </p>
       </section>
 
       <ProviderConnectionCard
         provider={provider}
-        connection={config?.providerConnections[provider.id]}
+        connection={connection}
         busy={saveMutation.isPending}
-        onChange={(next) => persist(provider.id, next)}
+        onSave={(next) => saveMutation.mutate(next)}
       />
 
       {models.length === 0 ? (
@@ -160,9 +145,10 @@ export function ProviderModelsPanel({ providerId }: { providerId: string }) {
         </section>
       ) : (
         <ModelsUnderProvider
-          config={config}
+          providerId={provider.id}
           models={models}
-          canTestEmbed={canTestEmbed}
+          assigned={assigned}
+          canTest={Boolean(connection)}
         />
       )}
 
@@ -179,130 +165,62 @@ function ProviderConnectionCard({
   provider,
   connection,
   busy,
-  onChange,
+  onSave,
 }: {
   provider: ProviderInfo;
-  connection: ProviderConnection | undefined;
+  connection: ProviderConnection | null;
   busy: boolean;
-  onChange: (next: ProviderConnection | null) => void;
+  onSave: (next: ProviderConnection) => void;
 }) {
-  // `local` is what the server currently holds (or the empty default).
-  // Memoize so the reference is stable between refetches — otherwise the
-  // useEffect below would fire on every render and call setDraft, looping.
-  const local = useMemo<ProviderConnection>(
-    () => connection ?? { apiKey: null, baseUrl: null, port: null },
-    [connection],
-  );
-  const [draft, setDraft] = useState<ProviderConnection>(local);
-  const dirty = !sameConnection(draft, local);
+  const fields = connectionFields(provider.id);
+  const [draft, setDraft] = useState<ProviderConnection>(connection ?? {});
+  const dirty = JSON.stringify(draft) !== JSON.stringify(connection ?? {});
 
-  // Refresh draft when the persisted connection changes (after a save
-  // refetches). Keyed by `connection` (not `local`) so the effect only
-  // fires when the row's data actually changes.
   useEffect(() => {
-    setDraft(connection ?? { apiKey: null, baseUrl: null, port: null });
+    setDraft(connection ?? {});
   }, [connection]);
 
-  const check = checkConfigured(draft, provider);
-  const fullyConfigured = check.ok;
-
-  const hostPlaceholder = hostFromUrl(provider.baseUrl) || "127.0.0.1";
-
-  function save() {
-    onChange(draft);
-    // Saving even when not fully-configured: server accepts partial entries
-    // (the provider just stays out of task dropdowns until filled).
-  }
+  const fullyConfigured = fields.every((field) => {
+    const value = draft[field];
+    return value !== null && value !== undefined && value !== "";
+  });
 
   return (
     <section className="flex flex-col gap-3 rounded-md border border-line bg-surface p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="m-0 font-display text-ink text-lg">Connection</h2>
-        <div className="flex items-center gap-2">
-          {fullyConfigured ? (
-            <span className="rounded bg-ok/15 px-2 py-0.5 font-mono text-ok text-xs">
-              fully configured
-            </span>
-          ) : (
-            <span className="rounded bg-warning/15 px-2 py-0.5 font-mono text-warning text-xs">
-              missing {check.ok ? "" : check.missing}
-            </span>
-          )}
-        </div>
+        {fullyConfigured ? (
+          <span className="rounded bg-ok/15 px-2 py-0.5 font-mono text-ok text-xs">
+            fully configured
+          </span>
+        ) : (
+          <span className="rounded bg-warning/15 px-2 py-0.5 font-mono text-warning text-xs">
+            incomplete
+          </span>
+        )}
       </div>
 
       <div className="flex flex-col gap-3">
-        {provider.userInputs.includes("apiKey") ? (
-          <label className="flex flex-col gap-1.5 text-sm">
-            <span>API key</span>
+        {fields.map((field) => (
+          <label key={field} className="flex flex-col gap-1.5 text-sm">
+            <span>{FIELD_LABEL[field] ?? field}</span>
             <input
-              type="password"
+              type={field === "apiKey" ? "password" : "text"}
               autoComplete="off"
               className="w-full rounded border border-line bg-canvas px-2.5 py-2 text-ink disabled:opacity-60"
-              value={draft.apiKey ?? ""}
+              value={String(draft[field] ?? "")}
               disabled={busy}
-              placeholder="Paste your provider API key"
-              onChange={(e) =>
-                setDraft({
-                  ...draft,
-                  apiKey: e.target.value === "" ? null : e.target.value,
-                })
-              }
-            />
-          </label>
-        ) : null}
-
-        {provider.userInputs.includes("baseUrl") ? (
-          <label className="flex flex-col gap-1.5 text-sm">
-            <span>Host</span>
-            <input
-              type="text"
-              className="w-full rounded border border-line bg-canvas px-2.5 py-2 text-ink disabled:opacity-60"
-              value={draft.baseUrl ?? ""}
-              disabled={busy}
-              placeholder={hostPlaceholder}
-              onChange={(e) =>
-                setDraft({
-                  ...draft,
-                  baseUrl: e.target.value === "" ? null : e.target.value,
-                })
-              }
-            />
-            <span className="text-muted text-xs">
-              Hostname or IP, e.g.{" "}
-              <span className="font-mono">{hostPlaceholder}</span>. Scheme and
-              port come from the URL field below + the Port field.
-            </span>
-          </label>
-        ) : null}
-
-        {provider.userInputs.includes("port") ? (
-          <label className="flex flex-col gap-1.5 text-sm">
-            <span>Port</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={65535}
-              className="w-full rounded border border-line bg-canvas px-2.5 py-2 text-ink disabled:opacity-60"
-              value={draft.port ?? ""}
-              disabled={busy}
-              placeholder="11434"
               onChange={(e) => {
                 const raw = e.target.value;
-                if (raw === "") {
-                  setDraft({ ...draft, port: null });
-                  return;
-                }
-                const n = Number.parseInt(raw, 10);
                 setDraft({
                   ...draft,
-                  port: Number.isInteger(n) && n > 0 && n <= 65535 ? n : null,
+                  [field]:
+                    raw === "" ? null : field === "port" ? Number(raw) : raw,
                 });
               }}
             />
           </label>
-        ) : null}
+        ))}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -310,20 +228,10 @@ function ProviderConnectionCard({
           type="button"
           className="rounded border border-accent bg-accent px-3.5 py-1.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
           disabled={busy || !dirty}
-          onClick={save}
+          onClick={() => onSave(draft)}
         >
           {busy ? "Saving…" : "Save"}
         </button>
-        {local.apiKey || local.baseUrl || local.port ? (
-          <button
-            type="button"
-            className="rounded border border-line bg-transparent px-3.5 py-1.5 text-ink text-sm disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={busy}
-            onClick={() => onChange(null)}
-          >
-            Delete connection
-          </button>
-        ) : null}
         {dirty ? (
           <span className="text-muted text-xs">unsaved changes</span>
         ) : null}
@@ -333,90 +241,71 @@ function ProviderConnectionCard({
 }
 
 function ModelsUnderProvider({
-  config,
+  providerId,
   models,
-  canTestEmbed,
+  assigned,
+  canTest,
 }: {
-  config: ModelConfig | undefined;
+  providerId: string;
   models: ModelInfo[];
-  canTestEmbed: boolean;
+  assigned: Set<string | null>;
+  canTest: boolean;
 }) {
   return (
     <section className="flex flex-col gap-3 rounded-md border border-line bg-surface p-6">
       <h2 className="m-0 font-display text-ink text-lg">Models</h2>
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
-        {models.map((m) => {
-          const capabilityTags = (
-            Object.entries(m.capabilities) as Array<
-              [keyof typeof CAPABILITY_LABEL, true | undefined]
-            >
-          )
-            .filter(([, v]) => v === true)
-            .map(([k]) => CAPABILITY_LABEL[k]);
-          const inUse = config
-            ? Object.values(config.tasks).some((id) => id === m.id)
-            : false;
-          return (
-            <ModelRow
-              key={m.id}
-              model={m}
-              capabilityTags={capabilityTags}
-              inUse={inUse}
-              canTestEmbed={canTestEmbed}
-            />
-          );
-        })}
+        {models.map((model) => (
+          <ModelRow
+            key={model.identifier}
+            providerId={providerId}
+            model={model}
+            inUse={assigned.has(model.identifier)}
+            canTest={canTest}
+          />
+        ))}
       </ul>
     </section>
   );
 }
 
+const CAPABILITY_LABEL = {
+  embedding: "Embedding",
+  text: "Text",
+  vision: "Vision",
+} as const;
+
 function ModelRow({
+  providerId,
   model,
-  capabilityTags,
   inUse,
-  canTestEmbed,
+  canTest,
 }: {
+  providerId: string;
   model: ModelInfo;
-  capabilityTags: string[];
   inUse: boolean;
-  canTestEmbed: boolean;
+  canTest: boolean;
 }) {
   const user = useAdminUser();
-  const mutation = useMutation({
-    mutationFn: () => testEmbed(user.apiKey, model.id),
-  });
-  const supportsEmbed = model.capabilities.embedding === true;
 
   return (
-    <li className="flex flex-col gap-2 rounded border border-line bg-canvas p-3">
+    <li className="flex flex-col gap-3 rounded border border-line bg-canvas p-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <p className="m-0 font-display text-ink text-sm">
             {model.displayName}
           </p>
-          <p className="m-0 font-mono text-muted text-xs">{model.id}</p>
-          <p className="m-0 text-muted text-xs">
-            Capabilities:{" "}
-            {capabilityTags.length > 0 ? capabilityTags.join(", ") : "—"}
-          </p>
+          <p className="m-0 font-mono text-muted text-xs">{model.identifier}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {supportsEmbed ? (
-            <button
-              type="button"
-              className="rounded border border-accent bg-accent px-3 py-1 text-white text-xs disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={mutation.isPending || !canTestEmbed}
-              title={
-                canTestEmbed
-                  ? "Embed a diagnostic string with this model"
-                  : "Save a fully-configured connection above to test this model"
-              }
-              onClick={() => mutation.mutate()}
+          {Object.keys(model.capabilities).map((cap) => (
+            <span
+              key={cap}
+              className="rounded bg-line/40 px-1.5 py-0.5 font-mono text-muted text-xs"
             >
-              {mutation.isPending ? "Embedding…" : "Test embed"}
-            </button>
-          ) : null}
+              {CAPABILITY_LABEL[cap as keyof typeof CAPABILITY_LABEL] ?? cap}
+            </span>
+          ))}
           {inUse ? (
             <span className="rounded bg-accent/15 px-1.5 py-0.5 font-mono text-accent text-xs">
               in use
@@ -424,55 +313,32 @@ function ModelRow({
           ) : null}
         </div>
       </div>
-      {supportsEmbed && !canTestEmbed ? (
-        <p className="m-0 text-muted text-xs">
-          Save a fully-configured connection above to test this model.
-        </p>
-      ) : null}
-      {supportsEmbed ? <EmbedTestPanel mutation={mutation} /> : null}
-    </li>
-  );
-}
 
-function EmbedTestPanel({
-  mutation,
-}: {
-  mutation: ReturnType<typeof useMutation<EmbedTestResult, Error>>;
-}) {
-  if (mutation.isPending) {
-    return (
-      <p className="m-0 text-muted text-xs">Embedding the diagnostic string…</p>
-    );
-  }
-  if (mutation.isError) {
-    return (
-      <p className="m-0 text-danger text-xs">
-        {mutation.error instanceof Error
-          ? mutation.error.message
-          : String(mutation.error)}
-      </p>
-    );
-  }
-  if (!mutation.data) return null;
-  const { embedding, modelId, dim, inputText } = mutation.data;
-  const previewCount = Math.min(8, embedding.length);
-  const preview = embedding.slice(0, previewCount).map((v) => v.toFixed(4));
-  return (
-    <div className="flex flex-col gap-1 rounded border border-line bg-surface p-2 text-xs">
-      <p className="m-0 text-muted">
-        Embedded{" "}
-        <span className="font-mono text-ink">&ldquo;{inputText}&rdquo;</span>{" "}
-        via <span className="font-mono text-ink">{modelId}</span>
-      </p>
-      <p className="m-0 text-muted">
-        Dim <span className="font-mono text-ink">{dim}</span> · first{" "}
-        {previewCount} values:{" "}
-        <span className="break-all font-mono text-ink">
-          [{preview.join(", ")}
-          {embedding.length > previewCount ? ", …" : ""}]
-        </span>
-      </p>
-    </div>
+      {model.capabilities.embedding ? (
+        <EmbeddingTester
+          apiKey={user.apiKey}
+          providerId={providerId}
+          modelId={model.modelId}
+          disabled={!canTest}
+        />
+      ) : null}
+      {model.capabilities.text ? (
+        <TextChatTester
+          apiKey={user.apiKey}
+          providerId={providerId}
+          modelId={model.modelId}
+          disabled={!canTest}
+        />
+      ) : null}
+      {model.capabilities.vision ? (
+        <ImageChatTester
+          apiKey={user.apiKey}
+          providerId={providerId}
+          modelId={model.modelId}
+          disabled={!canTest}
+        />
+      ) : null}
+    </li>
   );
 }
 
@@ -488,33 +354,5 @@ function Breadcrumb({ providerLabel }: { providerLabel: string }) {
       <span>/</span>
       <span className="text-ink">{providerLabel}</span>
     </nav>
-  );
-}
-
-function describeRequestShape(shape: ProviderInfo["requestShape"]): string {
-  switch (shape) {
-    case "anthropic-messages":
-      return "Anthropic-compatible Messages";
-    case "openai-embeddings":
-      return "OpenAI-compatible embeddings";
-    case "ollama-embed":
-      return "Ollama /api/embed";
-  }
-}
-
-/** Pull just the hostname out of a base URL for placeholder display. */
-function hostFromUrl(url: string): string {
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return "";
-  }
-}
-
-function sameConnection(a: ProviderConnection, b: ProviderConnection): boolean {
-  return (
-    (a.apiKey ?? null) === (b.apiKey ?? null) &&
-    (a.baseUrl ?? null) === (b.baseUrl ?? null) &&
-    (a.port ?? null) === (b.port ?? null)
   );
 }
