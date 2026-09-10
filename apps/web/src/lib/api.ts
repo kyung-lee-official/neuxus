@@ -92,6 +92,7 @@ export const UserQueryKey = {
     ["users", id, "data", messagePage] as const,
   Sessions: (userId: string) => ["sessions", userId] as const,
   ModelConfig: ["server-setting", "model-providers"] as const,
+  TaskModelMap: ["server-setting", "task-model-map"] as const,
   CorpusSettings: ["server-setting", "corpus"] as const,
   LogSettings: ["server-setting", "log"] as const,
   RetrieveSettings: ["server-setting", "retrieve"] as const,
@@ -304,64 +305,17 @@ export async function postRemember(input: {
   });
 }
 
-export type EmbedTestSearchHit = {
-  id: string;
-  slug: string;
-  title: string;
-  type: string | null;
-  tags: string[];
-  sourcePath: string | null;
-  contentHash: string;
-  updatedAt: string | null;
-  parentCount: number;
-  childCount: number;
-  /** Cosine similarity in [0, 1]; 1 - distance. */
-  score: number;
-};
+// --- Model providers (catalog + per-provider connections + diagnostics) ---
 
-export async function testEmbedSearch(
-  apiKey: string,
-  input: { query: string; limit?: number },
-): Promise<{
-  task: "embedding";
-  results: EmbedTestSearchHit[];
-}> {
-  return apiFetch<{ task: "embedding"; results: EmbedTestSearchHit[] }>(
-    "/server-setting/model-providers/test/embedding",
-    {
-      method: "POST",
-      apiKey,
-      body: JSON.stringify({ task: "embedding", ...input }),
-    },
-  );
-}
-
-// --- Model registry (Providers page + Server-settings task pointers) ---
-
-export type ModelCapability = "embedding" | "llm" | "vision";
-
-export type ProviderConnection = {
-  apiKey: string | null;
-  baseUrl: string | null;
-  port: number | null;
-};
-
-export type ProviderInfo = {
-  id: string;
-  displayName: string;
-  baseUrl: string;
-  requestShape: "anthropic-messages" | "openai-embeddings" | "ollama-embed";
-  headers?: Record<string, string>;
-  userInputs: ("apiKey" | "baseUrl" | "port")[];
-};
+export type ModelCapability = "embedding" | "text" | "vision";
 
 export type ModelInfo = {
-  id: string;
-  providerId: string;
+  identifier: string;
+  modelId: string;
   displayName: string;
   capabilities: {
     embedding?: true;
-    llm?: true;
+    text?: true;
     vision?: true;
   };
   defaults: {
@@ -372,65 +326,67 @@ export type ModelInfo = {
   };
 };
 
-export type ModelTaskPointers = {
-  embedding: string | null;
-  llm: string | null;
-  vision: string | null;
-};
-
-export type ModelConfig = {
-  providerConnections: Record<string, ProviderConnection>;
-  tasks: ModelTaskPointers;
-};
-
-export type ModelConfigResponse = {
-  config: ModelConfig;
-  providers: ProviderInfo[];
+export type ProviderInfo = {
+  id: string;
+  displayName: string;
+  baseUrl?: string;
+  headers?: Record<string, string>;
   models: ModelInfo[];
 };
 
-export async function getModelConfig(
+export type ProvidersResponse = {
+  providers: ProviderInfo[];
+};
+
+export async function getProviders(apiKey: string): Promise<ProvidersResponse> {
+  return apiFetch<ProvidersResponse>(
+    "/server-setting/model-providers/providers",
+    { apiKey },
+  );
+}
+
+/** A provider's connection payload is provider-specific. */
+export type ProviderConnection = Record<string, unknown>;
+
+export type ProviderConnectionResponse = {
+  providerId: string;
+  connection: ProviderConnection | null;
+};
+
+export async function getProviderConnection(
   apiKey: string,
-): Promise<ModelConfigResponse> {
-  return apiFetch<ModelConfigResponse>("/server-setting/model-providers", {
-    apiKey,
-  });
+  providerId: string,
+): Promise<ProviderConnectionResponse> {
+  return apiFetch<ProviderConnectionResponse>(
+    `/server-setting/model-providers/providers/${encodeURIComponent(providerId)}/connection`,
+    { apiKey },
+  );
 }
 
-export type PutModelConfigInput = {
-  providerConnections?: Record<string, ProviderConnection | null>;
-  tasks?: Partial<ModelTaskPointers>;
-};
-
-export async function putModelConfig(input: {
+export async function putProviderConnection(input: {
   apiKey: string;
-  patch: PutModelConfigInput;
-}): Promise<ModelConfigResponse> {
-  return apiFetch<ModelConfigResponse>("/server-setting/model-providers", {
-    method: "PUT",
-    apiKey: input.apiKey,
-    body: JSON.stringify(input.patch),
-  });
+  providerId: string;
+  connection: ProviderConnection;
+}): Promise<ProviderConnectionResponse> {
+  return apiFetch<ProviderConnectionResponse>(
+    `/server-setting/model-providers/providers/${encodeURIComponent(input.providerId)}/connection`,
+    {
+      method: "PUT",
+      apiKey: input.apiKey,
+      body: JSON.stringify({ connection: input.connection }),
+    },
+  );
 }
 
-export type ChatTestResult = {
-  task: "llm";
-  response: string;
-  prompt: string;
-};
-
-export type VisionTestResult = {
-  task: "vision";
-  description: string;
-  mimeType: string;
-  sizeBytes: number;
-  name: string;
-};
-
-export type EmbeddingTestResult = {
-  task: "embedding";
-  results: EmbedTestSearchHit[];
-};
+export async function deleteProviderConnection(input: {
+  apiKey: string;
+  providerId: string;
+}): Promise<{ providerId: string; deleted: true }> {
+  return apiFetch<{ providerId: string; deleted: true }>(
+    `/server-setting/model-providers/providers/${encodeURIComponent(input.providerId)}/connection`,
+    { method: "DELETE", apiKey: input.apiKey },
+  );
+}
 
 export type EmbedTestResult = {
   embedding: number[];
@@ -439,57 +395,104 @@ export type EmbedTestResult = {
   inputText: string;
 };
 
-export async function testEmbed(
-  apiKey: string,
-  modelId: string,
-): Promise<EmbedTestResult> {
+export async function testEmbed(input: {
+  apiKey: string;
+  providerId: string;
+  modelId: string;
+  text?: string;
+}): Promise<EmbedTestResult> {
   return apiFetch<EmbedTestResult>(
-    "/server-setting/model-providers/test/embed",
+    `/server-setting/model-providers/providers/${encodeURIComponent(input.providerId)}/test/embed`,
     {
       method: "POST",
-      apiKey,
-      body: JSON.stringify({ modelId }),
+      apiKey: input.apiKey,
+      body: JSON.stringify({
+        modelId: input.modelId,
+        ...(input.text ? { text: input.text } : {}),
+      }),
     },
   );
 }
 
-export async function testModelChat(
-  apiKey: string,
-  prompt: string,
-): Promise<ChatTestResult> {
-  return apiFetch<ChatTestResult>("/server-setting/model-providers/test/llm", {
-    method: "POST",
-    apiKey,
-    body: JSON.stringify({ task: "llm", prompt }),
-  });
+export type TextTestResult = {
+  modelId: string;
+  response: string;
+};
+
+export async function testChat(input: {
+  apiKey: string;
+  providerId: string;
+  modelId: string;
+  prompt: string;
+}): Promise<TextTestResult> {
+  return apiFetch<TextTestResult>(
+    `/server-setting/model-providers/providers/${encodeURIComponent(input.providerId)}/test/chat`,
+    {
+      method: "POST",
+      apiKey: input.apiKey,
+      body: JSON.stringify({ modelId: input.modelId, prompt: input.prompt }),
+    },
+  );
 }
 
-export async function testModelVision(
-  apiKey: string,
-  image: File,
-): Promise<VisionTestResult> {
+export async function testImage(input: {
+  apiKey: string;
+  providerId: string;
+  modelId: string;
+  prompt: string;
+  image: File;
+}): Promise<TextTestResult> {
   const dataUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
     reader.onerror = () =>
       reject(reader.error ?? new Error("FileReader error"));
-    reader.readAsDataURL(image);
+    reader.readAsDataURL(input.image);
   });
   const comma = dataUrl.indexOf(",");
-  const imageBase64 = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
-  return apiFetch<VisionTestResult>(
-    "/server-setting/model-providers/test/vision",
+  const data = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
+  return apiFetch<TextTestResult>(
+    `/server-setting/model-providers/providers/${encodeURIComponent(input.providerId)}/test/image`,
     {
       method: "POST",
-      apiKey,
+      apiKey: input.apiKey,
       body: JSON.stringify({
-        task: "vision",
-        imageBase64,
-        mimeType: image.type,
-        name: image.name,
+        modelId: input.modelId,
+        prompt: input.prompt,
+        image: { mimeType: input.image.type, data },
       }),
     },
   );
+}
+
+// --- Task-model map (which model serves each app task) ---
+
+export type TaskId = "embedding" | "text-synthesis" | "md-image-captioning";
+
+/** Task id -> catalog model identifier (lowercase providerId::modelId), or null. */
+export type TaskLinks = Record<TaskId, string | null>;
+
+export type TaskModelMapResponse = {
+  tasks: TaskLinks;
+};
+
+export async function getTaskModelMap(
+  apiKey: string,
+): Promise<TaskModelMapResponse> {
+  return apiFetch<TaskModelMapResponse>("/server-setting/task-model-map", {
+    apiKey,
+  });
+}
+
+export async function putTaskModelMap(input: {
+  apiKey: string;
+  tasks: Partial<TaskLinks>;
+}): Promise<TaskModelMapResponse> {
+  return apiFetch<TaskModelMapResponse>("/server-setting/task-model-map", {
+    method: "PUT",
+    apiKey: input.apiKey,
+    body: JSON.stringify({ tasks: input.tasks }),
+  });
 }
 
 export type RetrieveSettings = {
