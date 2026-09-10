@@ -17,6 +17,9 @@ import {
 import { saveProviderConnections } from "./core/dal.ts";
 import type { ModelProvidersModel } from "./model.ts";
 
+/** Bundled image used by the image-chat diagnostic. */
+const TEST_IMAGE_URL = new URL("./assets/test-image-chat.jpg", import.meta.url);
+
 function unknownProvider(providerId: string): never {
   throw status(404, { error: `Unknown provider: ${providerId}` });
 }
@@ -123,7 +126,7 @@ export abstract class ModelProviders {
     const provider = getProvider(providerId);
     const model = requireModel(providerId, body.modelId, "text");
     try {
-      const response = await provider.textChat(model.modelId, body.prompt);
+      const response = await provider.textChat(model.modelId, "Hello!");
       return { modelId: model.modelId, response };
     } catch (err) {
       throw status(400, asError(err));
@@ -137,12 +140,13 @@ export abstract class ModelProviders {
   ): Promise<ModelProvidersModel["textTestResponse"]> {
     const provider = getProvider(providerId);
     const model = requireModel(providerId, body.modelId, "vision");
-    const bytes = Buffer.from(body.image.data, "base64");
+    const bytes = Buffer.from(await Bun.file(TEST_IMAGE_URL).arrayBuffer());
     try {
-      const response = await provider.imageChat(model.modelId, body.prompt, {
-        bytes,
-        mimeType: body.image.mimeType,
-      });
+      const response = await provider.imageChat(
+        model.modelId,
+        "What is in this image?",
+        { bytes, mimeType: "image/jpeg" },
+      );
       return { modelId: model.modelId, response };
     } catch (err) {
       throw status(400, asError(err));

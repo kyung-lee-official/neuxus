@@ -71,18 +71,11 @@ export const ModelProvidersModel = {
   /** POST .../providers/:providerId/test/chat body. */
   chatTestBody: t.Object({
     modelId: t.String(),
-    prompt: t.String(),
   }),
 
   /** POST .../providers/:providerId/test/image body. */
   imageTestBody: t.Object({
     modelId: t.String(),
-    prompt: t.String(),
-    image: t.Object({
-      mimeType: t.String(),
-      /** Base64 image bytes (no `data:` prefix). */
-      data: t.String(),
-    }),
   }),
 
   /** POST .../providers/:providerId/test/{chat,image} response. */

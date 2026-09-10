@@ -98,7 +98,7 @@ export const modelProviders = new Elysia({ prefix: "/model-providers" })
         ...modelProvidersDetail,
         summary: "Chat with a specific model",
         description:
-          "One-shot text chat against `body.modelId` over the provider's saved connection.",
+          "One-shot text chat with the fixed prompt `Hello!` against `body.modelId` over the provider's saved connection.",
       },
     },
   )
@@ -114,7 +114,7 @@ export const modelProviders = new Elysia({ prefix: "/model-providers" })
         ...modelProvidersDetail,
         summary: "Chat with a specific model over an image",
         description:
-          "Sends an image + prompt to `body.modelId` and returns the text reply.",
+          "Sends the bundled `assets/test-image-chat.jpg` with the fixed prompt `What is in this image?` to `body.modelId` and returns the text reply.",
       },
     },
   );
