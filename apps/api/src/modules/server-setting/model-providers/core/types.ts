@@ -28,8 +28,10 @@ export type CapabilityTag =
 export type Capabilities = Partial<Record<CapabilityTag, true>>;
 
 export type Model = {
-  /** Model id, unique *within its provider* (scoped by `Provider.id`). */
-  id: string;
+  /** Globally unique, lowercase: `{providerId}::{modelId}` (double colon). */
+  identifier: string;
+  /** Model id, unique within its provider; case-sensitive. */
+  modelId: string;
   /** Human-readable name shown in the admin dropdown. */
   displayName: string;
   /** What this model can do. */
@@ -55,7 +57,5 @@ export type Provider = {
   models: Model[];
 };
 
-/** Flat model view with its owning provider id attached (for APIs/consumers). */
-export type ProviderModel = Model & {
-  providerId: string;
-};
+/** Delimiter inside a model `identifier` (`{providerId}::{modelId}`). */
+export const MODEL_IDENTIFIER_DELIMITER = "::";

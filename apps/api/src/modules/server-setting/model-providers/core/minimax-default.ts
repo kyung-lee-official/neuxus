@@ -24,7 +24,8 @@ export class MinimaxDefaultProvider extends ModelProvider<MinimaxDefaultConnecti
   override readonly headers = { "anthropic-version": "2023-06-01" };
   override readonly models: Model[] = [
     {
-      id: "MiniMax-M3",
+      identifier: "minimax-default::minimax-m3",
+      modelId: "MiniMax-M3",
       displayName: "MiniMax-M3",
       capabilities: { text: true, vision: true },
       defaults: {

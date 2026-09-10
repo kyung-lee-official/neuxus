@@ -25,7 +25,8 @@ export class MinimaxTokenPlanProvider extends ModelProvider<MinimaxTokenPlanConn
   override readonly headers = { "anthropic-version": "2023-06-01" };
   override readonly models: Model[] = [
     {
-      id: "MiniMax-M3",
+      identifier: "minimax-token-plan::minimax-m3",
+      modelId: "MiniMax-M3",
       displayName: "MiniMax-M3 (Token Plan)",
       capabilities: { text: true, vision: true },
       defaults: {

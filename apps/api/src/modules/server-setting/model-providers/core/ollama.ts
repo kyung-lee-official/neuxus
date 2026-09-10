@@ -15,13 +15,15 @@ export class OllamaProvider extends ModelProvider<OllamaConnection> {
   override readonly displayName = "Ollama (local)";
   override readonly models: Model[] = [
     {
-      id: "nomic-embed-text",
+      identifier: "ollama::nomic-embed-text",
+      modelId: "nomic-embed-text",
       displayName: "nomic-embed-text:latest",
       capabilities: { embedding: true },
       defaults: { embeddingDimensions: 768 },
     },
     {
-      id: "embeddinggemma",
+      identifier: "ollama::embeddinggemma",
+      modelId: "embeddinggemma",
       displayName: "embeddinggemma:latest",
       capabilities: { embedding: true },
       defaults: { embeddingDimensions: 768 },

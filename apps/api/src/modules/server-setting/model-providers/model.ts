@@ -4,7 +4,8 @@ import { type Static, t } from "elysia";
 const connectionValueSchema = t.Any();
 
 const modelSchema = t.Object({
-  id: t.String(),
+  identifier: t.String(),
+  modelId: t.String(),
   displayName: t.String(),
   capabilities: t.Object({
     embedding: t.Optional(t.Literal(true)),
