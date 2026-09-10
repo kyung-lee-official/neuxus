@@ -101,12 +101,12 @@ export abstract class ModelProviders {
     const model = requireModel(providerId, body.modelId, "embedding");
     const text = body.text?.trim() || "Why is the sky blue?";
     try {
-      const vectors = await provider.embed(model.id, [text]);
+      const vectors = await provider.embed(model.modelId, [text]);
       const embedding = vectors[0];
       if (!embedding) throw new Error("Embedder returned no vector");
       return {
         embedding,
-        modelId: model.id,
+        modelId: model.modelId,
         dim: embedding.length,
         inputText: text,
       };
@@ -123,8 +123,8 @@ export abstract class ModelProviders {
     const provider = getProvider(providerId);
     const model = requireModel(providerId, body.modelId, "text");
     try {
-      const response = await provider.textChat(model.id, body.prompt);
-      return { modelId: model.id, response };
+      const response = await provider.textChat(model.modelId, body.prompt);
+      return { modelId: model.modelId, response };
     } catch (err) {
       throw status(400, asError(err));
     }
@@ -139,11 +139,11 @@ export abstract class ModelProviders {
     const model = requireModel(providerId, body.modelId, "vision");
     const bytes = Buffer.from(body.image.data, "base64");
     try {
-      const response = await provider.imageChat(model.id, body.prompt, {
+      const response = await provider.imageChat(model.modelId, body.prompt, {
         bytes,
         mimeType: body.image.mimeType,
       });
-      return { modelId: model.id, response };
+      return { modelId: model.modelId, response };
     } catch (err) {
       throw status(400, asError(err));
     }

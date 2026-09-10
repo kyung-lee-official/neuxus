@@ -14,7 +14,7 @@ import {
   provider as minimaxTokenPlan,
 } from "./minimax-token-plan.ts";
 import { type OllamaConnection, provider as ollama } from "./ollama.ts";
-import type { CapabilityTag, Model, ProviderModel } from "./types.ts";
+import type { CapabilityTag, Model } from "./types.ts";
 
 /** Any concrete provider singleton — exposes `validateConnection`. */
 export type AnyProvider =
@@ -41,12 +41,12 @@ export function getProviderById(id: string): AnyProvider | null {
   return PROVIDERS.find((p) => p.id === id) ?? null;
 }
 
-/** Flat list of every model, with its owning `providerId` attached. */
-export function allModels(): ProviderModel[] {
-  const out: ProviderModel[] = [];
+/** Flat list of every model in the catalog. */
+export function allModels(): Model[] {
+  const out: Model[] = [];
   for (const provider of PROVIDERS) {
     for (const model of provider.models) {
-      out.push({ ...model, providerId: provider.id });
+      out.push(model);
     }
   }
   return out;
@@ -56,13 +56,16 @@ export function allModels(): ProviderModel[] {
 export function getModel(providerId: string, modelId: string): Model | null {
   const provider = getProviderById(providerId);
   if (!provider) return null;
-  return provider.models.find((m) => m.id === modelId) ?? null;
+  return provider.models.find((m) => m.modelId === modelId) ?? null;
+}
+
+/** Find a model by its global lowercase `identifier`. */
+export function getModelByIdentifier(identifier: string): Model | null {
+  return allModels().find((m) => m.identifier === identifier) ?? null;
 }
 
 /** Flat models that declare **all** the given capability tags. */
-export function getModelsByCapability(
-  tags: readonly CapabilityTag[],
-): ProviderModel[] {
+export function getModelsByCapability(tags: readonly CapabilityTag[]): Model[] {
   return allModels().filter((model) =>
     tags.every((tag) => model.capabilities[tag] === true),
   );
