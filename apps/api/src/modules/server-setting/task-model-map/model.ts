@@ -1,18 +1,18 @@
 import { type Static, t } from "elysia";
 
 /** Catalog model `identifier` (or null = unassigned). */
-const taskAssignmentSchema = t.Union([t.String(), t.Null()]);
+const taskLinkSchema = t.Union([t.String(), t.Null()]);
 
 const taskPointerSchema = t.Object({
-  embedding: taskAssignmentSchema,
-  "text-synthesis": taskAssignmentSchema,
-  "md-image-captioning": taskAssignmentSchema,
+  embedding: taskLinkSchema,
+  "text-synthesis": taskLinkSchema,
+  "md-image-captioning": taskLinkSchema,
 });
 
 const taskPatchSchema = t.Object({
-  embedding: t.Optional(taskAssignmentSchema),
-  "text-synthesis": t.Optional(taskAssignmentSchema),
-  "md-image-captioning": t.Optional(taskAssignmentSchema),
+  embedding: t.Optional(taskLinkSchema),
+  "text-synthesis": t.Optional(taskLinkSchema),
+  "md-image-captioning": t.Optional(taskLinkSchema),
 });
 
 export const TaskModelMapModel = {
@@ -21,7 +21,7 @@ export const TaskModelMapModel = {
     tasks: taskPointerSchema,
   }),
 
-  /** PUT /task-model-map body: partial assignment patch (null clears a task). */
+  /** PUT /task-model-map body: partial link patch (null clears a task). */
   putBody: t.Object({
     tasks: t.Optional(taskPatchSchema),
   }),

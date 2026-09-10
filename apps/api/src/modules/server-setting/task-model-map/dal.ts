@@ -1,6 +1,6 @@
 /**
  * DAL for the task-model-map business. Its only job: which business task
- * uses which catalog model. Assignments (`app_model_task_config`) map a
+ * uses which catalog model. Links (`app_model_task_config`) map a
  * task id to a `{ providerId, modelId }` pair; the pair must resolve in
  * the `model-providers` catalog and cover the task's required capabilities.
  */
@@ -60,8 +60,8 @@ function requiredCapabilitiesByTask(taskId: TaskId): readonly CapabilityTag[] {
   return task.requiredCapabilities;
 }
 
-/** Task assignments: task id → catalog model `identifier` (or null). */
-export type TaskAssignments = Record<TaskId, string | null>;
+/** Task links: task id → catalog model `identifier` (or null). */
+export type TaskLinks = Record<TaskId, string | null>;
 
 /** Validate a task→model link identifier (lowercase, resolves in catalog, can serve the task). */
 function validateTaskModelLink(
@@ -81,8 +81,8 @@ function validateTaskModelLink(
   return modelIdentifier;
 }
 
-/** Read the persisted task assignments. Unknown JSON keys are ignored. */
-export async function loadAssignments(): Promise<TaskAssignments> {
+/** Read the persisted task links. Unknown JSON keys are ignored. */
+export async function loadLinks(): Promise<TaskLinks> {
   const row = await getPrisma().appModelTaskConfig.findUnique({
     where: { id: CONFIG_ID },
   });
@@ -91,29 +91,29 @@ export async function loadAssignments(): Promise<TaskAssignments> {
     stored == null || typeof stored !== "object" || Array.isArray(stored)
       ? {}
       : (stored as Record<string, unknown>);
-  const assignments = {} as TaskAssignments;
+  const links = {} as TaskLinks;
   for (const taskId of TASK_IDS) {
     const value = raw[taskId];
     if (value == null) {
-      assignments[taskId] = null;
+      links[taskId] = null;
     } else if (typeof value !== "string") {
-      throw new Error(`Invalid task assignment for ${taskId}`);
+      throw new Error(`Invalid task link for ${taskId}`);
     } else {
-      assignments[taskId] = validateTaskModelLink(value, taskId);
+      links[taskId] = validateTaskModelLink(value, taskId);
     }
   }
-  return assignments;
+  return links;
 }
 
 /**
- * Save task assignment links. Every supplied key must be a known task id
+ * Save task link links. Every supplied key must be a known task id
  * and every value a catalog model identifier that can serve it — otherwise
  * this throws. Writes only the `app_model_task_config` row.
  */
-export async function saveAssignments(
+export async function saveLinks(
   input: Record<string, unknown>,
-): Promise<TaskAssignments> {
-  const merged = await loadAssignments();
+): Promise<TaskLinks> {
+  const merged = await loadLinks();
   for (const [key, value] of Object.entries(input)) {
     if (!(TASK_IDS as readonly string[]).includes(key)) {
       throw new Error(`Unknown task: ${key}`);
@@ -122,7 +122,7 @@ export async function saveAssignments(
     if (value == null) {
       merged[taskId] = null;
     } else if (typeof value !== "string") {
-      throw new Error(`Invalid task assignment for ${taskId}`);
+      throw new Error(`Invalid task link for ${taskId}`);
     } else {
       merged[taskId] = validateTaskModelLink(value, taskId);
     }
@@ -153,8 +153,8 @@ export type ResolvedTaskModel = {
 export async function resolveTaskModelLink(
   taskId: TaskId,
 ): Promise<ResolvedTaskModel | null> {
-  const assignments = await loadAssignments();
-  const identifier = assignments[taskId];
+  const links = await loadLinks();
+  const identifier = links[taskId];
   if (identifier == null) return null;
 
   const model = getModelByIdentifier(identifier);

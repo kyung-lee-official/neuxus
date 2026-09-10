@@ -10,7 +10,7 @@ const taskModelMapDetail = {
 };
 
 /**
- * App task assignment admin: which catalog model serves each app task
+ * App task link admin: which catalog model serves each app task
  * (`embedding`, `text-synthesis`, `md-image-captioning`). App-level wiring —
  * kept apart from the provider registry (`/model-providers`). Capability
  * tests live at model level under `/model-providers`.
@@ -22,7 +22,7 @@ export const taskModelMap = new Elysia({ prefix: "/task-model-map" })
     response: TaskModelMapModel.response,
     detail: {
       ...taskModelMapDetail,
-      summary: "Get app task → model assignments",
+      summary: "Get app task → model links",
       description:
         "Returns which catalog `modelId` is assigned to each app task (`embedding`, `text-synthesis`, `md-image-captioning`), or null when unassigned.",
     },
@@ -33,8 +33,8 @@ export const taskModelMap = new Elysia({ prefix: "/task-model-map" })
     response: TaskModelMapModel.response,
     detail: {
       ...taskModelMapDetail,
-      summary: "Update app task → model assignments",
+      summary: "Update app task → model links",
       description:
-        "Partial patch over `tasks`. Set a task to null to clear it. Assignments whose model is unknown, lacks the task's required capability, or whose provider is no longer fully configured are auto-nulled.",
+        "Partial patch over `tasks`. Set a task to null to clear it. Links whose model is unknown, lacks the task's required capability, or whose provider is no longer fully configured are auto-nulled.",
     },
   });
