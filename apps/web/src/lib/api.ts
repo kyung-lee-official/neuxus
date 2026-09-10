@@ -436,14 +436,13 @@ export async function testChat(input: {
   apiKey: string;
   providerId: string;
   modelId: string;
-  prompt: string;
 }): Promise<TextTestResult> {
   return apiFetch<TextTestResult>(
     `/server-setting/model-providers/providers/${encodeURIComponent(input.providerId)}/test/chat`,
     {
       method: "POST",
       apiKey: input.apiKey,
-      body: JSON.stringify({ modelId: input.modelId, prompt: input.prompt }),
+      body: JSON.stringify({ modelId: input.modelId }),
     },
   );
 }
@@ -452,28 +451,13 @@ export async function testImage(input: {
   apiKey: string;
   providerId: string;
   modelId: string;
-  prompt: string;
-  image: File;
 }): Promise<TextTestResult> {
-  const dataUrl = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () =>
-      reject(reader.error ?? new Error("FileReader error"));
-    reader.readAsDataURL(input.image);
-  });
-  const comma = dataUrl.indexOf(",");
-  const data = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
   return apiFetch<TextTestResult>(
     `/server-setting/model-providers/providers/${encodeURIComponent(input.providerId)}/test/image`,
     {
       method: "POST",
       apiKey: input.apiKey,
-      body: JSON.stringify({
-        modelId: input.modelId,
-        prompt: input.prompt,
-        image: { mimeType: input.image.type, data },
-      }),
+      body: JSON.stringify({ modelId: input.modelId }),
     },
   );
 }
