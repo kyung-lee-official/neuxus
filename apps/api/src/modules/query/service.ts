@@ -80,7 +80,7 @@ export abstract class Query {
         message,
         personalMemories,
         parents,
-        { userId: user.id },
+        user.id,
       );
       await insertMessage(sessionId, "user", message);
       await insertMessage(sessionId, "assistant", answer);
