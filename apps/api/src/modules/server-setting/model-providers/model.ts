@@ -58,7 +58,6 @@ export const ModelProvidersModel = {
   /** POST .../providers/:providerId/test/embed body. */
   embedTestBody: t.Object({
     modelId: t.String(),
-    text: t.Optional(t.String()),
   }),
 
   /** POST .../providers/:providerId/test/embed response. */

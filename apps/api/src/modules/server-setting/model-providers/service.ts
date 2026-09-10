@@ -99,7 +99,7 @@ export abstract class ModelProviders {
   ): Promise<ModelProvidersModel["embedTestResponse"]> {
     const provider = getProvider(providerId);
     const model = requireModel(providerId, body.modelId, "embedding");
-    const text = body.text?.trim() || "Why is the sky blue?";
+    const text = "Why is the sky blue?";
     try {
       const vectors = await provider.embed(model.modelId, [text]);
       const embedding = vectors[0];

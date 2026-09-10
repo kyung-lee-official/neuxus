@@ -388,6 +388,23 @@ export async function deleteProviderConnection(input: {
   );
 }
 
+/** Fetch each provider's saved connection, keyed by provider id. */
+export async function getProviderConnections(
+  apiKey: string,
+  providerIds: readonly string[],
+): Promise<Record<string, ProviderConnection | null>> {
+  const entries = await Promise.all(
+    providerIds.map(
+      async (providerId) =>
+        [
+          providerId,
+          (await getProviderConnection(apiKey, providerId)).connection,
+        ] as const,
+    ),
+  );
+  return Object.fromEntries(entries);
+}
+
 export type EmbedTestResult = {
   embedding: number[];
   modelId: string;
@@ -399,17 +416,13 @@ export async function testEmbed(input: {
   apiKey: string;
   providerId: string;
   modelId: string;
-  text?: string;
 }): Promise<EmbedTestResult> {
   return apiFetch<EmbedTestResult>(
     `/server-setting/model-providers/providers/${encodeURIComponent(input.providerId)}/test/embed`,
     {
       method: "POST",
       apiKey: input.apiKey,
-      body: JSON.stringify({
-        modelId: input.modelId,
-        ...(input.text ? { text: input.text } : {}),
-      }),
+      body: JSON.stringify({ modelId: input.modelId }),
     },
   );
 }
