@@ -74,7 +74,9 @@ export class OllamaProvider extends ModelProvider<OllamaConnection> {
     const conn = await this.loadConnection();
     if (!conn || !("baseUrl" in conn) || typeof conn.baseUrl !== "string")
       throw new Error(`No connection for provider ${this.id}`);
-    const res = await fetch(`${conn.baseUrl.replace(/\/$/, "")}/api/embed`, {
+    const url = new URL(conn.baseUrl);
+    url.port = String(conn.port);
+    const res = await fetch(`${url.toString().replace(/\/$/, "")}/api/embed`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
