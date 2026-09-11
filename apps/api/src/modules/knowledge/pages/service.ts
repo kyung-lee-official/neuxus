@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import type { ChunkifyResult } from "../../../shared/chunkify/index.ts";
 import { isoFromDate } from "../../../shared/serialize.ts";
+import type { ChunkifyResult } from "../chunkifier/index.ts";
 import { findChildrenByPage } from "./dal/children.dal.ts";
 import {
   findPageContentHash,

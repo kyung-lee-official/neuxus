@@ -7,7 +7,7 @@
  */
 
 import { type SQL, sql } from "bun";
-import type { ChunkifyResult } from "../../../../shared/chunkify/index.ts";
+import type { ChunkifyResult } from "../../chunkifier/index.ts";
 import { type ChildInsert, replaceChildren } from "./children.dal.ts";
 import { type ParentInsert, replaceParents } from "./parents.dal.ts";
 

@@ -7,7 +7,7 @@
  * rows), `settings/` (kb_corpus_settings).
  */
 
-import { chunkify } from "../../../shared/chunkify/chunkify.ts";
+import { Chunkifier } from "../chunkifier/index.ts";
 import { Embedder, type EmbedStaleChildrenResult } from "../embedder/index.ts";
 import { listPageBodies, replacePageChunks } from "../pages/index.ts";
 import {
@@ -210,7 +210,7 @@ export abstract class Corpus {
       let pagesSkipped = 0;
 
       for (const page of pages) {
-        const chunks = chunkify(page.body);
+        const chunks = Chunkifier.chunkify(page.body);
         const parentRows = chunks.parents.map((parent) => {
           const id = `${page.id}:p:${parent.index}`;
           return {

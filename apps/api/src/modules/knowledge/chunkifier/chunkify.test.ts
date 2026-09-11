@@ -5,9 +5,9 @@ import { normalizeBody } from "../../../shared/ingest/normalize.ts";
 import { legalSnapIndices, pickCutEnd, pickOverlapStart } from "./children.ts";
 import {
   CHUNKIFY_DEFAULTS,
+  Chunkifier,
   type ChunkifyOptions,
   type ChunkifyResult,
-  chunkify,
   resolveChunkifyOptions,
 } from "./index.ts";
 import { lexBlocks } from "./lex.ts";
@@ -73,7 +73,7 @@ async function writeReviewDump(
 async function runFixture(name: string, options?: ChunkifyOptions) {
   const body = await loadFixture(name);
   const normalizedBody = normalizeBody(body);
-  const result = chunkify(body, options);
+  const result = Chunkifier.chunkify(body, options);
   assertExactSlices(normalizedBody, result);
   await writeReviewDump(name, body, result, options);
   return { body: normalizedBody, ...result };
@@ -81,14 +81,14 @@ async function runFixture(name: string, options?: ChunkifyOptions) {
 
 describe("chunkify fixtures", () => {
   test("empty string → no chunks", async () => {
-    const result = chunkify("");
+    const result = Chunkifier.chunkify("");
     expect(result).toEqual({ parents: [], children: [] });
     await writeReviewDump("empty-string.md", "", result);
   });
 
   test("whitespace-only.md → no chunks", async () => {
     const body = await loadFixture("whitespace-only.md");
-    const result = chunkify(body);
+    const result = Chunkifier.chunkify(body);
     expect(result).toEqual({ parents: [], children: [] });
     await writeReviewDump("whitespace-only.md", body, result);
   });
@@ -97,7 +97,7 @@ describe("chunkify fixtures", () => {
     const raw = "Hello  \r\nworld\t";
     const body = normalizeBody(raw);
     expect(body).toBe("Hello\nworld\n");
-    const result = chunkify(raw);
+    const result = Chunkifier.chunkify(raw);
     expect(result.parents).toHaveLength(1);
     expect(result.parents[0]!.text).toBe(body);
     expect(result.children[0]!.text).toBe(body);
@@ -294,7 +294,7 @@ describe("chunkify fixtures", () => {
       words.push(`word${words.length}`);
     }
     const body = `# Title\n\n${words.join(" ")}`;
-    const { children } = chunkify(body, {
+    const { children } = Chunkifier.chunkify(body, {
       childTargetTokens: 20,
       childHardMaxTokens: 400,
     });
@@ -361,7 +361,7 @@ describe("force-split snap indices", () => {
       childHardMaxTokens: 55,
       childOverlapTokens: 15,
     };
-    const result = chunkify(body, options);
+    const result = Chunkifier.chunkify(body, options);
     expect(result.children.length).toBeGreaterThan(1);
 
     const paraStart = result.parents[0]!.start;

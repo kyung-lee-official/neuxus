@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
-import { chunkify } from "../../../shared/chunkify/index.ts";
 import { ingestMarkdown } from "../../../shared/ingest/index.ts";
+import { Chunkifier } from "../chunkifier/index.ts";
 import {
   ImageDescriptionEnricher,
   ImageDescValidationError,
@@ -60,7 +60,7 @@ export async function ingestCorpusCheckout(
       continue;
     }
 
-    const chunks = chunkify(enrichedBody);
+    const chunks = Chunkifier.chunkify(enrichedBody);
     await Page.save({
       id: file.slug,
       slug: file.slug,
