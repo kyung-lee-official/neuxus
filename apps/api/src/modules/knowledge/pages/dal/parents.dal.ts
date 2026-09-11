@@ -2,7 +2,7 @@
  * Knowledge-parents DAL. Owns the `kb_parents` table.
  *
  * Internal to the knowledge module: `pages.dal.ts` (atomic page write) and
- * the `pages/get.ts` inspect path import it.
+ * the `pages/service.ts` inspect path (`Page.findById`) import it.
  */
 
 import { type SQL, sql } from "bun";

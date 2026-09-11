@@ -3,12 +3,6 @@ export {
   findPageContentHash,
 } from "./dal/pages.dal.ts";
 export {
-  findKnowledgePageById,
-  type KnowledgeChildInspect,
-  type KnowledgePageDetail,
-  type KnowledgeParentInspect,
-} from "./get.ts";
-export {
   hashesMatch,
   type PageHashFields,
   pageContentHash,
@@ -22,3 +16,9 @@ export {
   type PersistKnowledgePageResult,
   persistKnowledgePage,
 } from "./persist.ts";
+export {
+  type KnowledgeChildInspect,
+  type KnowledgePageDetail,
+  type KnowledgeParentInspect,
+  Page,
+} from "./service.ts";
