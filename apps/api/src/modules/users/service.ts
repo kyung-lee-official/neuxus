@@ -1,7 +1,10 @@
 import { status } from "elysia";
-import { isoFromDate, sessionJson, userJson } from "../../shared/serialize.ts";
+import { isoFromDate } from "../../shared/serialize.ts";
 import { ChatMessage } from "../personal-data/chat-messages/service.ts";
-import { ChatSession } from "../personal-data/chat-sessions/service.ts";
+import {
+  ChatSession,
+  sessionJson,
+} from "../personal-data/chat-sessions/service.ts";
 import { PersonalMemory } from "../personal-data/personal-memory/service.ts";
 import {
   type AppUser,
@@ -27,6 +30,15 @@ function normalizeUserId(raw: string): string | null {
 
 function newApiKey(userId: string): string {
   return `demo-key-${userId}-${crypto.randomUUID().slice(0, 8)}`;
+}
+
+function userJson(user: AppUser) {
+  return {
+    id: user.id,
+    apiKey: user.api_key,
+    role: user.role,
+    createdAt: user.created_at?.toISOString?.() ?? user.created_at ?? null,
+  };
 }
 
 export abstract class Users {

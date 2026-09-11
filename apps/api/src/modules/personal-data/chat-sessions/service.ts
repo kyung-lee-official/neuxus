@@ -1,5 +1,5 @@
 import { status } from "elysia";
-import { sessionJson } from "../../../shared/serialize.ts";
+import { isoFromDate } from "../../../shared/serialize.ts";
 import type { AppUser } from "../../users/service.ts";
 import {
   type AppSession,
@@ -14,6 +14,20 @@ import {
 import type { SessionsModel } from "./model.ts";
 
 export type { AppSession } from "./dal.ts";
+
+export function sessionJson(session: {
+  id: string;
+  title: string | null;
+  created_at: Date;
+  updated_at: Date;
+}) {
+  return {
+    id: session.id,
+    title: session.title,
+    createdAt: isoFromDate(session.created_at),
+    updatedAt: isoFromDate(session.updated_at),
+  };
+}
 
 export abstract class ChatSession {
   static async list(user: AppUser) {
