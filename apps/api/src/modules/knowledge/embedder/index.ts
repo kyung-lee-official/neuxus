@@ -1,10 +1,8 @@
 export {
   type EmbedChildRow,
   type EmbedChildRowsResult,
+  type EmbedClient,
+  Embedder,
   type EmbedStaleChildrenOptions,
   type EmbedStaleChildrenResult,
-  embedChildRows,
-  embedStaleChildren,
-  pgvectorLiteral,
-} from "./children.ts";
-export type { Embedder } from "./types.ts";
+} from "./service.ts";
