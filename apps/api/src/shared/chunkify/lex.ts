@@ -47,7 +47,7 @@ const IMAGE_HTML = /^<img\b[^>]*>\s*$/i;
  * Block range: from end-of-opener-line through start-of-closer-line (excludes
  * the markers themselves; description text only). An unclosed opener leaves
  * no image_desc block — the orphan is caught by the body validator
- * (see shared/image-desc/validate.ts) and fail-fasts the whole markdown file.
+ * (see modules/knowledge/image-desc/validate.ts) and fail-fasts the whole markdown file.
  */
 const IMAGE_DESC_OPEN_LINE = "<!-- image_desc -->";
 const IMAGE_DESC_CLOSE_LINE = "<!-- /image_desc -->";
