@@ -11,10 +11,8 @@ import {
   TASK_EMBEDDING,
 } from "../../server-setting/task-model-map/service.ts";
 
-/** A text-embedding client: texts in, one vector per text out. */
-export type EmbedClient = {
-  embed(texts: string[]): Promise<number[][]>;
-};
+/** Embed texts: one vector per text, in order. */
+export type EmbedFn = (texts: string[]) => Promise<number[][]>;
 
 export type EmbedChildRow = {
   id: string;
@@ -28,7 +26,7 @@ export type EmbedChildRowsResult = {
 
 export type EmbedStaleChildrenOptions = {
   pageId?: string;
-  embedder?: EmbedClient;
+  embedder?: EmbedFn;
   /** Throw on the first provider failure instead of skipping the child. */
   failFast?: boolean;
 };
@@ -54,7 +52,7 @@ export abstract class Embedder {
   static async embedChildRows(
     rows: EmbedChildRow[],
     args: {
-      embedder: EmbedClient;
+      embedder: EmbedFn;
       writeVector: (id: string, vector: number[]) => Promise<void>;
       failFast?: boolean;
     },
@@ -68,7 +66,7 @@ export abstract class Embedder {
         continue;
       }
       try {
-        const vectors = await args.embedder.embed([row.text]);
+        const vectors = await args.embedder([row.text]);
         const vector = vectors[0];
         if (!vector) {
           if (args.failFast) {
@@ -102,10 +100,7 @@ export abstract class Embedder {
     const currentModel = link.model.identifier;
     const embedder =
       options?.embedder ??
-      ({
-        embed: (texts: string[]) =>
-          link.provider.embed(link.model.modelId, texts),
-      } satisfies EmbedClient);
+      ((texts: string[]) => link.provider.embed(link.model.modelId, texts));
 
     const rows = await getPrisma().knowledgeChild.findMany({
       where: {
