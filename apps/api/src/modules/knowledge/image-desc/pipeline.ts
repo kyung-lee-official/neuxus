@@ -23,11 +23,26 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { extname } from "node:path";
 
-import { getImageDescriber } from "../models/routing.ts";
-import type { ImageDescriber } from "../models/types.ts";
+import {
+  resolveTaskModelLink,
+  TASK_MD_IMAGE_CAPTIONING,
+} from "../../modules/server-setting/task-model-map/service.ts";
 import { dedupByPath, type ParsedImageRef, parseImageRefs } from "./parse.ts";
 import { findImageDescription, upsertImageDescription } from "./store.ts";
 import { findOrphanImageDescOpeners } from "./validate.ts";
+
+/** Business prompt for the `md-image-captioning` task. */
+const CAPTION_PROMPT =
+  "Describe this image in one concise paragraph. Focus on the technical content: what is shown, the meaning of any labels or values, and any diagram relationships. Do not start with phrases like 'This image shows' — start directly with the subject. Do not repeat information that is already described in nearby text. Output only the description, no preamble.";
+
+/** A captioning client: image bytes in, one-line description out. */
+type ImageDescriber = {
+  describe(image: {
+    absolutePath: string;
+    bytes: Buffer;
+    mimeType: string;
+  }): Promise<string>;
+};
 
 const MIME_BY_EXT: Record<string, string> = {
   ".png": "image/png",
@@ -77,8 +92,8 @@ export type EnrichOptions = {
   sourceAbsPath: string;
   body: string;
   /**
-   * Override the vision provider. If omitted, an image describer is
-   * built from the configured vision model via `getImageDescriber()`.
+   * Override the captioning client. If omitted, one is built from the
+   * model linked to the `md-image-captioning` task.
    */
   describer?: ImageDescriber;
   /**
@@ -131,7 +146,17 @@ export async function enrichImagesWithDescriptions(
 export class ImageDescValidationError extends Error {}
 
 async function buildDefaultDescriber(): Promise<ImageDescriber> {
-  return getImageDescriber();
+  const link = await resolveTaskModelLink(TASK_MD_IMAGE_CAPTIONING);
+  if (!link) {
+    throw new Error("No model is linked to the md-image-captioning task");
+  }
+  return {
+    describe: ({ bytes, mimeType }) =>
+      link.provider.imageChat(link.model.modelId, CAPTION_PROMPT, {
+        bytes,
+        mimeType,
+      }),
+  };
 }
 
 async function enrichOne(
