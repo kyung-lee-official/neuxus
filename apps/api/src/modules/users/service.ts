@@ -5,13 +5,13 @@ import {
   createUser,
   deleteUser,
   getUserById,
-  listSessionsForUser,
   listUsers,
   updateUserApiKey,
 } from "../../shared/db.ts";
 import { isoFromDate, sessionJson, userJson } from "../../shared/serialize.ts";
 import { Auth } from "../auth/service.ts";
-import { ChatMessage } from "../chat-message/service.ts";
+import { ChatMessage } from "../chat-messages/service.ts";
+import { ChatSession } from "../chat-sessions/service.ts";
 import { PersonalMemory } from "../personal-memory/service.ts";
 import type { UsersModel } from "./model.ts";
 
@@ -102,7 +102,7 @@ export abstract class Users {
 
     const [memories, sessions, messagePageResult] = await Promise.all([
       PersonalMemory.listByUser(id),
-      listSessionsForUser(id),
+      ChatSession.listByUser(id),
       ChatMessage.pageByUser(id, query.messagePage, undefined),
     ]);
 

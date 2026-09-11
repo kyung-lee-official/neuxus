@@ -1,15 +1,12 @@
 import { status } from "elysia";
-import {
-  type AppUser,
-  getOrCreateSession,
-  getSessionOwnedByUser,
-} from "../../shared/db.ts";
+import { type AppUser } from "../../shared/db.ts";
 import { isHttpStatus } from "../../shared/http.ts";
 import {
   loadRetrieveSettings,
   retrieveParentsByQuestion,
 } from "../../shared/retrieve/index.ts";
-import { ChatMessage } from "../chat-message/service.ts";
+import { ChatMessage } from "../chat-messages/service.ts";
+import { ChatSession } from "../chat-sessions/service.ts";
 import { PersonalMemory } from "../personal-memory/service.ts";
 import { answerFromContext } from "./answer.ts";
 import type { QueryModel } from "./model.ts";
@@ -23,11 +20,11 @@ export abstract class Query {
       const requested = body.sessionId?.trim();
       let sessionId: string;
       if (requested) {
-        const owned = await getSessionOwnedByUser(requested, user.id);
+        const owned = await ChatSession.getOwnedByUser(requested, user.id);
         if (!owned) throw status(404, { error: "Session not found" });
         sessionId = owned.id;
       } else {
-        sessionId = await getOrCreateSession(user.id);
+        sessionId = await ChatSession.getOrCreate(user.id);
       }
       const recent = await ChatMessage.listRecentBySession(sessionId);
       const personalMemories = await PersonalMemory.search(user.id, message);

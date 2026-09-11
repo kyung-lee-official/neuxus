@@ -1,12 +1,12 @@
 import { openapi } from "@elysia/openapi";
 import { cors } from "@elysiajs/cors";
 import { Elysia, status } from "elysia";
+import { chatSessions } from "./modules/chat-sessions/index.ts";
 import { health } from "./modules/health/index.ts";
 import { knowledge } from "./modules/knowledge/index.ts";
 import { logs } from "./modules/logs/index.ts";
 import { query } from "./modules/query/index.ts";
 import { serverSetting } from "./modules/server-setting/index.ts";
-import { sessions } from "./modules/sessions/index.ts";
 import { users } from "./modules/users/index.ts";
 import { serverPort } from "./shared/config.ts";
 import {
@@ -75,7 +75,7 @@ const app = new Elysia()
   .use(logs)
   .use(serverSetting)
   .use(query)
-  .use(sessions)
+  .use(chatSessions)
   .use(users)
   .listen(serverPort());
 
