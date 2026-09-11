@@ -1,8 +1,11 @@
 import { existsSync } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import type { StoredCorpusSettings } from "./defaults.ts";
-import { loadCorpusSettings, saveCorpusLastSyncedSha } from "./settings.ts";
+import type { StoredCorpusSettings } from "./settings/defaults.ts";
+import {
+  loadCorpusSettings,
+  saveCorpusLastSyncedSha,
+} from "./settings/service.ts";
 
 const GIT_TIMEOUT_MS = 120_000;
 const BRANCH_PATTERN = /^[A-Za-z0-9._/-]+$/;

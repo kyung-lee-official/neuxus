@@ -1,9 +1,12 @@
 import { embedStaleChildren } from "../../../shared/embed/index.ts";
 import { emitStage, finishCorpusOp } from "./corpus-status.ts";
-import { resolveCorpusSettings } from "./defaults.ts";
 import { corpusCheckoutDir, refreshCorpusCheckout } from "./git.ts";
 import { ingestCorpusCheckout } from "./ingest-checkout.ts";
-import { loadCorpusSettings, saveCorpusLastSyncedSha } from "./settings.ts";
+import { resolveCorpusSettings } from "./settings/defaults.ts";
+import {
+  loadCorpusSettings,
+  saveCorpusLastSyncedSha,
+} from "./settings/service.ts";
 
 /**
  * Run the full corpus pipeline against the unified lock. Caller must hold

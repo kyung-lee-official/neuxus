@@ -2,7 +2,11 @@ import { isoFromDate } from "../../../shared/serialize.ts";
 import { findChildrenByPage } from "./dal/children.dal.ts";
 import { findPageDetailRow, listPageSummaries } from "./dal/pages.dal.ts";
 import { findParentsByPage } from "./dal/parents.dal.ts";
-import { tagsFromRow } from "./row.ts";
+
+function tagsFromRow(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => String(item));
+}
 
 export type KnowledgePageListItem = {
   id: string;

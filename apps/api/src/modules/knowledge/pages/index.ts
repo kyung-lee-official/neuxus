@@ -8,10 +8,6 @@ export {
   pageContentHash,
 } from "./hash.ts";
 export {
-  type KnowledgePageListItem,
-  listKnowledgePages,
-} from "./list.ts";
-export {
   type PersistKnowledgePageInput,
   type PersistKnowledgePageResult,
   persistKnowledgePage,
@@ -19,6 +15,7 @@ export {
 export {
   type KnowledgeChildInspect,
   type KnowledgePageDetail,
+  type KnowledgePageListItem,
   type KnowledgeParentInspect,
   Page,
 } from "./service.ts";

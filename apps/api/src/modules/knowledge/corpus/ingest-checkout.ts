@@ -1,16 +1,16 @@
 import { readFile } from "node:fs/promises";
 import { chunkify } from "../../../shared/chunkify/index.ts";
-import {
-  enrichImagesWithDescriptions,
-  ImageDescValidationError,
-} from "../../../shared/image-desc/index.ts";
 import { ingestMarkdown } from "../../../shared/ingest/index.ts";
+import {
+  ImageDescriptionEnricher,
+  ImageDescValidationError,
+} from "../image-desc/index.ts";
 import {
   deleteKnowledgePagesMissingSourcePaths,
   findPageContentHash,
   hashesMatch,
   persistKnowledgePage,
-} from "../../../shared/knowledge/index.ts";
+} from "../pages/index.ts";
 import { listCorpusMarkdownFiles } from "./walk.ts";
 
 /**
@@ -23,6 +23,7 @@ export async function ingestCorpusCheckout(
 ): Promise<void> {
   const files = await listCorpusMarkdownFiles(checkoutDir, docsRoot);
   const keepSourcePaths = files.map((file) => file.sourcePath);
+  const enricher = new ImageDescriptionEnricher();
 
   for (const file of files) {
     const source = await readFile(file.absolutePath, "utf8");
@@ -34,7 +35,7 @@ export async function ingestCorpusCheckout(
     // image so the rest of the page still proceeds.
     let enrichedBody = ingested.body;
     try {
-      const enrichment = await enrichImagesWithDescriptions({
+      const enrichment = await enricher.enrich({
         pageId: file.slug,
         sourceAbsPath: file.absolutePath,
         body: ingested.body,
