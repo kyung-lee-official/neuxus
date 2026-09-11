@@ -6,19 +6,12 @@
  */
 
 import { getPrisma } from "../../../../shared/db.ts";
+import type { StoredCorpusSettings } from "./defaults.ts";
 
 const SETTINGS_ID = "default";
 
-/** Raw `kb_corpus_settings` row (id `default`), columns verbatim. */
-export type CorpusSettingsRecord = {
-  repoUrl: string | null;
-  branch: string | null;
-  docsRoot: string | null;
-  lastSyncedSha: string | null;
-};
-
 /** Load `kb_corpus_settings` id `default`, or null when no row exists. */
-export async function findCorpusSettings(): Promise<CorpusSettingsRecord | null> {
+export async function findCorpusSettings(): Promise<StoredCorpusSettings | null> {
   const row = await getPrisma().knowledgeCorpusSettings.findUnique({
     where: { id: SETTINGS_ID },
   });

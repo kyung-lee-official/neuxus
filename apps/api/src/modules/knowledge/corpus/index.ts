@@ -25,7 +25,6 @@ export {
   type ResolvedCorpusSettings,
   resolveCorpusSettings,
   type StoredCorpusSettings,
-  storedCorpusSettings,
 } from "./settings/defaults.ts";
 export { CorpusSettings } from "./settings/service.ts";
 export {

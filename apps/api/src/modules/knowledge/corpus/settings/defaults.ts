@@ -43,18 +43,7 @@ export function normalizeDocsRoot(
   return t.replace(/\/+$/, "") || undefined;
 }
 
-/** Stored columns only — null stays null (admin GET/PUT). */
-export function storedCorpusSettings(
-  row?: CorpusSettingsRow | null,
-): StoredCorpusSettings {
-  return {
-    repoUrl: nonEmpty(row?.repoUrl) ?? null,
-    branch: nonEmpty(row?.branch) ?? null,
-    docsRoot: normalizeDocsRoot(row?.docsRoot) ?? null,
-    lastSyncedSha: nonEmpty(row?.lastSyncedSha) ?? null,
-  };
-}
-
+/** Apply `CORPUS_DEFAULTS` to a stored row (walker view). */
 export function resolveCorpusSettings(
   row?: CorpusSettingsRow | null,
 ): ResolvedCorpusSettings {

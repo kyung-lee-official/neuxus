@@ -13,7 +13,6 @@ import {
   type CorpusSettingsRow,
   normalizeDocsRoot,
   type StoredCorpusSettings,
-  storedCorpusSettings,
 } from "./defaults.ts";
 
 function blankToNull(value: string | null | undefined): string | null {
@@ -25,7 +24,14 @@ function blankToNull(value: string | null | undefined): string | null {
 export abstract class CorpusSettings {
   /** Load `kb_corpus_settings` id `default`. Nulls stay null. */
   static async load(): Promise<StoredCorpusSettings> {
-    return storedCorpusSettings(await findCorpusSettings());
+    return (
+      (await findCorpusSettings()) ?? {
+        repoUrl: null,
+        branch: null,
+        docsRoot: null,
+        lastSyncedSha: null,
+      }
+    );
   }
 
   /** Upsert `kb_corpus_settings` id `default`. Empty strings stored as null. */
