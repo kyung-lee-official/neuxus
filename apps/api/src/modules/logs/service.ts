@@ -1,6 +1,6 @@
 import { status } from "elysia";
-import type { AppUser } from "../../shared/db.ts";
 import { getPrisma } from "../../shared/db.ts";
+import type { AppUser } from "../users/service.ts";
 import {
   clampLogLimit,
   type LogItem,

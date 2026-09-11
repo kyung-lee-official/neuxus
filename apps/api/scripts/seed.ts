@@ -1,19 +1,23 @@
 /**
  * Upsert demo users into app_users (requires Prisma-migrated app schema).
  */
+
+import { type AppUser, Users } from "../src/modules/users/service.ts";
 import {
   apiKeyForSeedUser,
   SEED_USER_IDS,
   type SeedUserId,
 } from "../src/shared/config.ts";
-import { type AppUser, closeDb, upsertUser } from "../src/shared/db.ts";
+import { closeDb } from "../src/shared/db.ts";
 
 async function seedAppUsers(): Promise<AppUser[]> {
   const seeded: AppUser[] = [];
   for (const id of SEED_USER_IDS) {
     const role: AppUser["role"] =
       (id as SeedUserId) === "haewon" ? "admin" : "member";
-    seeded.push(await upsertUser({ id, api_key: apiKeyForSeedUser(id), role }));
+    seeded.push(
+      await Users.upsert({ id, api_key: apiKeyForSeedUser(id), role }),
+    );
   }
   return seeded;
 }

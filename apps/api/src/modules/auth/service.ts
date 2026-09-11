@@ -1,5 +1,5 @@
 import { status } from "elysia";
-import { type AppUser, getUserByApiKey } from "../../shared/db.ts";
+import { type AppUser, Users } from "../users/service.ts";
 
 export abstract class Auth {
   static async resolveUserFromHeaders(
@@ -9,7 +9,7 @@ export abstract class Auth {
     const match = header.match(/^Bearer\s+(.+)$/i);
     const apiKey = match?.[1]?.trim();
     if (!apiKey) return null;
-    return getUserByApiKey(apiKey);
+    return Users.getByApiKey(apiKey);
   }
 
   static unauthorized() {
