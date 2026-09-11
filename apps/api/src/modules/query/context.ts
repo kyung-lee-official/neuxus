@@ -1,5 +1,6 @@
-import type { AppMemory, AppMessage } from "../../shared/db.ts";
+import type { AppMessage } from "../../shared/db.ts";
 import type { RetrievedParent } from "../../shared/retrieve/index.ts";
+import type { AppMemory } from "../personal-memory/service.ts";
 
 const MAX_CONTEXT_CHARS = 12_000;
 
@@ -81,8 +82,4 @@ function trimToMax(text: string, max: number): string {
  */
 export function stripMarkdownImageLines(text: string): string {
   return text.replace(/^!\[.*?\]\(.*?\)\s*\n?/gm, "");
-}
-
-export function slugForMemoryNote(now = new Date()): string {
-  return `memory/note-${now.getTime()}`;
 }
