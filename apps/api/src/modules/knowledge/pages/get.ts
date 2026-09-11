@@ -1,5 +1,5 @@
-import { sql } from "bun";
-import { isoFromDate } from "../serialize.ts";
+import { isoFromDate } from "../../../shared/serialize.ts";
+import { findChildRows, findPageDetailRow, findParentRows } from "./dal.ts";
 import { tagsFromRow } from "./row.ts";
 
 export type KnowledgeChildInspect = {
@@ -35,76 +35,17 @@ export type KnowledgePageDetail = {
   parents: KnowledgeParentInspect[];
 };
 
-type PageRow = {
-  id: string;
-  slug: string;
-  title: string | null;
-  type: string | null;
-  tags: string[];
-  body: string | null;
-  source_path: string | null;
-  content_hash: string | null;
-  updated_at: Date | null;
-};
-
-type ParentRow = {
-  id: string;
-  parent_index: number;
-  text: string | null;
-  start_offset: number | null;
-  end_offset: number | null;
-};
-
-type ChildRow = {
-  id: string;
-  parent_id: string;
-  child_index: number;
-  text: string | null;
-  start_offset: number | null;
-  end_offset: number | null;
-  embedding_model: string | null;
-  embedded_at: Date | null;
-  embedded: boolean;
-};
-
 /**
  * One page plus parent/child tree for admin inspect. No embedding vectors.
  */
 export async function findKnowledgePageById(
   pageId: string,
 ): Promise<KnowledgePageDetail | null> {
-  const pages = await sql<PageRow[]>`
-    SELECT
-      id, slug, title, type, tags, body, source_path, content_hash, updated_at
-    FROM kb_pages
-    WHERE id = ${pageId}
-    LIMIT 1
-  `;
-  const page = pages[0];
+  const page = await findPageDetailRow(pageId);
   if (!page) return null;
 
-  const parentRows = await sql<ParentRow[]>`
-    SELECT id, parent_index, text, start_offset, end_offset
-    FROM kb_parents
-    WHERE page_id = ${pageId}
-    ORDER BY parent_index
-  `;
-
-  const childRows = await sql<ChildRow[]>`
-    SELECT
-      id,
-      parent_id,
-      child_index,
-      text,
-      start_offset,
-      end_offset,
-      embedding_model,
-      embedded_at,
-      (embedding IS NOT NULL) AS embedded
-    FROM kb_children
-    WHERE page_id = ${pageId}
-    ORDER BY child_index
-  `;
+  const parentRows = await findParentRows(pageId);
+  const childRows = await findChildRows(pageId);
 
   const childrenByParentId = new Map<string, KnowledgeChildInspect[]>();
   for (const row of childRows) {

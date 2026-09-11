@@ -53,8 +53,8 @@ describe("hashesMatch", () => {
   });
 
   test("false when body changed", () => {
-    expect(hashesMatch(pageContentHash(fields), { ...fields, body: "Bye\n" })).toBe(
-      false,
-    );
+    expect(
+      hashesMatch(pageContentHash(fields), { ...fields, body: "Bye\n" }),
+    ).toBe(false);
   });
 });

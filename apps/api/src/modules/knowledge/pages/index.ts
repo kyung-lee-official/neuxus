@@ -1,4 +1,8 @@
 export {
+  deletePagesMissingSourcePaths as deleteKnowledgePagesMissingSourcePaths,
+  findPageContentHash,
+} from "./dal.ts";
+export {
   findKnowledgePageById,
   type KnowledgeChildInspect,
   type KnowledgePageDetail,
@@ -14,8 +18,6 @@ export {
   listKnowledgePages,
 } from "./list.ts";
 export {
-  deleteKnowledgePagesMissingSourcePaths,
-  findPageContentHash,
   type PersistKnowledgePageInput,
   type PersistKnowledgePageResult,
   persistKnowledgePage,

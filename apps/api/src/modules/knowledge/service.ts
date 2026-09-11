@@ -1,8 +1,5 @@
 import { status } from "elysia";
-import {
-  findKnowledgePageById,
-  listKnowledgePages,
-} from "../../shared/knowledge/index.ts";
+import { findKnowledgePageById, listKnowledgePages } from "./pages/index.ts";
 
 function pageIdFromWildcard(raw: string): string | null {
   const trimmed = raw.trim();
