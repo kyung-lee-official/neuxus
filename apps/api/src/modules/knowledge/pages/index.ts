@@ -1,7 +1,7 @@
 export {
   deletePagesMissingSourcePaths as deleteKnowledgePagesMissingSourcePaths,
   findPageContentHash,
-} from "./dal.ts";
+} from "../dal/pages.dal.ts";
 export {
   findKnowledgePageById,
   type KnowledgeChildInspect,

@@ -1,5 +1,5 @@
 import type { ChunkifyResult } from "../../../shared/chunkify/index.ts";
-import { findPageContentHash, upsertPageWithChunks } from "./dal.ts";
+import { findPageContentHash, upsertPageWithChunks } from "../dal/pages.dal.ts";
 import { pageContentHash } from "./hash.ts";
 
 export type PersistKnowledgePageInput = {

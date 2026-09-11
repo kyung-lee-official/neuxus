@@ -1,8 +1,8 @@
 /**
  * Knowledge-children DAL. Owns the `kb_children` table.
  *
- * Internal to the pages sub-module: `pages/dal.ts` (atomic page write) and
- * `pages/get.ts` (inspect) import it.
+ * Internal to the knowledge module: `pages.dal.ts` (atomic page write) and
+ * the `pages/get.ts` inspect path import it.
  */
 
 import { type SQL, sql } from "bun";

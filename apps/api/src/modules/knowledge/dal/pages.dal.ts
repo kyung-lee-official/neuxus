@@ -2,14 +2,14 @@
  * Knowledge-pages DAL. Owns the `kb_pages` table (and its chunk-tree
  * transaction, delegating the parent/child statements to the sibling dals).
  *
- * Internal to the pages sub-module: the domain files (`list.ts`, `get.ts`,
- * `persist.ts`) import it.
+ * Internal to the knowledge module: the `pages` domain files (`list.ts`,
+ * `get.ts`, `persist.ts`) import it.
  */
 
 import { type SQL, sql } from "bun";
 import type { ChunkifyResult } from "../../../shared/chunkify/index.ts";
-import { type ChildInsert, replaceChildren } from "../children/dal.ts";
-import { type ParentInsert, replaceParents } from "../parents/dal.ts";
+import { type ChildInsert, replaceChildren } from "./children.dal.ts";
+import { type ParentInsert, replaceParents } from "./parents.dal.ts";
 
 export type PageSummaryRow = {
   id: string;

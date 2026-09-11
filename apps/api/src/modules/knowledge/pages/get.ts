@@ -1,7 +1,7 @@
 import { isoFromDate } from "../../../shared/serialize.ts";
-import { findChildrenByPage } from "../children/dal.ts";
-import { findParentsByPage } from "../parents/dal.ts";
-import { findPageDetailRow } from "./dal.ts";
+import { findChildrenByPage } from "../dal/children.dal.ts";
+import { findPageDetailRow } from "../dal/pages.dal.ts";
+import { findParentsByPage } from "../dal/parents.dal.ts";
 import { tagsFromRow } from "./row.ts";
 
 export type KnowledgeChildInspect = {

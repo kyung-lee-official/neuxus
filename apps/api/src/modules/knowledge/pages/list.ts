@@ -1,5 +1,5 @@
 import { isoFromDate } from "../../../shared/serialize.ts";
-import { listPageSummaries } from "./dal.ts";
+import { listPageSummaries } from "../dal/pages.dal.ts";
 import { tagsFromRow } from "./row.ts";
 
 export type KnowledgePageListItem = {
