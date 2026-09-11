@@ -1,19 +1,22 @@
 import { status } from "elysia";
+import { isoFromDate, sessionJson, userJson } from "../../shared/serialize.ts";
+import { ChatMessage } from "../personal-data/chat-messages/service.ts";
+import { ChatSession } from "../personal-data/chat-sessions/service.ts";
+import { PersonalMemory } from "../personal-data/personal-memory/service.ts";
 import {
   type AppUser,
   countUsers,
   createUser,
   deleteUser,
+  getUserByApiKey,
   getUserById,
   listUsers,
   updateUserApiKey,
-} from "../../shared/db.ts";
-import { isoFromDate, sessionJson, userJson } from "../../shared/serialize.ts";
-import { Auth } from "../auth/service.ts";
-import { ChatMessage } from "../personal-data/chat-messages/service.ts";
-import { ChatSession } from "../personal-data/chat-sessions/service.ts";
-import { PersonalMemory } from "../personal-data/personal-memory/service.ts";
+  upsertUser,
+} from "./dal.ts";
 import type { UsersModel } from "./model.ts";
+
+export type { AppUser, AppUserRole } from "./dal.ts";
 
 function normalizeUserId(raw: string): string | null {
   const id = raw.trim().toLowerCase();
@@ -33,7 +36,11 @@ export abstract class Users {
   }
 
   static async create(actor: AppUser | null, body: UsersModel["createBody"]) {
-    if (!actor && (await countUsers()) > 0) throw Auth.unauthorized();
+    if (!actor && (await countUsers()) > 0) {
+      throw status(401, {
+        error: "Unauthorized. Use Authorization: Bearer <api-key>.",
+      });
+    }
 
     const id = normalizeUserId(body.id);
     if (!id) {
@@ -142,5 +149,15 @@ export abstract class Users {
     const deleted = await PersonalMemory.deleteByUser(id, memoryId);
     if (!deleted) throw status(404, { error: "Memory not found" });
     return { deleted: true as const, id: memoryId };
+  }
+
+  /** Resolve a user by API key (auth). */
+  static getByApiKey(apiKey: string): Promise<AppUser | null> {
+    return getUserByApiKey(apiKey);
+  }
+
+  /** Insert or update a user by id (seeding). */
+  static upsert(user: AppUser): Promise<AppUser> {
+    return upsertUser(user);
   }
 }

@@ -1,6 +1,6 @@
 import { status } from "elysia";
-import type { AppUser } from "../../../shared/db.ts";
 import { sessionJson } from "../../../shared/serialize.ts";
+import type { AppUser } from "../../users/service.ts";
 import {
   type AppSession,
   createSession,
