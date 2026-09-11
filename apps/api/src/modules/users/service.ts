@@ -5,17 +5,16 @@ import {
   countMessagesForUser,
   countUsers,
   createUser,
-  deleteMemoryForUser,
   deleteUser,
   findMessagesForUser,
   getUserById,
-  listMemoriesForUser,
   listSessionsForUser,
   listUsers,
   updateUserApiKey,
 } from "../../shared/db.ts";
 import { isoFromDate, sessionJson, userJson } from "../../shared/serialize.ts";
 import { Auth } from "../auth/service.ts";
+import { PersonalMemory } from "../personal-memory/service.ts";
 import type { UsersModel } from "./model.ts";
 
 export type MessagePage = {
@@ -141,7 +140,7 @@ export abstract class Users {
     if (!user) throw status(404, { error: "User not found" });
 
     const [memories, sessions, messagePageResult] = await Promise.all([
-      listMemoriesForUser(id),
+      PersonalMemory.listByUser(id),
       listSessionsForUser(id),
       pageMessagesForUser(id, query.messagePage, undefined),
     ]);
@@ -179,7 +178,7 @@ export abstract class Users {
       throw status(400, { error: "Invalid memory id" });
     }
 
-    const deleted = await deleteMemoryForUser(id, memoryId);
+    const deleted = await PersonalMemory.deleteByUser(id, memoryId);
     if (!deleted) throw status(404, { error: "Memory not found" });
     return { deleted: true as const, id: memoryId };
   }
