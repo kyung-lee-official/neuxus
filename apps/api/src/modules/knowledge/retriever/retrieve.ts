@@ -4,7 +4,7 @@ import {
   resolveTaskModelLink,
   TASK_EMBEDDING,
 } from "../../server-setting/task-model-map/service.ts";
-import { type Embedder, pgvectorLiteral } from "../embed/index.ts";
+import { Embedder, type EmbedFn } from "../embedder/index.ts";
 import { type RetrieveOptions, resolveRetrieveOptions } from "./defaults.ts";
 import {
   type ChildHit,
@@ -27,7 +27,7 @@ type TopKHit = {
 };
 
 export type RetrieveParentsByQuestionOptions = RetrieveOptions & {
-  embedder?: Embedder;
+  embedder?: EmbedFn;
   /**
    * Owner of the request. Stamped on every `app_log` row this call emits so
    * the user-facing "My logs" page can filter by it.
@@ -104,17 +104,14 @@ export async function retrieveParentsByQuestion(
   try {
     const embedder =
       options?.embedder ??
-      ({
-        embed: (texts: string[]) =>
-          link.provider.embed(link.model.modelId, texts),
-      } satisfies Embedder);
-    const vectors = await embedder.embed([trimmed]);
+      ((texts: string[]) => link.provider.embed(link.model.modelId, texts));
+    const vectors = await embedder([trimmed]);
     const vector = vectors[0];
     if (!vector) {
       throw new Error("Question embed returned no vector");
     }
 
-    const literal = pgvectorLiteral(vector);
+    const literal = Embedder.pgvectorLiteral(vector);
     const childRows = await sql<ChildHitRow[]>`
       SELECT
         c.id AS child_id,
