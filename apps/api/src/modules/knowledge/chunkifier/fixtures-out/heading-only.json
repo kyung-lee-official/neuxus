@@ -1,0 +1,39 @@
+{
+  "fixture": "heading-only.md",
+  "options": {
+    "childTargetTokens": 400,
+    "childHardMaxTokens": 500,
+    "childOverlapTokens": 60,
+    "childCrumbMinTokens": 64,
+    "parentMaxTokens": 1400,
+    "fenceIntroGlueMaxTokens": 40,
+    "tokenizerEncoding": "o200k_base"
+  },
+  "defaults": {
+    "childTargetTokens": 400,
+    "childHardMaxTokens": 500,
+    "childOverlapTokens": 60,
+    "childCrumbMinTokens": 64,
+    "parentMaxTokens": 1400,
+    "fenceIntroGlueMaxTokens": 40,
+    "tokenizerEncoding": "o200k_base"
+  },
+  "bodyChars": 16,
+  "parents": [
+    {
+      "index": 0,
+      "start": 0,
+      "end": 16,
+      "text": "## Only heading\n"
+    }
+  ],
+  "children": [
+    {
+      "index": 0,
+      "parentIndex": 0,
+      "start": 0,
+      "end": 16,
+      "text": "## Only heading\n"
+    }
+  ]
+}

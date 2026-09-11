@@ -1,0 +1,52 @@
+{
+  "fixture": "preamble-before-h2.md",
+  "options": {
+    "childTargetTokens": 400,
+    "childHardMaxTokens": 500,
+    "childOverlapTokens": 60,
+    "childCrumbMinTokens": 64,
+    "parentMaxTokens": 1400,
+    "fenceIntroGlueMaxTokens": 40,
+    "tokenizerEncoding": "o200k_base"
+  },
+  "defaults": {
+    "childTargetTokens": 400,
+    "childHardMaxTokens": 500,
+    "childOverlapTokens": 60,
+    "childCrumbMinTokens": 64,
+    "parentMaxTokens": 1400,
+    "fenceIntroGlueMaxTokens": 40,
+    "tokenizerEncoding": "o200k_base"
+  },
+  "bodyChars": 59,
+  "parents": [
+    {
+      "index": 0,
+      "start": 0,
+      "end": 35,
+      "text": "Intro before any section heading.\n\n"
+    },
+    {
+      "index": 1,
+      "start": 35,
+      "end": 59,
+      "text": "## First\n\nSection body.\n"
+    }
+  ],
+  "children": [
+    {
+      "index": 0,
+      "parentIndex": 0,
+      "start": 0,
+      "end": 35,
+      "text": "Intro before any section heading.\n\n"
+    },
+    {
+      "index": 0,
+      "parentIndex": 1,
+      "start": 35,
+      "end": 59,
+      "text": "## First\n\nSection body.\n"
+    }
+  ]
+}

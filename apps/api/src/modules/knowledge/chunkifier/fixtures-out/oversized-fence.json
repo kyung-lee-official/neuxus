@@ -1,0 +1,46 @@
+{
+  "fixture": "oversized-fence.md",
+  "options": {
+    "childTargetTokens": 50,
+    "childHardMaxTokens": 80,
+    "childOverlapTokens": 60,
+    "childCrumbMinTokens": 64,
+    "parentMaxTokens": 1400,
+    "fenceIntroGlueMaxTokens": 40,
+    "tokenizerEncoding": "o200k_base"
+  },
+  "defaults": {
+    "childTargetTokens": 400,
+    "childHardMaxTokens": 500,
+    "childOverlapTokens": 60,
+    "childCrumbMinTokens": 64,
+    "parentMaxTokens": 1400,
+    "fenceIntroGlueMaxTokens": 40,
+    "tokenizerEncoding": "o200k_base"
+  },
+  "bodyChars": 1278,
+  "parents": [
+    {
+      "index": 0,
+      "start": 0,
+      "end": 1278,
+      "text": "## Big\n\n```ts\nconst n0 = 0;\nconst n1 = 1;\nconst n2 = 2;\nconst n3 = 3;\nconst n4 = 4;\nconst n5 = 5;\nconst n6 = 6;\nconst n7 = 7;\nconst n8 = 8;\nconst n9 = 9;\nconst n10 = 10;\nconst n11 = 11;\nconst n12 = 12;\nconst n13 = 13;\nconst n14 = 14;\nconst n15 = 15;\nconst n16 = 16;\nconst n17 = 17;\nconst n18 = 18;\nconst n19 = 19;\nconst n20 = 20;\nconst n21 = 21;\nconst n22 = 22;\nconst n23 = 23;\nconst n24 = 24;\nconst n25 = 25;\nconst n26 = 26;\nconst n27 = 27;\nconst n28 = 28;\nconst n29 = 29;\nconst n30 = 30;\nconst n31 = 31;\nconst n32 = 32;\nconst n33 = 33;\nconst n34 = 34;\nconst n35 = 35;\nconst n36 = 36;\nconst n37 = 37;\nconst n38 = 38;\nconst n39 = 39;\nconst n40 = 40;\nconst n41 = 41;\nconst n42 = 42;\nconst n43 = 43;\nconst n44 = 44;\nconst n45 = 45;\nconst n46 = 46;\nconst n47 = 47;\nconst n48 = 48;\nconst n49 = 49;\nconst n50 = 50;\nconst n51 = 51;\nconst n52 = 52;\nconst n53 = 53;\nconst n54 = 54;\nconst n55 = 55;\nconst n56 = 56;\nconst n57 = 57;\nconst n58 = 58;\nconst n59 = 59;\nconst n60 = 60;\nconst n61 = 61;\nconst n62 = 62;\nconst n63 = 63;\nconst n64 = 64;\nconst n65 = 65;\nconst n66 = 66;\nconst n67 = 67;\nconst n68 = 68;\nconst n69 = 69;\nconst n70 = 70;\nconst n71 = 71;\nconst n72 = 72;\nconst n73 = 73;\nconst n74 = 74;\nconst n75 = 75;\nconst n76 = 76;\nconst n77 = 77;\nconst n78 = 78;\nconst n79 = 79;\n```\n"
+    }
+  ],
+  "children": [
+    {
+      "index": 0,
+      "parentIndex": 0,
+      "start": 0,
+      "end": 7,
+      "text": "## Big\n"
+    },
+    {
+      "index": 1,
+      "parentIndex": 0,
+      "start": 8,
+      "end": 1278,
+      "text": "```ts\nconst n0 = 0;\nconst n1 = 1;\nconst n2 = 2;\nconst n3 = 3;\nconst n4 = 4;\nconst n5 = 5;\nconst n6 = 6;\nconst n7 = 7;\nconst n8 = 8;\nconst n9 = 9;\nconst n10 = 10;\nconst n11 = 11;\nconst n12 = 12;\nconst n13 = 13;\nconst n14 = 14;\nconst n15 = 15;\nconst n16 = 16;\nconst n17 = 17;\nconst n18 = 18;\nconst n19 = 19;\nconst n20 = 20;\nconst n21 = 21;\nconst n22 = 22;\nconst n23 = 23;\nconst n24 = 24;\nconst n25 = 25;\nconst n26 = 26;\nconst n27 = 27;\nconst n28 = 28;\nconst n29 = 29;\nconst n30 = 30;\nconst n31 = 31;\nconst n32 = 32;\nconst n33 = 33;\nconst n34 = 34;\nconst n35 = 35;\nconst n36 = 36;\nconst n37 = 37;\nconst n38 = 38;\nconst n39 = 39;\nconst n40 = 40;\nconst n41 = 41;\nconst n42 = 42;\nconst n43 = 43;\nconst n44 = 44;\nconst n45 = 45;\nconst n46 = 46;\nconst n47 = 47;\nconst n48 = 48;\nconst n49 = 49;\nconst n50 = 50;\nconst n51 = 51;\nconst n52 = 52;\nconst n53 = 53;\nconst n54 = 54;\nconst n55 = 55;\nconst n56 = 56;\nconst n57 = 57;\nconst n58 = 58;\nconst n59 = 59;\nconst n60 = 60;\nconst n61 = 61;\nconst n62 = 62;\nconst n63 = 63;\nconst n64 = 64;\nconst n65 = 65;\nconst n66 = 66;\nconst n67 = 67;\nconst n68 = 68;\nconst n69 = 69;\nconst n70 = 70;\nconst n71 = 71;\nconst n72 = 72;\nconst n73 = 73;\nconst n74 = 74;\nconst n75 = 75;\nconst n76 = 76;\nconst n77 = 77;\nconst n78 = 78;\nconst n79 = 79;\n```\n"
+    }
+  ]
+}

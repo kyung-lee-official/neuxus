@@ -1,4 +1,4 @@
-import { normalizeBody } from "../ingest/normalize.ts";
+import { normalizeBody } from "../../../shared/ingest/normalize.ts";
 import { packChildren } from "./children.ts";
 import { type ChunkifyOptions, resolveChunkifyOptions } from "./defaults.ts";
 import { lexBlocks } from "./lex.ts";

@@ -1,0 +1,24 @@
+{
+  "fixture": "whitespace-only.md",
+  "options": {
+    "childTargetTokens": 400,
+    "childHardMaxTokens": 500,
+    "childOverlapTokens": 60,
+    "childCrumbMinTokens": 64,
+    "parentMaxTokens": 1400,
+    "fenceIntroGlueMaxTokens": 40,
+    "tokenizerEncoding": "o200k_base"
+  },
+  "defaults": {
+    "childTargetTokens": 400,
+    "childHardMaxTokens": 500,
+    "childOverlapTokens": 60,
+    "childCrumbMinTokens": 64,
+    "parentMaxTokens": 1400,
+    "fenceIntroGlueMaxTokens": 40,
+    "tokenizerEncoding": "o200k_base"
+  },
+  "bodyChars": 3,
+  "parents": [],
+  "children": []
+}

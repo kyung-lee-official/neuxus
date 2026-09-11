@@ -1,0 +1,39 @@
+{
+  "fixture": "blank-lines-preserved.md",
+  "options": {
+    "childTargetTokens": 400,
+    "childHardMaxTokens": 500,
+    "childOverlapTokens": 60,
+    "childCrumbMinTokens": 64,
+    "parentMaxTokens": 1400,
+    "fenceIntroGlueMaxTokens": 40,
+    "tokenizerEncoding": "o200k_base"
+  },
+  "defaults": {
+    "childTargetTokens": 400,
+    "childHardMaxTokens": 500,
+    "childOverlapTokens": 60,
+    "childCrumbMinTokens": 64,
+    "parentMaxTokens": 1400,
+    "fenceIntroGlueMaxTokens": 40,
+    "tokenizerEncoding": "o200k_base"
+  },
+  "bodyChars": 40,
+  "parents": [
+    {
+      "index": 0,
+      "start": 0,
+      "end": 40,
+      "text": "## S\n\nAlpha paragraph.\n\nBeta paragraph.\n"
+    }
+  ],
+  "children": [
+    {
+      "index": 0,
+      "parentIndex": 0,
+      "start": 0,
+      "end": 40,
+      "text": "## S\n\nAlpha paragraph.\n\nBeta paragraph.\n"
+    }
+  ]
+}

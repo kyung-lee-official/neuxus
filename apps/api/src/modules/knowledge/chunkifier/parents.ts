@@ -15,27 +15,16 @@ function spanOf(blocks: LexBlock[]): { start: number; end: number } {
   return { start: first.start, end: last.end };
 }
 
-function tokensFor(
-  body: string,
-  blocks: LexBlock[],
-  encoding: string,
-): number {
+function tokensFor(body: string, blocks: LexBlock[], encoding: string): number {
   const { start, end } = spanOf(blocks);
   return countTokens(body.slice(start, end), encoding);
 }
 
-function splitByHeadingLevel(
-  blocks: LexBlock[],
-  level: number,
-): LexBlock[][] {
+function splitByHeadingLevel(blocks: LexBlock[], level: number): LexBlock[][] {
   const groups: LexBlock[][] = [];
   let current: LexBlock[] = [];
   for (const b of blocks) {
-    if (
-      b.kind === "heading" &&
-      b.level === level &&
-      current.length > 0
-    ) {
+    if (b.kind === "heading" && b.level === level && current.length > 0) {
       groups.push(current);
       current = [b];
     } else {
@@ -121,20 +110,22 @@ export function buildParents(
   const parents: ParentSlice[] = [];
 
   for (const section of sections) {
-    if (tokensFor(body, section, options.tokenizerEncoding) <= options.parentMaxTokens) {
+    if (
+      tokensFor(body, section, options.tokenizerEncoding) <=
+      options.parentMaxTokens
+    ) {
       const { start, end } = spanOf(section);
       parents.push({ blocks: section, start, end });
       continue;
     }
 
     const hasH3 = section.some((b) => b.kind === "heading" && b.level === 3);
-    const subSections = hasH3
-      ? splitByHeadingLevel(section, 3)
-      : [section];
+    const subSections = hasH3 ? splitByHeadingLevel(section, 3) : [section];
 
     for (const sub of subSections) {
       if (
-        tokensFor(body, sub, options.tokenizerEncoding) <= options.parentMaxTokens
+        tokensFor(body, sub, options.tokenizerEncoding) <=
+        options.parentMaxTokens
       ) {
         const { start, end } = spanOf(sub);
         parents.push({ blocks: sub, start, end });

@@ -1,0 +1,39 @@
+{
+  "fixture": "fence-intro-glue.md",
+  "options": {
+    "childTargetTokens": 400,
+    "childHardMaxTokens": 500,
+    "childOverlapTokens": 60,
+    "childCrumbMinTokens": 64,
+    "parentMaxTokens": 1400,
+    "fenceIntroGlueMaxTokens": 40,
+    "tokenizerEncoding": "o200k_base"
+  },
+  "defaults": {
+    "childTargetTokens": 400,
+    "childHardMaxTokens": 500,
+    "childOverlapTokens": 60,
+    "childCrumbMinTokens": 64,
+    "parentMaxTokens": 1400,
+    "fenceIntroGlueMaxTokens": 40,
+    "tokenizerEncoding": "o200k_base"
+  },
+  "bodyChars": 68,
+  "parents": [
+    {
+      "index": 0,
+      "start": 0,
+      "end": 68,
+      "text": "## Examples\n\nHere is the setup code:\n\n```ts\nexport const x = 1;\n```\n"
+    }
+  ],
+  "children": [
+    {
+      "index": 0,
+      "parentIndex": 0,
+      "start": 0,
+      "end": 68,
+      "text": "## Examples\n\nHere is the setup code:\n\n```ts\nexport const x = 1;\n```\n"
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "fixture": "two-h2-sections.md",
+  "options": {
+    "childTargetTokens": 400,
+    "childHardMaxTokens": 500,
+    "childOverlapTokens": 60,
+    "childCrumbMinTokens": 64,
+    "parentMaxTokens": 1400,
+    "fenceIntroGlueMaxTokens": 40,
+    "tokenizerEncoding": "o200k_base"
+  },
+  "defaults": {
+    "childTargetTokens": 400,
+    "childHardMaxTokens": 500,
+    "childOverlapTokens": 60,
+    "childCrumbMinTokens": 64,
+    "parentMaxTokens": 1400,
+    "fenceIntroGlueMaxTokens": 40,
+    "tokenizerEncoding": "o200k_base"
+  },
+  "bodyChars": 30,
+  "parents": [
+    {
+      "index": 0,
+      "start": 0,
+      "end": 16,
+      "text": "## One\n\nAlpha.\n\n"
+    },
+    {
+      "index": 1,
+      "start": 16,
+      "end": 30,
+      "text": "## Two\n\nBeta.\n"
+    }
+  ],
+  "children": [
+    {
+      "index": 0,
+      "parentIndex": 0,
+      "start": 0,
+      "end": 16,
+      "text": "## One\n\nAlpha.\n\n"
+    },
+    {
+      "index": 0,
+      "parentIndex": 1,
+      "start": 16,
+      "end": 30,
+      "text": "## Two\n\nBeta.\n"
+    }
+  ]
+}
