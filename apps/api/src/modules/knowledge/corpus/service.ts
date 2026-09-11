@@ -25,16 +25,37 @@ import {
 } from "./settings/defaults.ts";
 import { CorpusSettings } from "./settings/service.ts";
 
-export type CorpusOperation = "clone" | "pull" | "chunkify" | "embed" | "sync";
+/** Corpus operation ids — single source of truth. */
+export const CORPUS_OP_CLONE = "clone";
+export const CORPUS_OP_PULL = "pull";
+export const CORPUS_OP_CHUNKIFY = "chunkify";
+export const CORPUS_OP_EMBED = "embed";
+export const CORPUS_OP_SYNC = "sync";
+
+/** Corpus stage ids — single source of truth. */
+export const CORPUS_STG_CLONE = "clone";
+export const CORPUS_STG_FETCH = "fetch";
+export const CORPUS_STG_CHECKOUT = "checkout";
+export const CORPUS_STG_MERGE = "merge";
+export const CORPUS_STG_INGEST = "ingest";
+export const CORPUS_STG_CHUNKIFY = "chunkify";
+export const CORPUS_STG_EMBED = "embed";
+
+export type CorpusOperation =
+  | typeof CORPUS_OP_CLONE
+  | typeof CORPUS_OP_PULL
+  | typeof CORPUS_OP_CHUNKIFY
+  | typeof CORPUS_OP_EMBED
+  | typeof CORPUS_OP_SYNC;
 
 export type CorpusStage =
-  | "clone"
-  | "fetch"
-  | "checkout"
-  | "merge"
-  | "ingest"
-  | "chunkify"
-  | "embed";
+  | typeof CORPUS_STG_CLONE
+  | typeof CORPUS_STG_FETCH
+  | typeof CORPUS_STG_CHECKOUT
+  | typeof CORPUS_STG_MERGE
+  | typeof CORPUS_STG_INGEST
+  | typeof CORPUS_STG_CHUNKIFY
+  | typeof CORPUS_STG_EMBED;
 
 export type CorpusProgress = CloneProgress;
 
@@ -73,16 +94,16 @@ function errorMessage(err: unknown): string {
 
 function initialStage(op: CorpusOperation): CorpusStage {
   switch (op) {
-    case "clone":
-      return "clone";
-    case "pull":
-      return "fetch";
-    case "chunkify":
-      return "chunkify";
-    case "embed":
-      return "embed";
-    case "sync":
-      return "fetch";
+    case CORPUS_OP_CLONE:
+      return CORPUS_STG_CLONE;
+    case CORPUS_OP_PULL:
+      return CORPUS_STG_FETCH;
+    case CORPUS_OP_CHUNKIFY:
+      return CORPUS_STG_CHUNKIFY;
+    case CORPUS_OP_EMBED:
+      return CORPUS_STG_EMBED;
+    case CORPUS_OP_SYNC:
+      return CORPUS_STG_FETCH;
   }
 }
 
@@ -172,7 +193,7 @@ export abstract class Corpus {
 
   /** Clone the configured repo into the local checkout. */
   static async clone(): Promise<StoredCorpusSettings> {
-    if (!Corpus.tryStart("clone")) throw new CorpusLockedError();
+    if (!Corpus.tryStart(CORPUS_OP_CLONE)) throw new CorpusLockedError();
     try {
       const result = await cloneCorpusStream(Corpus.emitProgress);
       Corpus.finish();
@@ -185,7 +206,7 @@ export abstract class Corpus {
 
   /** Pull the latest commit into the local checkout. */
   static async pull(): Promise<StoredCorpusSettings> {
-    if (!Corpus.tryStart("pull")) throw new CorpusLockedError();
+    if (!Corpus.tryStart(CORPUS_OP_PULL)) throw new CorpusLockedError();
     try {
       const result = await pullCorpusStream(Corpus.emitStage);
       Corpus.finish();
@@ -201,9 +222,9 @@ export abstract class Corpus {
     pagesProcessed: number;
     pagesSkipped: number;
   }> {
-    if (!Corpus.tryStart("chunkify")) throw new CorpusLockedError();
+    if (!Corpus.tryStart(CORPUS_OP_CHUNKIFY)) throw new CorpusLockedError();
     try {
-      Corpus.emitStage("chunkify");
+      Corpus.emitStage(CORPUS_STG_CHUNKIFY);
       const pages = await listPageBodies();
 
       let pagesProcessed = 0;
@@ -251,9 +272,9 @@ export abstract class Corpus {
 
   /** Embed children whose `embedding_model` is missing or stale. */
   static async embed(): Promise<EmbedStaleChildrenResult> {
-    if (!Corpus.tryStart("embed")) throw new CorpusLockedError();
+    if (!Corpus.tryStart(CORPUS_OP_EMBED)) throw new CorpusLockedError();
     try {
-      Corpus.emitStage("embed");
+      Corpus.emitStage(CORPUS_STG_EMBED);
       const result = await Embedder.embedStaleChildren({ failFast: true });
       Corpus.finish();
       return result;
@@ -265,7 +286,7 @@ export abstract class Corpus {
 
   /** Start the full sync pipeline (fetch → ingest → embed → record sha). */
   static sync(): void {
-    if (!Corpus.tryStart("sync")) throw new CorpusLockedError();
+    if (!Corpus.tryStart(CORPUS_OP_SYNC)) throw new CorpusLockedError();
     void Corpus.runSync().catch(() => {
       /* errors already recorded in status via finish(err) */
     });
@@ -273,14 +294,14 @@ export abstract class Corpus {
 
   private static async runSync(): Promise<void> {
     try {
-      Corpus.emitStage("fetch");
+      Corpus.emitStage(CORPUS_STG_FETCH);
       const sha = await refreshCorpusCheckout();
       const settings: ResolvedCorpusSettings = resolveCorpusSettings(
         await CorpusSettings.load(),
       );
-      Corpus.emitStage("ingest");
+      Corpus.emitStage(CORPUS_STG_INGEST);
       await ingestCorpusCheckout(corpusCheckoutDir(), settings.docsRoot);
-      Corpus.emitStage("embed");
+      Corpus.emitStage(CORPUS_STG_EMBED);
       await Embedder.embedStaleChildren({ failFast: true });
       await CorpusSettings.saveLastSyncedSha(sha);
       Corpus.finish();
