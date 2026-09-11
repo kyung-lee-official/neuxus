@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { ChunkifyResult } from "../../../shared/chunkify/index.ts";
 import { isoFromDate } from "../../../shared/serialize.ts";
 import { findChildrenByPage } from "./dal/children.dal.ts";
@@ -8,7 +9,13 @@ import {
   upsertPageWithChunks,
 } from "./dal/pages.dal.ts";
 import { findParentsByPage } from "./dal/parents.dal.ts";
-import { pageContentHash } from "./hash.ts";
+
+export type PageHashFields = {
+  title: string;
+  type: string | null;
+  tags: string[];
+  body: string;
+};
 
 export type KnowledgePageListItem = {
   id: string;
@@ -73,6 +80,17 @@ export type SaveKnowledgePageResult = {
 };
 
 export abstract class Page {
+  /** Stable page skip-gate hash. @see docs/modern-knowledge-base-design/02-ingest.md */
+  static pageContentHash(fields: PageHashFields): string {
+    const payload = JSON.stringify({
+      title: fields.title,
+      type: fields.type ?? null,
+      tags: [...fields.tags].sort(),
+      body: fields.body,
+    });
+    return createHash("sha256").update(payload).digest("hex");
+  }
+
   /** All `kb_pages` for admin inspect. No `body`. */
   static async list(): Promise<KnowledgePageListItem[]> {
     const summaries = await listPageSummaries();
@@ -154,7 +172,7 @@ export abstract class Page {
   static async save(
     input: SaveKnowledgePageInput,
   ): Promise<SaveKnowledgePageResult> {
-    const contentHash = pageContentHash({
+    const contentHash = Page.pageContentHash({
       title: input.title,
       type: input.type,
       tags: input.tags,

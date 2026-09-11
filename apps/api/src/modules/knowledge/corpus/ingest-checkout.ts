@@ -8,8 +8,7 @@ import {
 import {
   deleteKnowledgePagesMissingSourcePaths,
   findPageContentHash,
-  hashesMatch,
-  persistKnowledgePage,
+  Page,
 } from "../pages/index.ts";
 import { listCorpusMarkdownFiles } from "./walk.ts";
 
@@ -57,10 +56,12 @@ export async function ingestCorpusCheckout(
       body: enrichedBody,
     };
     const storedHash = await findPageContentHash(file.slug);
-    if (hashesMatch(storedHash, fields)) continue;
+    if (storedHash !== null && storedHash === Page.pageContentHash(fields)) {
+      continue;
+    }
 
     const chunks = chunkify(enrichedBody);
-    await persistKnowledgePage({
+    await Page.save({
       id: file.slug,
       slug: file.slug,
       title: ingested.title,
