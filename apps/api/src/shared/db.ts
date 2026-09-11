@@ -1,5 +1,5 @@
 import { PrismaPg } from "@prisma/adapter-pg";
-import { SQL, sql } from "bun";
+import { SQL } from "bun";
 import { PrismaClient } from "../generated/prisma/client.ts";
 import { requireDatabaseUrl } from "./config.ts";
 
@@ -10,22 +10,6 @@ export type AppUser = {
   api_key: string;
   role: AppUserRole;
   created_at?: Date;
-};
-
-export type AppMessage = {
-  id: number;
-  session_id: string;
-  role: "user" | "assistant";
-  content: string;
-  created_at: Date;
-};
-
-export type AppMemory = {
-  id: number;
-  user_id: string;
-  slug: string;
-  content: string;
-  created_at: Date;
 };
 
 export type AppSession = {
@@ -45,11 +29,6 @@ export function getPrisma(): PrismaClient {
     prisma = new PrismaClient({ adapter });
   }
   return prisma;
-}
-
-/** Convert Prisma's `bigint` id back to the `number` shape callers expect. */
-function bigIntToNumber(value: bigint): number {
-  return Number(value);
 }
 
 /** Normalize a raw role string from the DB to the `"admin" | "member"` union. */
@@ -84,38 +63,6 @@ function mapSession(row: {
     title: row.title,
     created_at: row.createdAt,
     updated_at: row.updatedAt,
-  };
-}
-
-function mapMessage(row: {
-  id: bigint;
-  sessionId: string;
-  role: string;
-  content: string;
-  createdAt: Date;
-}): AppMessage {
-  return {
-    id: bigIntToNumber(row.id),
-    session_id: row.sessionId,
-    role: row.role === "assistant" ? "assistant" : "user",
-    content: row.content,
-    created_at: row.createdAt,
-  };
-}
-
-function mapMemory(row: {
-  id: bigint;
-  userId: string;
-  slug: string;
-  content: string;
-  createdAt: Date;
-}): AppMemory {
-  return {
-    id: bigIntToNumber(row.id),
-    user_id: row.userId,
-    slug: row.slug,
-    content: row.content,
-    created_at: row.createdAt,
   };
 }
 
@@ -367,64 +314,6 @@ export async function touchSession(sessionId: string): Promise<void> {
   }
 }
 
-export async function listRecentMessages(
-  sessionId: string,
-  limit = 12,
-): Promise<AppMessage[]> {
-  const rows = await getPrisma().message.findMany({
-    where: { sessionId },
-    orderBy: { createdAt: "desc" },
-    take: limit,
-  });
-  return rows.map(mapMessage).reverse();
-}
-
-export async function insertMessage(
-  sessionId: string,
-  role: "user" | "assistant",
-  content: string,
-): Promise<void> {
-  await getPrisma().message.create({
-    data: { sessionId, role, content },
-  });
-  await touchSession(sessionId);
-}
-
-export async function insertMemory(
-  userId: string,
-  slug: string,
-  content: string,
-): Promise<AppMemory> {
-  const row = await getPrisma().memory.upsert({
-    where: { userId_slug: { userId, slug } },
-    create: { userId, slug, content },
-    update: { content },
-  });
-  return mapMemory(row);
-}
-
-/** All personal memories for one user (hard `user_id` filter). */
-export async function listMemoriesForUser(
-  userId: string,
-): Promise<AppMemory[]> {
-  const rows = await getPrisma().memory.findMany({
-    where: { userId },
-    orderBy: { createdAt: "desc" },
-  });
-  return rows.map(mapMemory);
-}
-
-/** Delete one memory owned by `userId`. Returns false if missing. */
-export async function deleteMemoryForUser(
-  userId: string,
-  memoryId: number,
-): Promise<boolean> {
-  const result = await getPrisma().memory.deleteMany({
-    where: { id: BigInt(memoryId), userId },
-  });
-  return result.count > 0;
-}
-
 /** All chat sessions for one user. */
 export async function listSessionsForUser(
   userId: string,
@@ -434,67 +323,4 @@ export async function listSessionsForUser(
     orderBy: { updatedAt: "desc" },
   });
   return rows.map(mapSession);
-}
-
-/** Count chat messages across all sessions for one user. */
-export async function countMessagesForUser(userId: string): Promise<number> {
-  return getPrisma().message.count({
-    where: { session: { userId } },
-  });
-}
-
-/**
- * Page of chat messages for one user (newest first). Pagination is
- * the caller's concern — `skip`/`take` in. Order: `createdAt DESC, id DESC`.
- */
-export async function findMessagesForUser(
-  userId: string,
-  options: { skip: number; take: number },
-): Promise<AppMessage[]> {
-  const rows = await getPrisma().message.findMany({
-    where: { session: { userId } },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: options.take,
-    skip: options.skip,
-  });
-  return rows.map(mapMessage);
-}
-
-type MemoryRow = {
-  /** Postgres `bigint` is returned as string by default in Bun's `sql`. */
-  id: string;
-  user_id: string;
-  slug: string;
-  content: string;
-  created_at: Date;
-};
-
-/**
- * Postgres full-text search over a user's memories via
- * `to_tsvector`/`plainto_tsquery`. Returns up to `limit` matches,
- * newest first. Stays raw — Prisma does not model this index.
- *
- * Search policy (trim input, try FTS first, fall back to recent)
- * lives in the calling service.
- */
-export async function searchMemoriesByUserFTS(
-  userId: string,
-  query: string,
-  limit: number,
-): Promise<AppMemory[]> {
-  const matched = await sql<MemoryRow[]>`
-    SELECT id, user_id, slug, content, created_at
-    FROM app_memories
-    WHERE user_id = ${userId}
-      AND to_tsvector('english', content) @@ plainto_tsquery('english', ${query})
-    ORDER BY created_at DESC
-    LIMIT ${limit}
-  `;
-  return matched.map((row) => ({
-    id: Number(row.id),
-    user_id: row.user_id,
-    slug: row.slug,
-    content: row.content,
-    created_at: row.created_at,
-  }));
 }

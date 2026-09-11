@@ -1,12 +1,9 @@
 import { status } from "elysia";
 import {
-  type AppMessage,
   type AppUser,
-  countMessagesForUser,
   countUsers,
   createUser,
   deleteUser,
-  findMessagesForUser,
   getUserById,
   listSessionsForUser,
   listUsers,
@@ -14,18 +11,9 @@ import {
 } from "../../shared/db.ts";
 import { isoFromDate, sessionJson, userJson } from "../../shared/serialize.ts";
 import { Auth } from "../auth/service.ts";
+import { ChatMessage } from "../chat-message/service.ts";
 import { PersonalMemory } from "../personal-memory/service.ts";
 import type { UsersModel } from "./model.ts";
-
-export type MessagePage = {
-  items: AppMessage[];
-  total: number;
-  page: number;
-  pageSize: number;
-};
-
-const MESSAGE_PAGE_SIZE_DEFAULT = 50;
-const MESSAGE_PAGE_SIZE_MAX = 200;
 
 function normalizeUserId(raw: string): string | null {
   const id = raw.trim().toLowerCase();
@@ -36,33 +24,6 @@ function normalizeUserId(raw: string): string | null {
 
 function newApiKey(userId: string): string {
   return `demo-key-${userId}-${crypto.randomUUID().slice(0, 8)}`;
-}
-
-function clampPage(raw: string | number | undefined): number {
-  const n = typeof raw === "number" ? raw : Number.parseInt(raw ?? "1", 10);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 1;
-}
-
-function clampPageSize(raw: number | undefined): number {
-  if (typeof raw !== "number" || !Number.isFinite(raw) || raw < 1) {
-    return MESSAGE_PAGE_SIZE_DEFAULT;
-  }
-  return Math.min(Math.floor(raw), MESSAGE_PAGE_SIZE_MAX);
-}
-
-async function pageMessagesForUser(
-  userId: string,
-  rawPage: string | number | undefined,
-  rawPageSize: number | undefined,
-): Promise<MessagePage> {
-  const page = clampPage(rawPage);
-  const pageSize = clampPageSize(rawPageSize);
-  const skip = (page - 1) * pageSize;
-  const [total, items] = await Promise.all([
-    countMessagesForUser(userId),
-    findMessagesForUser(userId, { skip, take: pageSize }),
-  ]);
-  return { items, total, page, pageSize };
 }
 
 export abstract class Users {
@@ -142,7 +103,7 @@ export abstract class Users {
     const [memories, sessions, messagePageResult] = await Promise.all([
       PersonalMemory.listByUser(id),
       listSessionsForUser(id),
-      pageMessagesForUser(id, query.messagePage, undefined),
+      ChatMessage.pageByUser(id, query.messagePage, undefined),
     ]);
 
     return {
