@@ -1,5 +1,5 @@
 import { chunkify } from "../../../shared/chunkify/chunkify.ts";
-import { getPrisma } from "../../../shared/db.ts";
+import { listPageBodies, replacePageChunks } from "./dal.ts";
 
 /**
  * Re-chunk every page in `kb_pages`. Replaces each page's `kb_parents` and
@@ -13,10 +13,7 @@ export async function rechunkAllPages(): Promise<{
   pagesProcessed: number;
   pagesSkipped: number;
 }> {
-  const prisma = getPrisma();
-  const pages = await prisma.knowledgePage.findMany({
-    select: { id: true, body: true },
-  });
+  const pages = await listPageBodies();
 
   let pagesProcessed = 0;
   let pagesSkipped = 0;
@@ -47,15 +44,7 @@ export async function rechunkAllPages(): Promise<{
       };
     });
 
-    await prisma.$transaction(async (tx) => {
-      await tx.knowledgeParent.deleteMany({ where: { pageId: page.id } });
-      if (parentRows.length > 0) {
-        await tx.knowledgeParent.createMany({ data: parentRows });
-      }
-      if (childRows.length > 0) {
-        await tx.knowledgeChild.createMany({ data: childRows });
-      }
-    });
+    await replacePageChunks(page.id, parentRows, childRows);
 
     pagesProcessed += 1;
     if (chunks.parents.length === 0) pagesSkipped += 1;

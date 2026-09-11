@@ -1,4 +1,5 @@
 import { status } from "elysia";
+import { embedStaleChildren } from "../../../shared/embed/children.ts";
 import {
   CorpusGitError,
   type CorpusSettingsRow,
@@ -13,8 +14,7 @@ import {
   runCorpusSync,
   saveCorpusSettings,
   tryStartCorpusOp,
-} from "../../../shared/corpus/index.ts";
-import { embedStaleChildren } from "../../../shared/embed/children.ts";
+} from "../../knowledge/corpus/index.ts";
 import type { CorpusModel } from "./model.ts";
 
 const LOCKED_MESSAGE = "A corpus operation is already running.";
