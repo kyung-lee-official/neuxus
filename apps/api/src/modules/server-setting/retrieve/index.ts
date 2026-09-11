@@ -1,8 +1,8 @@
 import { Elysia } from "elysia";
 import { API_TAGS, bearerSecurity } from "../../../shared/openapi.ts";
 import { auth } from "../../auth/index.ts";
+import { RetrieverSettings } from "../../knowledge/retriever/index.ts";
 import { RetrieveSettingsModel } from "./model.ts";
-import { RetrieveSettings } from "./service.ts";
 
 const retrieveDetail = {
   security: [bearerSecurity],
@@ -11,7 +11,7 @@ const retrieveDetail = {
 
 export const retrieveSettings = new Elysia({ prefix: "/retrieve" })
   .use(auth)
-  .get("/", () => RetrieveSettings.get(), {
+  .get("/", () => RetrieverSettings.loadAdmin(), {
     requireAdmin: true,
     response: RetrieveSettingsModel.retrieveResponse,
     detail: {
@@ -21,18 +21,25 @@ export const retrieveSettings = new Elysia({ prefix: "/retrieve" })
         "Returns the stored `kb_retrieve_settings` row (or nulls) plus hardcoded defaults.",
     },
   })
-  .put("/", ({ body }) => RetrieveSettings.put(body), {
-    requireAdmin: true,
-    body: RetrieveSettingsModel.retrieveBody,
-    response: RetrieveSettingsModel.retrieveResponse,
-    detail: {
-      ...retrieveDetail,
-      summary: "Update retrieve settings",
-      description:
-        "Empty / `null` fields store as null; runtime falls back to `defaults`.",
+  .put(
+    "/",
+    async ({ body }) => {
+      await RetrieverSettings.save(body);
+      return RetrieverSettings.loadAdmin();
     },
-  })
-  .post("/reset", () => RetrieveSettings.reset(), {
+    {
+      requireAdmin: true,
+      body: RetrieveSettingsModel.retrieveBody,
+      response: RetrieveSettingsModel.retrieveResponse,
+      detail: {
+        ...retrieveDetail,
+        summary: "Update retrieve settings",
+        description:
+          "Empty / `null` fields store as null; runtime falls back to `defaults`.",
+      },
+    },
+  )
+  .post("/reset", () => RetrieverSettings.reset(), {
     requireAdmin: true,
     response: RetrieveSettingsModel.retrieveResponse,
     detail: {
