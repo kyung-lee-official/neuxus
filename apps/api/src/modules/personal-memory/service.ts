@@ -16,13 +16,9 @@ export type { AppMemory } from "./dal.ts";
 const SEARCH_LIMIT = 8;
 
 export abstract class PersonalMemory {
-  /** Upsert a note by `(userId, slug)`. */
-  static upsert(
-    userId: string,
-    slug: string,
-    content: string,
-  ): Promise<AppMemory> {
-    return upsertMemory(userId, slug, content);
+  /** Upsert a note; its slug is generated from the current time. */
+  static upsert(userId: string, content: string): Promise<AppMemory> {
+    return upsertMemory(userId, `memory/note-${Date.now()}`, content);
   }
 
   /** All of a user's memories, newest first. */
@@ -51,10 +47,5 @@ export abstract class PersonalMemory {
       if (matched.length > 0) return matched;
     }
     return listMemoriesByUser(userId, limit);
-  }
-
-  /** Slug for a fresh memory note, e.g. `memory/note-1726000000000`. */
-  static slugForNote(now = new Date()): string {
-    return `memory/note-${now.getTime()}`;
   }
 }
