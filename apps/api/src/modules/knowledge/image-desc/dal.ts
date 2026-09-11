@@ -5,7 +5,7 @@
 
 import { getPrisma } from "../../../shared/db.ts";
 
-export type ImageDescRow = {
+type ImageDescRow = {
   pageId: string;
   imagePath: string;
   contentHash: string;

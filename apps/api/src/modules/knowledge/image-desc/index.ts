@@ -12,11 +12,6 @@
  * task link (see `buildDefaultDescriber` in pipeline.ts).
  */
 
-export {
-  findImageDescription,
-  type ImageDescRow,
-  upsertImageDescription,
-} from "./dal.ts";
 export { dedupByPath, type ParsedImageRef, parseImageRefs } from "./parse.ts";
 export {
   defaultPersistHooks,
