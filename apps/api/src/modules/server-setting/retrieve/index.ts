@@ -2,7 +2,7 @@ import { Elysia } from "elysia";
 import { API_TAGS, bearerSecurity } from "../../../shared/openapi.ts";
 import { auth } from "../../auth/index.ts";
 import { RetrieverSettings } from "../../knowledge/retriever/index.ts";
-import { RetrieveSettingsModel } from "./model.ts";
+import { RetrieverSettingsModel } from "./model.ts";
 
 const retrieveDetail = {
   security: [bearerSecurity],
@@ -13,7 +13,7 @@ export const retrieveSettings = new Elysia({ prefix: "/retrieve" })
   .use(auth)
   .get("/", () => RetrieverSettings.loadAdmin(), {
     requireAdmin: true,
-    response: RetrieveSettingsModel.retrieveResponse,
+    response: RetrieverSettingsModel.retrieverResponse,
     detail: {
       ...retrieveDetail,
       summary: "Get retrieve settings",
@@ -29,8 +29,8 @@ export const retrieveSettings = new Elysia({ prefix: "/retrieve" })
     },
     {
       requireAdmin: true,
-      body: RetrieveSettingsModel.retrieveBody,
-      response: RetrieveSettingsModel.retrieveResponse,
+      body: RetrieverSettingsModel.retrieverBody,
+      response: RetrieverSettingsModel.retrieverResponse,
       detail: {
         ...retrieveDetail,
         summary: "Update retrieve settings",
@@ -41,7 +41,7 @@ export const retrieveSettings = new Elysia({ prefix: "/retrieve" })
   )
   .post("/reset", () => RetrieverSettings.reset(), {
     requireAdmin: true,
-    response: RetrieveSettingsModel.retrieveResponse,
+    response: RetrieverSettingsModel.retrieverResponse,
     detail: {
       ...retrieveDetail,
       summary: "Reset retrieve settings to defaults",

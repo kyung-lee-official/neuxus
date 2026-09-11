@@ -1,15 +1,15 @@
 import { type Static, t } from "elysia";
 
-const retrieveFields = {
+const retrieverFields = {
   childLimit: t.Union([t.Integer({ minimum: 1 }), t.Null()]),
   maxParents: t.Union([t.Integer({ minimum: 1 }), t.Null()]),
   maxCharacters: t.Union([t.Integer({ minimum: 1 }), t.Null()]),
 };
 
-export const RetrieveSettingsModel = {
-  retrieveBody: t.Object(retrieveFields),
-  retrieveResponse: t.Object({
-    ...retrieveFields,
+export const RetrieverSettingsModel = {
+  retrieverBody: t.Object(retrieverFields),
+  retrieverResponse: t.Object({
+    ...retrieverFields,
     defaults: t.Object({
       childLimit: t.Integer(),
       maxParents: t.Integer(),
@@ -18,8 +18,8 @@ export const RetrieveSettingsModel = {
   }),
 } as const;
 
-export type RetrieveSettingsModel = {
-  [K in keyof typeof RetrieveSettingsModel]: Static<
-    (typeof RetrieveSettingsModel)[K]
+export type RetrieverSettingsModel = {
+  [K in keyof typeof RetrieverSettingsModel]: Static<
+    (typeof RetrieverSettingsModel)[K]
   >;
 };
