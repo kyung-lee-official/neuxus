@@ -3,7 +3,7 @@ import {
   type RetrieveSettingsRow,
   resetRetrieveSettings,
   saveRetrieveSettings,
-} from "../../../shared/retrieve/index.ts";
+} from "../../knowledge/retrieve/index.ts";
 import type { RetrieveSettingsModel } from "./model.ts";
 
 export abstract class RetrieveSettings {

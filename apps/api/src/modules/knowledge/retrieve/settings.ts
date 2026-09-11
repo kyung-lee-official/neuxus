@@ -5,7 +5,7 @@
  * apply when a column is null.
  */
 
-import { getPrisma } from "../db.ts";
+import { getPrisma } from "../../../shared/db.ts";
 import {
   RETRIEVE_DEFAULTS,
   type ResolvedRetrieveOptions,

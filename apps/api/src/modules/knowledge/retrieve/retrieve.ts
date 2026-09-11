@@ -1,8 +1,10 @@
 import { sql } from "bun";
-import { pgvectorLiteral } from "../embed/index.ts";
-import { childLogger } from "../log/index.ts";
-import { getEmbedder, getEmbedModelId } from "../models/routing.ts";
-import type { Embedder } from "../models/types.ts";
+import { childLogger } from "../../../shared/log/index.ts";
+import {
+  resolveTaskModelLink,
+  TASK_EMBEDDING,
+} from "../../server-setting/task-model-map/service.ts";
+import { type Embedder, pgvectorLiteral } from "../embed/index.ts";
 import { type RetrieveOptions, resolveRetrieveOptions } from "./defaults.ts";
 import {
   type ChildHit,
@@ -81,7 +83,11 @@ export async function retrieveParentsByQuestion(
 ): Promise<RetrieveParentsByQuestionResult> {
   const trimmed = question.trim();
   const knobs = resolveRetrieveOptions(options);
-  const currentModel = await getEmbedModelId();
+  const link = await resolveTaskModelLink(TASK_EMBEDDING);
+  if (!link) {
+    throw new Error("No model is linked to the embedding task");
+  }
+  const currentModel = link.model.identifier;
   const start = performance.now();
 
   if (trimmed === "") {
@@ -96,7 +102,12 @@ export async function retrieveParentsByQuestion(
   }
 
   try {
-    const embedder = options?.embedder ?? (await getEmbedder());
+    const embedder =
+      options?.embedder ??
+      ({
+        embed: (texts: string[]) =>
+          link.provider.embed(link.model.modelId, texts),
+      } satisfies Embedder);
     const vectors = await embedder.embed([trimmed]);
     const vector = vectors[0];
     if (!vector) {
