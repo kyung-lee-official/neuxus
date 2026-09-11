@@ -2,11 +2,11 @@ import { Elysia } from "elysia";
 import { API_TAGS, bearerSecurity } from "../../shared/openapi.ts";
 import { auth } from "../auth/index.ts";
 import { SessionsModel } from "./model.ts";
-import { Sessions } from "./service.ts";
+import { ChatSession } from "./service.ts";
 
-export const sessions = new Elysia({ prefix: "/sessions" })
+export const chatSessions = new Elysia({ prefix: "/sessions" })
   .use(auth)
-  .get("/", ({ user }) => Sessions.list(user), {
+  .get("/", ({ user }) => ChatSession.list(user), {
     requireUser: true,
     detail: {
       tags: [API_TAGS.sessions],
@@ -14,7 +14,7 @@ export const sessions = new Elysia({ prefix: "/sessions" })
       security: [bearerSecurity],
     },
   })
-  .post("/", ({ user }) => Sessions.create(user), {
+  .post("/", ({ user }) => ChatSession.create(user), {
     requireUser: true,
     detail: {
       tags: [API_TAGS.sessions],
@@ -24,7 +24,7 @@ export const sessions = new Elysia({ prefix: "/sessions" })
   })
   .patch(
     "/:sessionId",
-    ({ user, params, body }) => Sessions.patch(user, params.sessionId, body),
+    ({ user, params, body }) => ChatSession.patch(user, params.sessionId, body),
     {
       requireUser: true,
       params: SessionsModel.sessionParams,
@@ -38,7 +38,7 @@ export const sessions = new Elysia({ prefix: "/sessions" })
   )
   .delete(
     "/:sessionId",
-    ({ user, params }) => Sessions.delete(user, params.sessionId),
+    ({ user, params }) => ChatSession.delete(user, params.sessionId),
     {
       requireUser: true,
       params: SessionsModel.sessionParams,
