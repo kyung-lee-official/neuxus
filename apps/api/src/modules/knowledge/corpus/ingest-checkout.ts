@@ -1,10 +1,10 @@
 import { readFile } from "node:fs/promises";
-import { ingestMarkdown } from "../../../shared/ingest/index.ts";
 import { Chunkifier } from "../chunkifier/index.ts";
 import {
   ImageDescriptionEnricher,
   ImageDescValidationError,
 } from "../image-desc/index.ts";
+import { ingestMarkdown } from "../ingest/index.ts";
 import {
   deleteKnowledgePagesMissingSourcePaths,
   findPageContentHash,

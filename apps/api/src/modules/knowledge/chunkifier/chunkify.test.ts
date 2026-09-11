@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { normalizeBody } from "../../../shared/ingest/normalize.ts";
+import { normalizeBody } from "../ingest/normalize.ts";
 import { legalSnapIndices, pickCutEnd, pickOverlapStart } from "./children.ts";
 import {
   CHUNKIFY_DEFAULTS,

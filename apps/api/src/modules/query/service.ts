@@ -1,9 +1,5 @@
-import { status } from "elysia";
-import { isHttpStatus } from "../../shared/http.ts";
-import {
-  loadRetrieveSettings,
-  retrieveParentsByQuestion,
-} from "../../shared/retrieve/index.ts";
+import { ElysiaCustomStatusResponse, status } from "elysia";
+import { Retriever, RetrieverSettings } from "../knowledge/retriever/index.ts";
 import { ChatMessage } from "../personal-data/chat-messages/service.ts";
 import { ChatSession } from "../personal-data/chat-sessions/service.ts";
 import { PersonalMemory } from "../personal-data/personal-memory/service.ts";
@@ -28,8 +24,8 @@ export abstract class Query {
       }
       const recent = await ChatMessage.listRecentBySession(sessionId);
       const personalMemories = await PersonalMemory.search(user.id, message);
-      const retrieveSettings = await loadRetrieveSettings();
-      const { parents } = await retrieveParentsByQuestion(message, {
+      const retrieveSettings = await RetrieverSettings.load();
+      const { parents } = await Retriever.parentsByQuestion(message, {
         ...retrieveSettings,
         userId: user.id,
       });
@@ -49,7 +45,7 @@ export abstract class Query {
         answer,
       };
     } catch (err) {
-      if (isHttpStatus(err)) throw err;
+      if (err instanceof ElysiaCustomStatusResponse) throw err;
       const msg = err instanceof Error ? err.message : String(err);
       throw status(502, { error: msg });
     }
