@@ -1,4 +1,4 @@
-import { getPrisma } from "../db.ts";
+import { getPrisma } from "../../../shared/db.ts";
 import {
   type CorpusSettingsRow,
   normalizeDocsRoot,

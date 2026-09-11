@@ -1,5 +1,5 @@
-import { chunkify } from "../chunkify/chunkify.ts";
-import { getPrisma } from "../db.ts";
+import { chunkify } from "../../../shared/chunkify/chunkify.ts";
+import { getPrisma } from "../../../shared/db.ts";
 
 /**
  * Re-chunk every page in `kb_pages`. Replaces each page's `kb_parents` and

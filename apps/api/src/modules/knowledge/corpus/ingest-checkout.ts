@@ -1,16 +1,16 @@
 import { readFile } from "node:fs/promises";
-import { chunkify } from "../chunkify/index.ts";
+import { chunkify } from "../../../shared/chunkify/index.ts";
 import {
   enrichImagesWithDescriptions,
   ImageDescValidationError,
-} from "../image-desc/index.ts";
-import { ingestMarkdown } from "../ingest/index.ts";
+} from "../../../shared/image-desc/index.ts";
+import { ingestMarkdown } from "../../../shared/ingest/index.ts";
 import {
   deleteKnowledgePagesMissingSourcePaths,
   findPageContentHash,
   hashesMatch,
   persistKnowledgePage,
-} from "../knowledge/index.ts";
+} from "../../../shared/knowledge/index.ts";
 import { listCorpusMarkdownFiles } from "./walk.ts";
 
 /**

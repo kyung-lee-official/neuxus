@@ -1,4 +1,4 @@
-import { embedStaleChildren } from "../embed/index.ts";
+import { embedStaleChildren } from "../../../shared/embed/index.ts";
 import { emitStage, finishCorpusOp } from "./corpus-status.ts";
 import { resolveCorpusSettings } from "./defaults.ts";
 import { corpusCheckoutDir, refreshCorpusCheckout } from "./git.ts";
