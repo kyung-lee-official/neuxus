@@ -2,14 +2,12 @@ export {
   type ChildHit,
   capParents,
   type RetrievedParent,
-  scoreByParentFromHits,
-  uniqueParentIdsByBestScore,
-} from "./rank.ts";
-export {
   type RetrieveParentsByQuestionOptions,
   type RetrieveParentsByQuestionResult,
-  retrieveParentsByQuestion,
-} from "./retrieve.ts";
+  Retriever,
+  scoreByParentFromHits,
+  uniqueParentIdsByBestScore,
+} from "./retriever.ts";
 export {
   RETRIEVE_DEFAULTS,
   type ResolvedRetrieveOptions,

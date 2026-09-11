@@ -5,7 +5,7 @@ import {
   type RetrievedParent,
   scoreByParentFromHits,
   uniqueParentIdsByBestScore,
-} from "./rank.ts";
+} from "./retriever.ts";
 import {
   RETRIEVE_DEFAULTS,
   resolveRetrieveOptions,
