@@ -7,3 +7,4 @@ export {
   embedStaleChildren,
   pgvectorLiteral,
 } from "./children.ts";
+export type { Embedder } from "./types.ts";

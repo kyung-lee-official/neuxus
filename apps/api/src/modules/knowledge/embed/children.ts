@@ -1,7 +1,10 @@
 import { sql } from "bun";
-import { getPrisma } from "../db.ts";
-import { getEmbedder, getEmbedModelId } from "../models/routing.ts";
-import type { Embedder } from "../models/types.ts";
+import { getPrisma } from "../../../shared/db.ts";
+import {
+  resolveTaskModelLink,
+  TASK_EMBEDDING,
+} from "../../server-setting/task-model-map/service.ts";
+import type { Embedder } from "./types.ts";
 
 export type EmbedChildRow = {
   id: string;
@@ -80,8 +83,17 @@ export async function embedChildRows(
 export async function embedStaleChildren(
   options?: EmbedStaleChildrenOptions,
 ): Promise<EmbedStaleChildrenResult> {
-  const embedder = options?.embedder ?? (await getEmbedder());
-  const currentModel = await getEmbedModelId();
+  const link = await resolveTaskModelLink(TASK_EMBEDDING);
+  if (!link) {
+    throw new Error("No model is linked to the embedding task");
+  }
+  const currentModel = link.model.identifier;
+  const embedder =
+    options?.embedder ??
+    ({
+      embed: (texts: string[]) =>
+        link.provider.embed(link.model.modelId, texts),
+    } satisfies Embedder);
 
   const rows = await getPrisma().knowledgeChild.findMany({
     where: {
