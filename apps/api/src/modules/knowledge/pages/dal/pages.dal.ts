@@ -62,6 +62,15 @@ export async function listPageSummaries(): Promise<PageSummaryRow[]> {
   `;
 }
 
+/** Page id + body for every `kb_pages` row (rechunk input). */
+export async function listPageBodies(): Promise<
+  { id: string; body: string }[]
+> {
+  return sql<{ id: string; body: string }[]>`
+    SELECT id, body FROM kb_pages
+  `;
+}
+
 /** One `kb_pages` row including `body`, or null when missing. */
 export async function findPageDetailRow(
   pageId: string,
@@ -166,6 +175,18 @@ async function upsertPageRow(
       content_hash = EXCLUDED.content_hash,
       updated_at = NOW()
   `;
+}
+
+/** Replace one page's parent/child tree in a transaction (no `kb_pages` write). */
+export async function replacePageChunks(
+  pageId: string,
+  parents: ParentInsert[],
+  children: ChildInsert[],
+): Promise<void> {
+  await sql.begin(async (tx) => {
+    await replaceParents(tx, pageId, parents);
+    await replaceChildren(tx, pageId, children);
+  });
 }
 
 /**

@@ -9,7 +9,7 @@
 
 import { chunkify } from "../../../shared/chunkify/chunkify.ts";
 import { Embedder, type EmbedStaleChildrenResult } from "../embedder/index.ts";
-import { listPageBodies, replacePageChunks } from "./dal.ts";
+import { listPageBodies, replacePageChunks } from "../pages/index.ts";
 import {
   type CloneProgress,
   cloneCorpusStream,
