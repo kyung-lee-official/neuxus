@@ -7,7 +7,7 @@
  */
 
 import { sql } from "bun";
-import { getPrisma } from "../../shared/db.ts";
+import { getPrisma } from "../../../shared/db";
 
 export type AppMemory = {
   id: number;

@@ -5,7 +5,7 @@
  * Internal: only `service.ts` imports this file. Other modules use `service.ts`.
  */
 
-import { getPrisma } from "../../shared/db.ts";
+import { getPrisma } from "../../../shared/db";
 
 export type AppSession = {
   id: string;

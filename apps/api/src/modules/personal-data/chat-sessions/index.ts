@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
-import { API_TAGS, bearerSecurity } from "../../shared/openapi.ts";
-import { auth } from "../auth/index.ts";
+import { API_TAGS, bearerSecurity } from "../../../shared/openapi.ts";
+import { auth } from "../../auth/index.ts";
 import { SessionsModel } from "./model.ts";
 import { ChatSession } from "./service.ts";
 

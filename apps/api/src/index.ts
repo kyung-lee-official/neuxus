@@ -1,10 +1,10 @@
 import { openapi } from "@elysia/openapi";
 import { cors } from "@elysiajs/cors";
 import { Elysia, status } from "elysia";
-import { chatSessions } from "./modules/chat-sessions/index.ts";
 import { health } from "./modules/health/index.ts";
 import { knowledge } from "./modules/knowledge/index.ts";
 import { logs } from "./modules/logs/index.ts";
+import { chatSessions } from "./modules/personal-data/chat-sessions/index.ts";
 import { query } from "./modules/query/index.ts";
 import { serverSetting } from "./modules/server-setting/index.ts";
 import { users } from "./modules/users/index.ts";
