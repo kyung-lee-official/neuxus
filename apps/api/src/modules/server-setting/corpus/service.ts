@@ -1,26 +1,15 @@
 import { status } from "elysia";
-import { embedStaleChildren } from "../../../shared/embed/children.ts";
 import {
   CorpusGitError,
+  CorpusLockedError,
+  Corpus as CorpusService,
+  CorpusSettings,
   type CorpusSettingsRow,
-  cloneCorpusStream,
-  corpusEventStream,
-  emitProgress,
-  emitStage,
-  finishCorpusOp,
-  loadCorpusSettings,
-  pullCorpusStream,
-  rechunkAllPages,
-  runCorpusSync,
-  saveCorpusSettings,
-  tryStartCorpusOp,
 } from "../../knowledge/corpus/index.ts";
 import type { CorpusModel } from "./model.ts";
 
-const LOCKED_MESSAGE = "A corpus operation is already running.";
-
 function mapCorpusError(err: unknown): never {
-  if (err instanceof CorpusGitError) {
+  if (err instanceof CorpusGitError || err instanceof CorpusLockedError) {
     throw status(err.httpStatus, { error: err.message });
   }
   const msg = err instanceof Error ? err.message : String(err);
@@ -29,7 +18,7 @@ function mapCorpusError(err: unknown): never {
 
 export abstract class Corpus {
   static async get() {
-    return loadCorpusSettings();
+    return CorpusSettings.load();
   }
 
   static async put(body: CorpusModel["corpusBody"]) {
@@ -38,80 +27,53 @@ export abstract class Corpus {
       branch: body.branch,
       docsRoot: body.docsRoot,
     };
-    return saveCorpusSettings(row);
+    return CorpusSettings.save(row);
   }
 
   static async clone() {
-    if (!tryStartCorpusOp("clone")) {
-      throw status(409, { error: LOCKED_MESSAGE });
-    }
     try {
-      const result = await cloneCorpusStream(emitProgress);
-      finishCorpusOp();
-      return result;
+      return await CorpusService.clone();
     } catch (err) {
-      finishCorpusOp(err);
       return mapCorpusError(err);
     }
   }
 
   static async pull() {
-    if (!tryStartCorpusOp("pull")) {
-      throw status(409, { error: LOCKED_MESSAGE });
-    }
     try {
-      const result = await pullCorpusStream(emitStage);
-      finishCorpusOp();
-      return result;
+      return await CorpusService.pull();
     } catch (err) {
-      finishCorpusOp(err);
       return mapCorpusError(err);
     }
   }
 
   static async chunkify() {
-    if (!tryStartCorpusOp("chunkify")) {
-      throw status(409, { error: LOCKED_MESSAGE });
-    }
     try {
-      emitStage("chunkify");
-      const result = await rechunkAllPages();
-      finishCorpusOp();
+      const result = await CorpusService.rechunk();
       return { ok: true as const, ...result };
     } catch (err) {
-      finishCorpusOp(err);
-      const msg = err instanceof Error ? err.message : String(err);
-      throw status(500, { error: msg });
+      return mapCorpusError(err);
     }
   }
 
   static async embed() {
-    if (!tryStartCorpusOp("embed")) {
-      throw status(409, { error: LOCKED_MESSAGE });
-    }
     try {
-      emitStage("embed");
-      const result = await embedStaleChildren({ failFast: true });
-      finishCorpusOp();
+      const result = await CorpusService.embed();
       return { ok: true as const, ...result };
     } catch (err) {
-      finishCorpusOp(err);
-      const msg = err instanceof Error ? err.message : String(err);
-      throw status(500, { error: msg });
+      return mapCorpusError(err);
     }
   }
 
   static startSync() {
-    if (!tryStartCorpusOp("sync")) {
-      throw status(409, { error: LOCKED_MESSAGE });
+    try {
+      CorpusService.sync();
+      return status(202, { ok: true as const });
+    } catch (err) {
+      return mapCorpusError(err);
     }
-    void runCorpusSync().catch(() => {
-      /* errors already recorded in status via finishCorpusOp(err) */
-    });
-    return status(202, { ok: true as const });
   }
 
   static events() {
-    return corpusEventStream();
+    return CorpusService.events();
   }
 }
