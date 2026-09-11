@@ -32,10 +32,7 @@ export {
   type StoredCorpusSettings,
   storedCorpusSettings,
 } from "./settings/defaults.ts";
-export {
-  loadCorpusSettings,
-  saveCorpusSettings,
-} from "./settings/service.ts";
+export { CorpusSettings } from "./settings/service.ts";
 export { runCorpusSync } from "./sync.ts";
 export {
   assertSafeDocsRoot,
