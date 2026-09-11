@@ -5,7 +5,6 @@ import {
   TASK_EMBEDDING,
 } from "../../server-setting/task-model-map/service.ts";
 import { Embedder, type EmbedFn } from "../embedder/index.ts";
-import { type RetrieveOptions, resolveRetrieveOptions } from "./defaults.ts";
 import {
   type ChildHit,
   capParents,
@@ -13,6 +12,10 @@ import {
   scoreByParentFromHits,
   uniqueParentIdsByBestScore,
 } from "./rank.ts";
+import {
+  type RetrieveOptions,
+  resolveRetrieveOptions,
+} from "./settings/defaults.ts";
 
 const retrieveLog = childLogger({ module: "retrieve" }, "retrieve");
 

@@ -1,10 +1,4 @@
 export {
-  RETRIEVE_DEFAULTS,
-  type ResolvedRetrieveOptions,
-  type RetrieveOptions,
-  resolveRetrieveOptions,
-} from "./defaults.ts";
-export {
   type ChildHit,
   capParents,
   type RetrievedParent,
@@ -17,6 +11,12 @@ export {
   retrieveParentsByQuestion,
 } from "./retrieve.ts";
 export {
+  RETRIEVE_DEFAULTS,
+  type ResolvedRetrieveOptions,
+  type RetrieveOptions,
+  resolveRetrieveOptions,
+} from "./settings/defaults.ts";
+export {
   type AdminRetrieveSettings,
   adminRetrieveSettings,
   loadRetrieveSettings,
@@ -24,4 +24,4 @@ export {
   resetRetrieveSettings,
   type StoredRetrieveSettings,
   saveRetrieveSettings,
-} from "./settings.ts";
+} from "./settings/service.ts";

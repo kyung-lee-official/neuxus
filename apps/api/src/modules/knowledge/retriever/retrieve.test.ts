@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { RETRIEVE_DEFAULTS, resolveRetrieveOptions } from "./defaults.ts";
 import {
   type ChildHit,
   capParents,
@@ -7,6 +6,10 @@ import {
   scoreByParentFromHits,
   uniqueParentIdsByBestScore,
 } from "./rank.ts";
+import {
+  RETRIEVE_DEFAULTS,
+  resolveRetrieveOptions,
+} from "./settings/defaults.ts";
 
 function hit(
   parentId: string,

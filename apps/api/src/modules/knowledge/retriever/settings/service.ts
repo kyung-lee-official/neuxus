@@ -1,18 +1,15 @@
 /**
- * DB-backed retrieval knobs. Mirrors the `app_synthesis_settings` /
- * `kb_embed_settings` / `kb_chunk_settings` pattern: single row
- * `id = "default"`, nullable columns, code defaults in `RETRIEVE_DEFAULTS`
- * apply when a column is null.
+ * Retriever-settings domain. Mirrors the `kb_embed_settings` /
+ * `kb_chunk_settings` pattern: single row `id = "default"`, nullable
+ * columns, code defaults in `RETRIEVE_DEFAULTS` apply when a column is null.
  */
 
-import { getPrisma } from "../../../shared/db.ts";
+import { findRetrieveSettings, upsertRetrieveSettings } from "./dal.ts";
 import {
   RETRIEVE_DEFAULTS,
   type ResolvedRetrieveOptions,
   resolveRetrieveOptions,
 } from "./defaults.ts";
-
-const SETTINGS_ID = "default";
 
 export type RetrieveSettingsRow = {
   childLimit?: number | null;
@@ -42,20 +39,8 @@ function storedRetrieveSettings(
   };
 }
 
-async function fetchRetrieveRow(): Promise<RetrieveSettingsRow | null> {
-  const row = await getPrisma().knowledgeRetrieveSettings.findUnique({
-    where: { id: SETTINGS_ID },
-  });
-  if (!row) return null;
-  return {
-    childLimit: row.childLimit,
-    maxParents: row.maxParents,
-    maxCharacters: row.maxCharacters,
-  };
-}
-
 export async function loadRetrieveSettings(): Promise<ResolvedRetrieveOptions> {
-  return resolveRetrieveOptions(await fetchRetrieveRow());
+  return resolveRetrieveOptions(await findRetrieveSettings());
 }
 
 export type AdminRetrieveSettings = StoredRetrieveSettings & {
@@ -67,7 +52,7 @@ export type AdminRetrieveSettings = StoredRetrieveSettings & {
 };
 
 export async function adminRetrieveSettings(): Promise<AdminRetrieveSettings> {
-  const stored = storedRetrieveSettings(await fetchRetrieveRow());
+  const stored = storedRetrieveSettings(await findRetrieveSettings());
   return {
     ...stored,
     defaults: {
@@ -82,23 +67,10 @@ export async function adminRetrieveSettings(): Promise<AdminRetrieveSettings> {
 export async function saveRetrieveSettings(
   row: RetrieveSettingsRow,
 ): Promise<ResolvedRetrieveOptions> {
-  const childLimit = positiveIntOrNull(row.childLimit);
-  const maxParents = positiveIntOrNull(row.maxParents);
-  const maxCharacters = positiveIntOrNull(row.maxCharacters);
-
-  await getPrisma().knowledgeRetrieveSettings.upsert({
-    where: { id: SETTINGS_ID },
-    create: {
-      id: SETTINGS_ID,
-      childLimit,
-      maxParents,
-      maxCharacters,
-    },
-    update: {
-      childLimit,
-      maxParents,
-      maxCharacters,
-    },
+  await upsertRetrieveSettings({
+    childLimit: positiveIntOrNull(row.childLimit),
+    maxParents: positiveIntOrNull(row.maxParents),
+    maxCharacters: positiveIntOrNull(row.maxCharacters),
   });
 
   return loadRetrieveSettings();
