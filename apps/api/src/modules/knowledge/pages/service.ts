@@ -1,7 +1,14 @@
+import type { ChunkifyResult } from "../../../shared/chunkify/index.ts";
 import { isoFromDate } from "../../../shared/serialize.ts";
 import { findChildrenByPage } from "./dal/children.dal.ts";
-import { findPageDetailRow, listPageSummaries } from "./dal/pages.dal.ts";
+import {
+  findPageContentHash,
+  findPageDetailRow,
+  listPageSummaries,
+  upsertPageWithChunks,
+} from "./dal/pages.dal.ts";
 import { findParentsByPage } from "./dal/parents.dal.ts";
+import { pageContentHash } from "./hash.ts";
 
 export type KnowledgePageListItem = {
   id: string;
@@ -47,6 +54,22 @@ export type KnowledgePageDetail = {
   contentHash: string;
   updatedAt: string | null;
   parents: KnowledgeParentInspect[];
+};
+
+export type SaveKnowledgePageInput = {
+  id: string;
+  slug: string;
+  title: string;
+  type: string | null;
+  tags: string[];
+  body: string;
+  sourcePath: string | null;
+  chunks: ChunkifyResult;
+};
+
+export type SaveKnowledgePageResult = {
+  contentHash: string;
+  skipped: boolean;
 };
 
 export abstract class Page {
@@ -119,5 +142,42 @@ export abstract class Page {
       updatedAt: isoFromDate(page.updated_at),
       parents,
     };
+  }
+
+  /**
+   * Upsert `kb_pages` and replace that page's parent/child tree, unless
+   * `content_hash` already matches (skip gate — no rewrite, no re-chunk needed).
+   * Embeddings stay null until a later embed pass.
+   * @see docs/modern-knowledge-base-design/02-ingest.md
+   * @see docs/modern-knowledge-base-design/appendix-a-data-model.md
+   */
+  static async save(
+    input: SaveKnowledgePageInput,
+  ): Promise<SaveKnowledgePageResult> {
+    const contentHash = pageContentHash({
+      title: input.title,
+      type: input.type,
+      tags: input.tags,
+      body: input.body,
+    });
+
+    const stored = await findPageContentHash(input.id);
+    if (stored === contentHash) {
+      return { contentHash, skipped: true };
+    }
+
+    await upsertPageWithChunks({
+      id: input.id,
+      slug: input.slug,
+      title: input.title,
+      type: input.type,
+      tags: input.tags,
+      body: input.body,
+      sourcePath: input.sourcePath,
+      contentHash,
+      chunks: input.chunks,
+    });
+
+    return { contentHash, skipped: false };
   }
 }
