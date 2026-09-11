@@ -1,5 +1,4 @@
 import { status } from "elysia";
-import { type AppUser } from "../../shared/db.ts";
 import { isHttpStatus } from "../../shared/http.ts";
 import {
   loadRetrieveSettings,
@@ -8,6 +7,7 @@ import {
 import { ChatMessage } from "../personal-data/chat-messages/service.ts";
 import { ChatSession } from "../personal-data/chat-sessions/service.ts";
 import { PersonalMemory } from "../personal-data/personal-memory/service.ts";
+import { type AppUser } from "../users/service.ts";
 import { answerFromContext } from "./answer.ts";
 import type { QueryModel } from "./model.ts";
 
