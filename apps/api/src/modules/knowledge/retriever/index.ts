@@ -18,10 +18,7 @@ export {
 } from "./settings/defaults.ts";
 export {
   type AdminRetrieveSettings,
-  adminRetrieveSettings,
-  loadRetrieveSettings,
+  RetrieverSettings,
   type RetrieveSettingsRow,
-  resetRetrieveSettings,
   type StoredRetrieveSettings,
-  saveRetrieveSettings,
 } from "./settings/service.ts";

@@ -39,10 +39,6 @@ function storedRetrieveSettings(
   };
 }
 
-export async function loadRetrieveSettings(): Promise<ResolvedRetrieveOptions> {
-  return resolveRetrieveOptions(await findRetrieveSettings());
-}
-
 export type AdminRetrieveSettings = StoredRetrieveSettings & {
   defaults: {
     childLimit: number;
@@ -51,37 +47,45 @@ export type AdminRetrieveSettings = StoredRetrieveSettings & {
   };
 };
 
-export async function adminRetrieveSettings(): Promise<AdminRetrieveSettings> {
-  const stored = storedRetrieveSettings(await findRetrieveSettings());
-  return {
-    ...stored,
-    defaults: {
+export abstract class RetrieverSettings {
+  /** Resolved knobs used by the retriever (stored values or code defaults). */
+  static async load(): Promise<ResolvedRetrieveOptions> {
+    return resolveRetrieveOptions(await findRetrieveSettings());
+  }
+
+  /** Stored values + code defaults, for the admin form. */
+  static async loadAdmin(): Promise<AdminRetrieveSettings> {
+    const stored = storedRetrieveSettings(await findRetrieveSettings());
+    return {
+      ...stored,
+      defaults: {
+        childLimit: RETRIEVE_DEFAULTS.childLimit,
+        maxParents: RETRIEVE_DEFAULTS.maxParents,
+        maxCharacters: RETRIEVE_DEFAULTS.maxCharacters,
+      },
+    };
+  }
+
+  /** Upsert `kb_retrieve_settings` id `default`. Invalid values stored as null. */
+  static async save(
+    row: RetrieveSettingsRow,
+  ): Promise<ResolvedRetrieveOptions> {
+    await upsertRetrieveSettings({
+      childLimit: positiveIntOrNull(row.childLimit),
+      maxParents: positiveIntOrNull(row.maxParents),
+      maxCharacters: positiveIntOrNull(row.maxCharacters),
+    });
+
+    return RetrieverSettings.load();
+  }
+
+  /** Write `RETRIEVE_DEFAULTS` into the row. */
+  static async reset(): Promise<AdminRetrieveSettings> {
+    await RetrieverSettings.save({
       childLimit: RETRIEVE_DEFAULTS.childLimit,
       maxParents: RETRIEVE_DEFAULTS.maxParents,
       maxCharacters: RETRIEVE_DEFAULTS.maxCharacters,
-    },
-  };
-}
-
-/** Upsert `kb_retrieve_settings` id `default`. Invalid values are stored as null. */
-export async function saveRetrieveSettings(
-  row: RetrieveSettingsRow,
-): Promise<ResolvedRetrieveOptions> {
-  await upsertRetrieveSettings({
-    childLimit: positiveIntOrNull(row.childLimit),
-    maxParents: positiveIntOrNull(row.maxParents),
-    maxCharacters: positiveIntOrNull(row.maxCharacters),
-  });
-
-  return loadRetrieveSettings();
-}
-
-/** Write `RETRIEVE_DEFAULTS` into the row. */
-export async function resetRetrieveSettings(): Promise<AdminRetrieveSettings> {
-  await saveRetrieveSettings({
-    childLimit: RETRIEVE_DEFAULTS.childLimit,
-    maxParents: RETRIEVE_DEFAULTS.maxParents,
-    maxCharacters: RETRIEVE_DEFAULTS.maxCharacters,
-  });
-  return adminRetrieveSettings();
+    });
+    return RetrieverSettings.loadAdmin();
+  }
 }
