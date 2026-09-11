@@ -1,13 +1,15 @@
 /**
- * Knowledge-pages DAL. Owns `kb_pages` and its `kb_parents` / `kb_children`
- * chunk tree.
+ * Knowledge-pages DAL. Owns the `kb_pages` table (and its chunk-tree
+ * transaction, delegating the parent/child statements to the sibling dals).
  *
  * Internal to the pages sub-module: the domain files (`list.ts`, `get.ts`,
  * `persist.ts`) import it.
  */
 
-import { sql } from "bun";
+import { type SQL, sql } from "bun";
 import type { ChunkifyResult } from "../../../shared/chunkify/index.ts";
+import { type ChildInsert, replaceChildren } from "../children/dal.ts";
+import { type ParentInsert, replaceParents } from "../parents/dal.ts";
 
 export type PageSummaryRow = {
   id: string;
@@ -34,27 +36,10 @@ export type PageDetailRow = {
   updated_at: Date | null;
 };
 
-export type ParentRow = {
-  id: string;
-  parent_index: number;
-  text: string | null;
-  start_offset: number | null;
-  end_offset: number | null;
-};
-
-export type ChildRow = {
-  id: string;
-  parent_id: string;
-  child_index: number;
-  text: string | null;
-  start_offset: number | null;
-  end_offset: number | null;
-  embedding_model: string | null;
-  embedded_at: Date | null;
-  embedded: boolean;
-};
-
-/** All `kb_pages` with parent/child counts, ordered by slug. No `body`. */
+/**
+ * All `kb_pages` with parent/child counts, ordered by slug. No `body`.
+ * The counts read `kb_parents`/`kb_children` as aggregates for the listing.
+ */
 export async function listPageSummaries(): Promise<PageSummaryRow[]> {
   return sql<PageSummaryRow[]>`
     SELECT
@@ -91,35 +76,6 @@ export async function findPageDetailRow(
   return rows[0] ?? null;
 }
 
-/** Parent rows for one page, ordered by `parent_index`. */
-export async function findParentRows(pageId: string): Promise<ParentRow[]> {
-  return sql<ParentRow[]>`
-    SELECT id, parent_index, text, start_offset, end_offset
-    FROM kb_parents
-    WHERE page_id = ${pageId}
-    ORDER BY parent_index
-  `;
-}
-
-/** Child rows for one page, ordered by `child_index`. */
-export async function findChildRows(pageId: string): Promise<ChildRow[]> {
-  return sql<ChildRow[]>`
-    SELECT
-      id,
-      parent_id,
-      child_index,
-      text,
-      start_offset,
-      end_offset,
-      embedding_model,
-      embedded_at,
-      (embedding IS NOT NULL) AS embedded
-    FROM kb_children
-    WHERE page_id = ${pageId}
-    ORDER BY child_index
-  `;
-}
-
 /** Stored `kb_pages.content_hash`, or null when the page is missing. */
 export async function findPageContentHash(
   pageId: string,
@@ -143,75 +99,73 @@ export type UpsertPageWithChunksInput = {
   chunks: ChunkifyResult;
 };
 
-/** Upsert one `kb_pages` row and replace its parent/child tree atomically. */
+/**
+ * Upsert one `kb_pages` row and replace its parent/child tree atomically.
+ * The transaction is opened here; the `kb_parents`/`kb_children` statements
+ * live in the `parents`/`children` dals and receive this transaction.
+ */
 export async function upsertPageWithChunks(
   input: UpsertPageWithChunksInput,
 ): Promise<void> {
-  await sql.begin(async (tx) => {
-    await tx`
-      INSERT INTO kb_pages (
-        id, slug, title, type, tags, body, source_path, content_hash, updated_at
-      )
-      VALUES (
-        ${input.id},
-        ${input.slug},
-        ${input.title},
-        ${input.type},
-        ${tx.array(input.tags)}::text[],
-        ${input.body},
-        ${input.sourcePath},
-        ${input.contentHash},
-        NOW()
-      )
-      ON CONFLICT (id) DO UPDATE SET
-        slug = EXCLUDED.slug,
-        title = EXCLUDED.title,
-        type = EXCLUDED.type,
-        tags = EXCLUDED.tags,
-        body = EXCLUDED.body,
-        source_path = EXCLUDED.source_path,
-        content_hash = EXCLUDED.content_hash,
-        updated_at = NOW()
-    `;
+  const parentRows: ParentInsert[] = input.chunks.parents.map((parent) => ({
+    id: `${input.id}:p:${parent.index}`,
+    pageId: input.id,
+    parentIndex: parent.index,
+    text: parent.text,
+    startOffset: parent.start,
+    endOffset: parent.end,
+  }));
 
-    await tx`DELETE FROM kb_parents WHERE page_id = ${input.id}`;
-
-    for (const parent of input.chunks.parents) {
-      const parentId = `${input.id}:p:${parent.index}`;
-      await tx`
-        INSERT INTO kb_parents (
-          id, page_id, parent_index, text, start_offset, end_offset
-        )
-        VALUES (
-          ${parentId},
-          ${input.id},
-          ${parent.index},
-          ${parent.text},
-          ${parent.start},
-          ${parent.end}
-        )
-      `;
-    }
-
-    for (const child of input.chunks.children) {
-      const parentId = `${input.id}:p:${child.parentIndex}`;
-      const childId = `${parentId}:c:${child.index}`;
-      await tx`
-        INSERT INTO kb_children (
-          id, parent_id, page_id, child_index, text, start_offset, end_offset
-        )
-        VALUES (
-          ${childId},
-          ${parentId},
-          ${input.id},
-          ${child.index},
-          ${child.text},
-          ${child.start},
-          ${child.end}
-        )
-      `;
-    }
+  const childRows: ChildInsert[] = input.chunks.children.map((child) => {
+    const parentId = `${input.id}:p:${child.parentIndex}`;
+    return {
+      id: `${parentId}:c:${child.index}`,
+      parentId,
+      pageId: input.id,
+      childIndex: child.index,
+      text: child.text,
+      startOffset: child.start,
+      endOffset: child.end,
+    };
   });
+
+  await sql.begin(async (tx) => {
+    await upsertPageRow(tx, input);
+    await replaceParents(tx, input.id, parentRows);
+    await replaceChildren(tx, input.id, childRows);
+  });
+}
+
+/** Upsert the `kb_pages` row inside the caller's transaction. */
+async function upsertPageRow(
+  tx: SQL,
+  input: UpsertPageWithChunksInput,
+): Promise<void> {
+  await tx`
+    INSERT INTO kb_pages (
+      id, slug, title, type, tags, body, source_path, content_hash, updated_at
+    )
+    VALUES (
+      ${input.id},
+      ${input.slug},
+      ${input.title},
+      ${input.type},
+      ${tx.array(input.tags)}::text[],
+      ${input.body},
+      ${input.sourcePath},
+      ${input.contentHash},
+      NOW()
+    )
+    ON CONFLICT (id) DO UPDATE SET
+      slug = EXCLUDED.slug,
+      title = EXCLUDED.title,
+      type = EXCLUDED.type,
+      tags = EXCLUDED.tags,
+      body = EXCLUDED.body,
+      source_path = EXCLUDED.source_path,
+      content_hash = EXCLUDED.content_hash,
+      updated_at = NOW()
+  `;
 }
 
 /**

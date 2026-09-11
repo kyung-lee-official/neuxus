@@ -1,5 +1,7 @@
 import { isoFromDate } from "../../../shared/serialize.ts";
-import { findChildRows, findPageDetailRow, findParentRows } from "./dal.ts";
+import { findChildrenByPage } from "../children/dal.ts";
+import { findParentsByPage } from "../parents/dal.ts";
+import { findPageDetailRow } from "./dal.ts";
 import { tagsFromRow } from "./row.ts";
 
 export type KnowledgeChildInspect = {
@@ -44,8 +46,8 @@ export async function findKnowledgePageById(
   const page = await findPageDetailRow(pageId);
   if (!page) return null;
 
-  const parentRows = await findParentRows(pageId);
-  const childRows = await findChildRows(pageId);
+  const parentRows = await findParentsByPage(pageId);
+  const childRows = await findChildrenByPage(pageId);
 
   const childrenByParentId = new Map<string, KnowledgeChildInspect[]>();
   for (const row of childRows) {
