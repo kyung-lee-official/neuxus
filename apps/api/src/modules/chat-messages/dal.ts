@@ -5,7 +5,8 @@
  * Internal: only `service.ts` imports this file. Other modules use `service.ts`.
  */
 
-import { getPrisma, touchSession } from "../../shared/db.ts";
+import { getPrisma } from "../../shared/db.ts";
+import { ChatSession } from "../chat-sessions/service.ts";
 
 export type AppMessage = {
   id: number;
@@ -40,7 +41,7 @@ export async function insertMessage(
   await getPrisma().message.create({
     data: { sessionId, role, content },
   });
-  await touchSession(sessionId);
+  await ChatSession.touch(sessionId);
 }
 
 /** Most recent messages in a session, oldest first. */
