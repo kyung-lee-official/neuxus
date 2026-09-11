@@ -3,11 +3,6 @@ import { findChildrenByPage } from "./dal/children.dal.ts";
 import { findPageDetailRow, listPageSummaries } from "./dal/pages.dal.ts";
 import { findParentsByPage } from "./dal/parents.dal.ts";
 
-function tagsFromRow(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.map((item) => String(item));
-}
-
 export type KnowledgePageListItem = {
   id: string;
   slug: string;
@@ -57,19 +52,19 @@ export type KnowledgePageDetail = {
 export abstract class Page {
   /** All `kb_pages` for admin inspect. No `body`. */
   static async list(): Promise<KnowledgePageListItem[]> {
-    const rows = await listPageSummaries();
+    const summaries = await listPageSummaries();
 
-    return rows.map((row) => ({
-      id: row.id,
-      slug: row.slug,
-      title: row.title ?? "",
-      type: row.type,
-      tags: tagsFromRow(row.tags),
-      sourcePath: row.source_path,
-      contentHash: row.content_hash ?? "",
-      updatedAt: isoFromDate(row.updated_at),
-      parentCount: row.parent_count,
-      childCount: row.child_count,
+    return summaries.map((summary) => ({
+      id: summary.id,
+      slug: summary.slug,
+      title: summary.title ?? "",
+      type: summary.type,
+      tags: Array.isArray(summary.tags) ? summary.tags.map(String) : [],
+      sourcePath: summary.source_path,
+      contentHash: summary.content_hash ?? "",
+      updatedAt: isoFromDate(summary.updated_at),
+      parentCount: summary.parent_count,
+      childCount: summary.child_count,
     }));
   }
 
@@ -84,30 +79,30 @@ export abstract class Page {
     const childRows = await findChildrenByPage(pageId);
 
     const childrenByParentId = new Map<string, KnowledgeChildInspect[]>();
-    for (const row of childRows) {
-      const list = childrenByParentId.get(row.parent_id) ?? [];
-      list.push({
-        id: row.id,
-        childIndex: row.child_index,
-        text: row.text ?? "",
-        startOffset: row.start_offset,
-        endOffset: row.end_offset,
-        embeddingModel: row.embedding_model,
-        embeddedAt: isoFromDate(row.embedded_at),
-        embedded: row.embedded,
+    for (const child of childRows) {
+      const siblings = childrenByParentId.get(child.parent_id) ?? [];
+      siblings.push({
+        id: child.id,
+        childIndex: child.child_index,
+        text: child.text ?? "",
+        startOffset: child.start_offset,
+        endOffset: child.end_offset,
+        embeddingModel: child.embedding_model,
+        embeddedAt: isoFromDate(child.embedded_at),
+        embedded: child.embedded,
       });
-      childrenByParentId.set(row.parent_id, list);
+      childrenByParentId.set(child.parent_id, siblings);
     }
 
-    const parents: KnowledgeParentInspect[] = parentRows.map((row) => {
-      const children = (childrenByParentId.get(row.id) ?? []).slice();
+    const parents: KnowledgeParentInspect[] = parentRows.map((parent) => {
+      const children = (childrenByParentId.get(parent.id) ?? []).slice();
       children.sort((a, b) => a.childIndex - b.childIndex);
       return {
-        id: row.id,
-        parentIndex: row.parent_index,
-        text: row.text ?? "",
-        startOffset: row.start_offset,
-        endOffset: row.end_offset,
+        id: parent.id,
+        parentIndex: parent.parent_index,
+        text: parent.text ?? "",
+        startOffset: parent.start_offset,
+        endOffset: parent.end_offset,
         children,
       };
     });
@@ -117,7 +112,7 @@ export abstract class Page {
       slug: page.slug,
       title: page.title ?? "",
       type: page.type,
-      tags: tagsFromRow(page.tags),
+      tags: Array.isArray(page.tags) ? page.tags.map(String) : [],
       body: page.body ?? "",
       sourcePath: page.source_path,
       contentHash: page.content_hash ?? "",
