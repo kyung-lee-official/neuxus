@@ -2,10 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { StoredCorpusSettings } from "./settings/defaults.ts";
-import {
-  loadCorpusSettings,
-  saveCorpusLastSyncedSha,
-} from "./settings/service.ts";
+import { CorpusSettings } from "./settings/service.ts";
 
 const GIT_TIMEOUT_MS = 120_000;
 const BRANCH_PATTERN = /^[A-Za-z0-9._/-]+$/;
@@ -132,7 +129,7 @@ async function requireHeadSha(checkout: string): Promise<string> {
 async function requireRepoUrl(): Promise<
   StoredCorpusSettings & { repoUrl: string }
 > {
-  const settings = await loadCorpusSettings();
+  const settings = await CorpusSettings.load();
   if (!settings.repoUrl) {
     throw new CorpusGitError(400, "Save a repo URL first.");
   }
@@ -213,14 +210,14 @@ export async function cloneCorpus(): Promise<StoredCorpusSettings> {
   const settings = await requireRepoUrl();
   await cloneIntoCheckout(settings);
   const sha = await requireHeadSha(corpusCheckoutDir());
-  return saveCorpusLastSyncedSha(sha);
+  return CorpusSettings.saveLastSyncedSha(sha);
 }
 
 export async function pullCorpus(): Promise<StoredCorpusSettings> {
   const settings = await requireRepoUrl();
   await pullInCheckout(settings);
   const sha = await requireHeadSha(corpusCheckoutDir());
-  return saveCorpusLastSyncedSha(sha);
+  return CorpusSettings.saveLastSyncedSha(sha);
 }
 
 /** Parsed progress from `git clone`'s stderr stream. */
@@ -266,7 +263,7 @@ export async function cloneCorpusStream(
     if (progress) onProgress(progress);
   });
   const sha = await requireHeadSha(corpusCheckoutDir());
-  return saveCorpusLastSyncedSha(sha);
+  return CorpusSettings.saveLastSyncedSha(sha);
 }
 
 /** Pull with stage transitions emitted as each git subcommand starts. */
@@ -306,7 +303,7 @@ export async function pullCorpusStream(
   }
 
   const sha = await requireHeadSha(corpusCheckoutDir());
-  return saveCorpusLastSyncedSha(sha);
+  return CorpusSettings.saveLastSyncedSha(sha);
 }
 
 /**

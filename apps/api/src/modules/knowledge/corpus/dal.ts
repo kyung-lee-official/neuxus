@@ -2,7 +2,7 @@
  * Corpus chunk DAL. Owns the `kb_pages` / `kb_parents` / `kb_children`
  * chunk rows used by rechunk.
  *
- * Internal to the corpus module: `rechunk.ts` imports it.
+ * Internal to the corpus module: `service.ts` imports it.
  */
 
 import { getPrisma } from "../../../shared/db.ts";

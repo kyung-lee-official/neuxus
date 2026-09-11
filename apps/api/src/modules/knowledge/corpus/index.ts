@@ -1,16 +1,4 @@
 export {
-  type CorpusOperation,
-  type CorpusProgress,
-  type CorpusStage,
-  type CorpusStatus,
-  corpusEventStream,
-  emitProgress,
-  emitStage,
-  finishCorpusOp,
-  getCorpusStatus,
-  tryStartCorpusOp,
-} from "./corpus-status.ts";
-export {
   type CloneProgress,
   CorpusGitError,
   cloneCorpus,
@@ -23,7 +11,14 @@ export {
   refreshCorpusCheckout,
 } from "./git.ts";
 export { ingestCorpusCheckout } from "./ingest-checkout.ts";
-export { rechunkAllPages } from "./rechunk.ts";
+export {
+  Corpus,
+  CorpusLockedError,
+  type CorpusOperation,
+  type CorpusProgress,
+  type CorpusStage,
+  type CorpusStatus,
+} from "./service.ts";
 export {
   CORPUS_DEFAULTS,
   type CorpusSettingsRow,
@@ -33,7 +28,6 @@ export {
   storedCorpusSettings,
 } from "./settings/defaults.ts";
 export { CorpusSettings } from "./settings/service.ts";
-export { runCorpusSync } from "./sync.ts";
 export {
   assertSafeDocsRoot,
   listCorpusMarkdownFiles,
