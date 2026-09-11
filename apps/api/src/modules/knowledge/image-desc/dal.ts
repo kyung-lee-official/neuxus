@@ -1,9 +1,9 @@
 /**
- * Prisma CRUD for `kb_image_descriptions`. One row per (page_id, image_path).
+ * DAL for `kb_image_descriptions`. One row per (page_id, image_path).
  * Used by the image-description enricher (see ./pipeline.ts).
  */
 
-import { getPrisma } from "../db.ts";
+import { getPrisma } from "../../../shared/db.ts";
 
 export type ImageDescRow = {
   pageId: string;

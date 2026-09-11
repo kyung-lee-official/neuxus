@@ -26,9 +26,9 @@ import { extname } from "node:path";
 import {
   resolveTaskModelLink,
   TASK_MD_IMAGE_CAPTIONING,
-} from "../../modules/server-setting/task-model-map/service.ts";
+} from "../../server-setting/task-model-map/service.ts";
+import { findImageDescription, upsertImageDescription } from "./dal.ts";
 import { dedupByPath, type ParsedImageRef, parseImageRefs } from "./parse.ts";
-import { findImageDescription, upsertImageDescription } from "./store.ts";
 import { findOrphanImageDescOpeners } from "./validate.ts";
 
 /** Business prompt for the `md-image-captioning` task. */
@@ -277,8 +277,8 @@ function injectImageDescBlock(
     if (closerIdx === -1) return body;
     const before = body.slice(0, imageLineEnd + 1);
     const after = body.slice(closerIdx);
-    return before + "\n" + block + "\n" + after;
+    return `${before}\n${block}\n${after}`;
   }
 
-  return body.slice(0, imageLineEnd + 1) + "\n" + block + "\n" + afterImage;
+  return `${body.slice(0, imageLineEnd + 1)}\n${block}\n${afterImage}`;
 }
