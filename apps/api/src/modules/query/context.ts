@@ -1,6 +1,6 @@
 import type { RetrievedParent } from "../../shared/retrieve/index.ts";
-import type { AppMessage } from "../chat-messages/service.ts";
-import type { AppMemory } from "../personal-memory/service.ts";
+import type { AppMessage } from "../personal-data/chat-messages/service.ts";
+import type { AppMemory } from "../personal-data/personal-memory/service.ts";
 
 const MAX_CONTEXT_CHARS = 12_000;
 

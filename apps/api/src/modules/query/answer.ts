@@ -5,8 +5,8 @@ import {
 } from "../../modules/server-setting/task-model-map/service.ts";
 import { childLogger } from "../../shared/log/index.ts";
 import type { RetrievedParent } from "../../shared/retrieve/index.ts";
-import type { AppMessage } from "../chat-messages/service.ts";
-import type { AppMemory } from "../personal-memory/service.ts";
+import type { AppMessage } from "../personal-data/chat-messages/service.ts";
+import type { AppMemory } from "../personal-data/personal-memory/service.ts";
 import { buildSynthesisPrompt, stripMarkdownImageLines } from "./context.ts";
 
 const synthesisLog = childLogger({ module: "synthesis" }, "synthesis");

@@ -10,9 +10,9 @@ import {
 } from "../../shared/db.ts";
 import { isoFromDate, sessionJson, userJson } from "../../shared/serialize.ts";
 import { Auth } from "../auth/service.ts";
-import { ChatMessage } from "../chat-messages/service.ts";
-import { ChatSession } from "../chat-sessions/service.ts";
-import { PersonalMemory } from "../personal-memory/service.ts";
+import { ChatMessage } from "../personal-data/chat-messages/service.ts";
+import { ChatSession } from "../personal-data/chat-sessions/service.ts";
+import { PersonalMemory } from "../personal-data/personal-memory/service.ts";
 import type { UsersModel } from "./model.ts";
 
 function normalizeUserId(raw: string): string | null {
