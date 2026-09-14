@@ -1,11 +1,13 @@
 import { Elysia } from "elysia";
 import { API_TAGS, bearerSecurity } from "../../shared/openapi.ts";
 import { auth } from "../auth/index.ts";
+import { corpus } from "./corpus/index.ts";
 import { KnowledgeModel } from "./model.ts";
 import { Knowledge } from "./service.ts";
 
 export const knowledge = new Elysia({ prefix: "/knowledge" })
   .use(auth)
+  .use(corpus)
   .get("/pages", () => Knowledge.listPages(), {
     requireAdmin: true,
     response: KnowledgeModel.pageListResponse,

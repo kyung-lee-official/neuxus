@@ -1,14 +1,5 @@
 import { type Static, t } from "elysia";
 
-const corpusFields = {
-  repoUrl: t.Union([
-    t.String({ examples: ["https://github.com/org/kb.git"] }),
-    t.Null(),
-  ]),
-  branch: t.Union([t.String({ examples: ["main"] }), t.Null()]),
-  docsRoot: t.Union([t.String({ examples: ["docs"] }), t.Null()]),
-};
-
 const corpusOperationLiteral = t.Union([
   t.Literal("clone"),
   t.Literal("pull"),
@@ -27,12 +18,8 @@ const corpusStageLiteral = t.Union([
   t.Literal("embed"),
 ]);
 
+/** Schemas for the corpus operation routes (clone / pull / chunkify / embed / sync / events). */
 export const CorpusModel = {
-  corpusBody: t.Object(corpusFields),
-  corpusResponse: t.Object({
-    ...corpusFields,
-    lastSyncedSha: t.Union([t.String(), t.Null()]),
-  }),
   corpusChunkifyResponse: t.Object({
     ok: t.Literal(true),
     pagesProcessed: t.Integer({ minimum: 0 }),

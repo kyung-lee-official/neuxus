@@ -93,7 +93,7 @@ export const UserQueryKey = {
   Sessions: (userId: string) => ["sessions", userId] as const,
   ModelConfig: ["model-providers"] as const,
   TaskModelMap: ["server-setting", "task-model-map"] as const,
-  CorpusSettings: ["server-setting", "corpus"] as const,
+  CorpusSettings: ["knowledge", "corpus", "settings"] as const,
   LogSettings: ["server-setting", "log"] as const,
   RetrieveSettings: ["server-setting", "retrieve"] as const,
   KnowledgePages: ["knowledge", "pages"] as const,
@@ -597,7 +597,7 @@ export type CorpusSettings = {
 export async function getCorpusSettings(
   apiKey: string,
 ): Promise<CorpusSettings> {
-  return apiFetch<CorpusSettings>("/server-setting/corpus", { apiKey });
+  return apiFetch<CorpusSettings>("/knowledge/corpus/settings", { apiKey });
 }
 
 export async function putCorpusSettings(input: {
@@ -608,7 +608,7 @@ export async function putCorpusSettings(input: {
     docsRoot: string | null;
   };
 }): Promise<CorpusSettings> {
-  return apiFetch<CorpusSettings>("/server-setting/corpus", {
+  return apiFetch<CorpusSettings>("/knowledge/corpus/settings", {
     method: "PUT",
     apiKey: input.apiKey,
     body: JSON.stringify(input.settings),
@@ -616,14 +616,14 @@ export async function putCorpusSettings(input: {
 }
 
 export async function cloneCorpus(apiKey: string): Promise<CorpusSettings> {
-  return apiFetch<CorpusSettings>("/server-setting/corpus/clone", {
+  return apiFetch<CorpusSettings>("/knowledge/corpus/clone", {
     method: "POST",
     apiKey,
   });
 }
 
 export async function pullCorpus(apiKey: string): Promise<CorpusSettings> {
-  return apiFetch<CorpusSettings>("/server-setting/corpus/pull", {
+  return apiFetch<CorpusSettings>("/knowledge/corpus/pull", {
     method: "POST",
     apiKey,
   });
@@ -717,21 +717,21 @@ function parseCorpusStatus(value: unknown): CorpusStatus | null {
 }
 
 export async function startChunkify(apiKey: string): Promise<{ ok: true }> {
-  return apiFetch<{ ok: true }>("/server-setting/corpus/chunkify", {
+  return apiFetch<{ ok: true }>("/knowledge/corpus/chunkify", {
     method: "POST",
     apiKey,
   });
 }
 
 export async function startEmbed(apiKey: string): Promise<{ ok: true }> {
-  return apiFetch<{ ok: true }>("/server-setting/corpus/embed", {
+  return apiFetch<{ ok: true }>("/knowledge/corpus/embed", {
     method: "POST",
     apiKey,
   });
 }
 
 export async function startCorpusSync(apiKey: string): Promise<{ ok: true }> {
-  return apiFetch<{ ok: true }>("/server-setting/corpus/sync", {
+  return apiFetch<{ ok: true }>("/knowledge/corpus/sync", {
     method: "POST",
     apiKey,
   });
@@ -765,7 +765,7 @@ export async function subscribeCorpusEvents(
   onStatus: (status: CorpusStatus) => void,
   signal: AbortSignal,
 ): Promise<void> {
-  const res = await fetch(`${apiBaseUrl()}/server-setting/corpus/events`, {
+  const res = await fetch(`${apiBaseUrl()}/knowledge/corpus/events`, {
     headers: { Authorization: `Bearer ${apiKey}` },
     signal,
     cache: "no-store",
