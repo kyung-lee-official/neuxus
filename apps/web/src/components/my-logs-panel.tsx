@@ -191,6 +191,7 @@ export function MyLogsPanel() {
 
         <List
           apiKey={active.apiKey}
+          userId={active.id}
           onSelect={setSelected}
           onPreview={setPreviewItem}
         />
@@ -230,18 +231,20 @@ export function MyLogsPanel() {
 
 function List({
   apiKey,
+  userId,
   onSelect,
   onPreview,
 }: {
   apiKey: string;
+  userId: string;
   onSelect: (item: MyLogItem) => void;
   onPreview: (item: MyLogItem) => void;
 }) {
   const query = useInfiniteQuery({
-    queryKey: UserQueryKey.MyLogs(null),
+    queryKey: UserQueryKey.MyLogs(userId, null),
     initialPageParam: null as string | null,
     queryFn: ({ pageParam }) =>
-      getMyLogs({ apiKey, cursor: pageParam, limit: 50 }),
+      getMyLogs({ apiKey, userId, cursor: pageParam, limit: 50 }),
     getNextPageParam: (last) => last.nextCursor,
   });
 

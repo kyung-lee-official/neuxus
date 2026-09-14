@@ -86,7 +86,7 @@ console.log(`neuxus API listening on http://localhost:${app.server?.port}`);
 console.log(`OpenAPI docs: http://localhost:${app.server?.port}/openapi`);
 console.log(`OpenAPI spec: http://localhost:${app.server?.port}/openapi/json`);
 console.log(
-  "User CRUD: GET/POST /users, GET/PATCH/DELETE /users/:id, GET /users/:id/data, DELETE /users/:id/memories/:memoryId; GET /users/logs (current user)",
+  "User CRUD: GET/POST /users, GET/PATCH/DELETE /users/:id, GET /users/:id/data, GET /users/:id/logs, DELETE /users/:id/memories/:memoryId",
 );
 console.log(
   "Sessions: GET/POST /sessions, PATCH /sessions/:id; POST /query accepts body.sessionId",

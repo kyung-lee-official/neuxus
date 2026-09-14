@@ -7,15 +7,16 @@ import { Users } from "./service.ts";
 
 export const users = new Elysia({ prefix: "/users" })
   .use(auth)
-  .get("/logs", ({ user, query }) => Users.listLogs(user, query), {
+  .get("/:id/logs", ({ params, query }) => Users.listLogs(params.id, query), {
     requireUser: true,
+    params: UsersModel.idParams,
     query: LogsModel.listQuery,
     response: LogsModel.listResponse,
     detail: {
       tags: [API_TAGS.users],
-      summary: "List logs for the current user",
+      summary: "List logs for a user",
       description:
-        "Returns child-logger entries scoped to the bearer user. Defaults to `names=synthesis,retrieve`, `limit=50`.",
+        "Returns child-logger entries scoped to the user id. Defaults to `names=synthesis,retrieve`, `limit=50`.",
       security: [bearerSecurity],
     },
   })

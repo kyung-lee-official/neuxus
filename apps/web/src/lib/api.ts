@@ -99,7 +99,8 @@ export const UserQueryKey = {
   KnowledgePages: ["knowledge", "pages"] as const,
   KnowledgePage: (id: string) => ["knowledge", "pages", id] as const,
   /** Page of the current user's own retrieve/synthesis logs. */
-  MyLogs: (cursor: string | null) => ["logs", "mine", cursor] as const,
+  MyLogs: (userId: string, cursor: string | null) =>
+    ["users", userId, "logs", cursor] as const,
 } as const;
 
 export async function getHealth(): Promise<{ ok: boolean }> {
@@ -123,6 +124,7 @@ export type MyLogsPage = {
 
 export async function getMyLogs(input: {
   apiKey: string;
+  userId: string;
   cursor?: string | null;
   limit?: number;
 }): Promise<MyLogsPage> {
@@ -132,9 +134,12 @@ export async function getMyLogs(input: {
     params.set("limit", String(input.limit));
   }
   const qs = params.toString();
-  return apiFetch<MyLogsPage>(`/users/logs${qs ? `?${qs}` : ""}`, {
-    apiKey: input.apiKey,
-  });
+  return apiFetch<MyLogsPage>(
+    `/users/${encodeURIComponent(input.userId)}/logs${qs ? `?${qs}` : ""}`,
+    {
+      apiKey: input.apiKey,
+    },
+  );
 }
 
 export type NukeTarget = "app";

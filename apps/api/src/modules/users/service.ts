@@ -203,16 +203,19 @@ export abstract class Users {
     return { deleted: true as const, id: memoryId };
   }
 
-  /** The current user's `app_log` entries (newest first, cursor-paged). */
+  /** A user's `app_log` entries (newest first, cursor-paged). */
   static async listLogs(
-    user: AppUser,
+    idParam: string,
     query: LogsModel["listQuery"],
   ): Promise<LogListResult> {
+    const id = normalizeUserId(idParam);
+    if (!id) throw status(400, { error: "Invalid user id" });
+
     const names = resolveLogNames(query.names);
     const limit = clampLogLimit(query.limit);
     const cursor = parseLogCursor(query.cursor);
 
-    const rows = await findLogsByUser(user.id, {
+    const rows = await findLogsByUser(id, {
       names,
       take: limit + 1,
       cursor,
