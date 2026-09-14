@@ -3,7 +3,7 @@ import { API_TAGS, bearerSecurity } from "../../shared/openapi.ts";
 import { auth } from "../auth/index.ts";
 import { deleteAllLogs } from "./dal.ts";
 import { LogModel } from "./model.ts";
-import { logSettings } from "./settings/index.ts";
+import { logSettings } from "./settings/route.ts";
 
 const logDetail = {
   security: [bearerSecurity],

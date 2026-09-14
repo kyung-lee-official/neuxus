@@ -4,8 +4,8 @@ import { auth } from "../../auth/index.ts";
 import { CorpusGitError } from "./git.ts";
 import { CorpusModel } from "./model.ts";
 import { Corpus, CorpusLockedError } from "./service.ts";
-import { corpusSettings } from "./settings/index.ts";
 import { CorpusSettingsModel } from "./settings/model.ts";
+import { corpusSettings } from "./settings/route.ts";
 
 const corpusDetail = {
   security: [bearerSecurity],

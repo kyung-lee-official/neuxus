@@ -1,15 +1,15 @@
 import { openapi } from "@elysia/openapi";
 import { cors } from "@elysiajs/cors";
 import { Elysia, status } from "elysia";
-import { health } from "./modules/health/index.ts";
-import { knowledge } from "./modules/knowledge/index.ts";
+import { health } from "./modules/health/route.ts";
+import { knowledge } from "./modules/knowledge/route.ts";
 import { Logger, LogSettings, PostgresTransport } from "./modules/log/index.ts";
-import { logRoutes } from "./modules/log/routes.ts";
-import { modelProviders } from "./modules/model-providers/index.ts";
-import { chatSessions } from "./modules/personal-data/chat-sessions/index.ts";
-import { query } from "./modules/query/index.ts";
-import { serverSetting } from "./modules/server-setting/index.ts";
-import { users } from "./modules/users/index.ts";
+import { logRoutes } from "./modules/log/route.ts";
+import { modelProviders } from "./modules/model-providers/route.ts";
+import { chatSessions } from "./modules/personal-data/chat-sessions/route.ts";
+import { query } from "./modules/query/route.ts";
+import { serverSetting } from "./modules/server-setting/route.ts";
+import { users } from "./modules/users/route.ts";
 import { serverPort } from "./shared/config.ts";
 import { apiTagList, bearerSecurityScheme } from "./shared/openapi.ts";
 

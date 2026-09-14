@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
-import { nuke } from "./nuke/index.ts";
-import { taskModelMap } from "./task-model-map/index.ts";
+import { nuke } from "./nuke/route.ts";
+import { taskModelMap } from "./task-model-map/route.ts";
 
 /**
  * Admin server settings — a composition root over one sub-module per

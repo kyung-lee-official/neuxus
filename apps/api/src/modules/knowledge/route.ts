@@ -1,9 +1,9 @@
 import { Elysia } from "elysia";
 import { API_TAGS, bearerSecurity } from "../../shared/openapi.ts";
 import { auth } from "../auth/index.ts";
-import { corpus } from "./corpus/index.ts";
+import { corpus } from "./corpus/route.ts";
 import { KnowledgeModel } from "./model.ts";
-import { retrieverSettings } from "./retriever/settings/index.ts";
+import { retrieverSettings } from "./retriever/settings/route.ts";
 import { Knowledge } from "./service.ts";
 
 export const knowledge = new Elysia({ prefix: "/knowledge" })
