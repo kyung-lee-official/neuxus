@@ -6,21 +6,12 @@ import {
   type SimpleGitProgressEvent,
   simpleGit,
 } from "simple-git";
+import { CorpusGitError } from "../errors.ts";
 import type { StoredCorpusSettings } from "./settings/defaults.ts";
 import { CorpusSettings } from "./settings/service.ts";
 
 const GIT_TIMEOUT_MS = 120_000;
 const BRANCH_PATTERN = /^[A-Za-z0-9._/-]+$/;
-
-export class CorpusGitError extends Error {
-  readonly httpStatus: 400 | 409 | 500;
-
-  constructor(httpStatus: 400 | 409 | 500, message: string) {
-    super(message);
-    this.name = "CorpusGitError";
-    this.httpStatus = httpStatus;
-  }
-}
 
 /** Local checkout of `kb_corpus_settings` (`apps/api/data/corpus`). */
 export function corpusCheckoutDir(): string {

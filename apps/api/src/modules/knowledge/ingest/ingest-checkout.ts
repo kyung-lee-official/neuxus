@@ -4,12 +4,12 @@ import {
   ImageDescriptionEnricher,
   ImageDescValidationError,
 } from "../image-desc/index.ts";
-import { Ingester } from "../ingest/index.ts";
 import {
   deleteKnowledgePagesMissingSourcePaths,
   findPageContentHash,
   Page,
 } from "../pages/index.ts";
+import { Ingester } from "./service.ts";
 import { listCorpusMarkdownFiles } from "./walk.ts";
 
 /**

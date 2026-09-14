@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { lstat, readdir, realpath, stat } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
-import { CorpusGitError } from "./git.ts";
+import { CorpusGitError } from "../errors.ts";
 
 export type CorpusMarkdownFile = {
   sourcePath: string;

@@ -1,7 +1,7 @@
 import { Elysia, status } from "elysia";
 import { API_TAGS, bearerSecurity } from "../../../shared/openapi.ts";
 import { auth } from "../../auth/index.ts";
-import { CorpusGitError } from "./git.ts";
+import { CorpusGitError } from "../errors.ts";
 import { CorpusModel } from "./model.ts";
 import { Corpus, CorpusLockedError } from "./service.ts";
 import { CorpusSettingsModel } from "./settings/model.ts";

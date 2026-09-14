@@ -2,13 +2,14 @@
  * Corpus service. Owns the corpus operations (clone / pull / rechunk /
  * embed / sync) and the single-operation lock + progress stream they share.
  *
- * Lower-level pieces stay separate: `git.ts` (git plumbing), `walk.ts`
- * (filesystem walk), `ingest-checkout.ts` (page persist), `dal.ts` (chunk
- * rows), `settings/` (kb_corpus_settings).
+ * Lower-level pieces stay separate: `git.ts` (git plumbing), `dal.ts` (chunk
+ * rows), `settings/` (kb_corpus_settings). The checkout → pages write path
+ * (walk + ingest + chunkify + persist) lives in `ingest/`.
  */
 
 import { Chunkifier } from "../chunkifier/index.ts";
 import { Embedder, type EmbedStaleChildrenResult } from "../embedder/index.ts";
+import { ingestCorpusCheckout } from "../ingest/index.ts";
 import { listPageBodies, replacePageChunks } from "../pages/index.ts";
 import {
   type CloneProgress,
@@ -17,7 +18,6 @@ import {
   pullCorpusStream,
   refreshCorpusCheckout,
 } from "./git.ts";
-import { ingestCorpusCheckout } from "./ingest-checkout.ts";
 import {
   type ResolvedCorpusSettings,
   resolveCorpusSettings,
