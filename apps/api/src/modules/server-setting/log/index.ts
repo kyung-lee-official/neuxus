@@ -1,7 +1,7 @@
 import { Elysia } from "elysia";
 import { API_TAGS, bearerSecurity } from "../../../shared/openapi.ts";
 import { auth } from "../../auth/index.ts";
-import { LogSettings } from "../../log/index.ts";
+import { deleteAllLogs, LogSettings } from "../../log/index.ts";
 import { LogSettingsModel } from "./model.ts";
 
 const logDetail = {
@@ -46,7 +46,7 @@ export const logSettings = new Elysia({ prefix: "/log" })
         "Writes hardcoded `LOG_DEFAULTS`: `sinks=['console']`, `queueSize=1000`, `drainTimeoutMs=2000`, `pretty=false`. Returns the same shape as `GET /log`.",
     },
   })
-  .post("/purge", () => LogSettings.purge(), {
+  .post("/purge", async () => ({ deleted: await deleteAllLogs() }), {
     requireAdmin: true,
     response: LogSettingsModel.logPurgeResponse,
     detail: {
