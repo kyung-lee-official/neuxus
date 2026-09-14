@@ -91,7 +91,7 @@ export const UserQueryKey = {
   Data: (id: string, messagePage: number) =>
     ["users", id, "data", messagePage] as const,
   Sessions: (userId: string) => ["sessions", userId] as const,
-  ModelConfig: ["server-setting", "model-providers"] as const,
+  ModelConfig: ["model-providers"] as const,
   TaskModelMap: ["server-setting", "task-model-map"] as const,
   CorpusSettings: ["server-setting", "corpus"] as const,
   LogSettings: ["server-setting", "log"] as const,
@@ -344,10 +344,7 @@ export type ProvidersResponse = {
 };
 
 export async function getProviders(apiKey: string): Promise<ProvidersResponse> {
-  return apiFetch<ProvidersResponse>(
-    "/server-setting/model-providers/providers",
-    { apiKey },
-  );
+  return apiFetch<ProvidersResponse>("/model-providers/providers", { apiKey });
 }
 
 /** A provider's connection payload is provider-specific. */
@@ -363,7 +360,7 @@ export async function getProviderConnection(
   providerId: string,
 ): Promise<ProviderConnectionResponse> {
   return apiFetch<ProviderConnectionResponse>(
-    `/server-setting/model-providers/providers/${encodeURIComponent(providerId)}/connection`,
+    `/model-providers/providers/${encodeURIComponent(providerId)}/connection`,
     { apiKey },
   );
 }
@@ -374,7 +371,7 @@ export async function putProviderConnection(input: {
   connection: ProviderConnection;
 }): Promise<ProviderConnectionResponse> {
   return apiFetch<ProviderConnectionResponse>(
-    `/server-setting/model-providers/providers/${encodeURIComponent(input.providerId)}/connection`,
+    `/model-providers/providers/${encodeURIComponent(input.providerId)}/connection`,
     {
       method: "PUT",
       apiKey: input.apiKey,
@@ -388,7 +385,7 @@ export async function deleteProviderConnection(input: {
   providerId: string;
 }): Promise<{ providerId: string; deleted: true }> {
   return apiFetch<{ providerId: string; deleted: true }>(
-    `/server-setting/model-providers/providers/${encodeURIComponent(input.providerId)}/connection`,
+    `/model-providers/providers/${encodeURIComponent(input.providerId)}/connection`,
     { method: "DELETE", apiKey: input.apiKey },
   );
 }
@@ -423,7 +420,7 @@ export async function testEmbed(input: {
   modelId: string;
 }): Promise<EmbedTestResult> {
   return apiFetch<EmbedTestResult>(
-    `/server-setting/model-providers/providers/${encodeURIComponent(input.providerId)}/test/embed`,
+    `/model-providers/providers/${encodeURIComponent(input.providerId)}/test/embed`,
     {
       method: "POST",
       apiKey: input.apiKey,
@@ -443,7 +440,7 @@ export async function testChat(input: {
   modelId: string;
 }): Promise<TextTestResult> {
   return apiFetch<TextTestResult>(
-    `/server-setting/model-providers/providers/${encodeURIComponent(input.providerId)}/test/chat`,
+    `/model-providers/providers/${encodeURIComponent(input.providerId)}/test/chat`,
     {
       method: "POST",
       apiKey: input.apiKey,
@@ -458,7 +455,7 @@ export async function testImage(input: {
   modelId: string;
 }): Promise<TextTestResult> {
   return apiFetch<TextTestResult>(
-    `/server-setting/model-providers/providers/${encodeURIComponent(input.providerId)}/test/image`,
+    `/model-providers/providers/${encodeURIComponent(input.providerId)}/test/image`,
     {
       method: "POST",
       apiKey: input.apiKey,

@@ -1,12 +1,12 @@
 import { Elysia } from "elysia";
-import { API_TAGS, bearerSecurity } from "../../../shared/openapi.ts";
-import { auth } from "../../auth/index.ts";
+import { API_TAGS, bearerSecurity } from "../../shared/openapi.ts";
+import { auth } from "../auth/index.ts";
 import { ModelProvidersModel, providerIdParams } from "./model.ts";
 import { ModelProviders } from "./service.ts";
 
 const modelProvidersDetail = {
   security: [bearerSecurity],
-  tags: [API_TAGS.serverSettingModelProviders],
+  tags: [API_TAGS.modelProviders],
 };
 
 /**

@@ -4,6 +4,7 @@ import { Elysia, status } from "elysia";
 import { health } from "./modules/health/index.ts";
 import { knowledge } from "./modules/knowledge/index.ts";
 import { Logger, LogSettings, PostgresTransport } from "./modules/log/index.ts";
+import { modelProviders } from "./modules/model-providers/index.ts";
 import { chatSessions } from "./modules/personal-data/chat-sessions/index.ts";
 import { query } from "./modules/query/index.ts";
 import { serverSetting } from "./modules/server-setting/index.ts";
@@ -67,6 +68,7 @@ const app = new Elysia()
   })
   .use(health)
   .use(knowledge)
+  .use(modelProviders)
   .use(serverSetting)
   .use(query)
   .use(chatSessions)
@@ -88,6 +90,9 @@ console.log(
   "Sessions: GET/POST /sessions, PATCH /sessions/:id; POST /query accepts body.sessionId",
 );
 console.log("Knowledge: GET /knowledge/pages, GET /knowledge/pages/*");
+console.log(
+  "Model providers: GET /model-providers/providers, GET/PUT/DELETE /model-providers/providers/:providerId/connection, POST /model-providers/providers/:providerId/test/embed|chat|image",
+);
 console.log(
   "Server setting: GET/PUT /server-setting/embed, /synthesis, /corpus, /log; POST /embed/reset, /synthesis/reset, /log/reset, /corpus/clone, /corpus/pull, /corpus/chunkify, /corpus/embed, /corpus/sync; GET /corpus/events; POST /nuke",
 );

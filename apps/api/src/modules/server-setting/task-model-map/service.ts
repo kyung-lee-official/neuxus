@@ -14,7 +14,7 @@ import {
   type AnyProvider,
   getModelByIdentifier,
   getProviderById,
-} from "../model-providers/core/catalog.ts";
+} from "../../model-providers/core/catalog.ts";
 import {
   CAPABILITY_EMBEDDING,
   CAPABILITY_TEXT,
@@ -22,7 +22,7 @@ import {
   type CapabilityTag,
   MODEL_IDENTIFIER_DELIMITER,
   type Model,
-} from "../model-providers/core/types.ts";
+} from "../../model-providers/core/types.ts";
 import type { TaskModelMapModel } from "./model.ts";
 
 const CONFIG_ID = "default";
