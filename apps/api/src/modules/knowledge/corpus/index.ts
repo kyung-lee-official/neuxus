@@ -1,11 +1,9 @@
 export {
   type CloneProgress,
   CorpusGitError,
-  cloneCorpus,
   cloneCorpusStream,
   corpusCheckoutDir,
   type PullStage,
-  pullCorpus,
   pullCorpusStream,
   refreshCorpusCheckout,
 } from "./git.ts";

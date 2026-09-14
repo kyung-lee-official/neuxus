@@ -159,20 +159,6 @@ async function pullInCheckout(
   }
 }
 
-export async function cloneCorpus(): Promise<StoredCorpusSettings> {
-  const settings = await requireRepoUrl();
-  await cloneIntoCheckout(settings);
-  const sha = await requireHeadSha(corpusCheckoutDir());
-  return CorpusSettings.saveLastSyncedSha(sha);
-}
-
-export async function pullCorpus(): Promise<StoredCorpusSettings> {
-  const settings = await requireRepoUrl();
-  await pullInCheckout(settings);
-  const sha = await requireHeadSha(corpusCheckoutDir());
-  return CorpusSettings.saveLastSyncedSha(sha);
-}
-
 /** Clone progress the UI cares about. */
 export type CloneProgress = {
   phase: "receiving" | "resolving" | "checking-out";
@@ -181,36 +167,30 @@ export type CloneProgress = {
   total?: number;
 };
 
-/** Map a `simple-git` progress event to the clone phases the UI renders. */
-function toCloneProgress(event: SimpleGitProgressEvent): CloneProgress | null {
-  const phase =
-    event.stage === "receiving"
-      ? "receiving"
-      : event.stage === "resolving"
-        ? "resolving"
-        : event.stage === "checking"
-          ? "checking-out"
-          : null;
-  if (phase === null) return null;
-  return {
-    phase,
-    percent: event.progress,
-    processed: event.processed,
-    total: event.total,
-  };
-}
-
 /** Pull stages the UI cares about. */
 export type PullStage = "fetch" | "checkout" | "merge";
 
-/** Clone with progress mapped from the git progress stream. */
+/** Clone, mapping git progress to the phases the UI renders. */
 export async function cloneCorpusStream(
   onProgress: (progress: CloneProgress) => void,
 ): Promise<StoredCorpusSettings> {
   const settings = await requireRepoUrl();
   await cloneIntoCheckout(settings, (event) => {
-    const progress = toCloneProgress(event);
-    if (progress) onProgress(progress);
+    const phase =
+      event.stage === "receiving"
+        ? "receiving"
+        : event.stage === "resolving"
+          ? "resolving"
+          : event.stage === "checking"
+            ? "checking-out"
+            : null;
+    if (phase === null) return;
+    onProgress({
+      phase,
+      percent: event.progress,
+      processed: event.processed,
+      total: event.total,
+    });
   });
   const sha = await requireHeadSha(corpusCheckoutDir());
   return CorpusSettings.saveLastSyncedSha(sha);
