@@ -21,4 +21,4 @@ export {
   storedLogSettings,
 } from "./settings/defaults.ts";
 export { type AdminLogSettings, LogSettings } from "./settings/service.ts";
-export { PostgresTransport } from "./sinks/postgres.ts";
+export { PostgresTransport } from "./sinks/postgres-transport.ts";

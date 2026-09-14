@@ -2,8 +2,9 @@
  * App-log DAL. Owns the `app_log` table: the sink's inserts and the admin
  * purge.
  *
- * Internal to the log module: `sinks/postgres.ts` imports it; `deleteAllLogs`
- * is re-exported from the module barrel for the admin purge route.
+ * Internal to the log module: `sinks/postgres-transport.ts` imports it.
+ * `deleteAllLogs` is re-exported from the module barrel for the admin purge
+ * route.
  */
 
 import { hostname } from "node:os";

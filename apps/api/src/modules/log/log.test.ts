@@ -5,7 +5,7 @@ import {
   type LogSettingsRow,
   resolveLogSettings,
 } from "./settings/defaults.ts";
-import { PostgresTransport } from "./sinks/postgres.ts";
+import { PostgresTransport } from "./sinks/postgres-transport.ts";
 import { BoundedQueue } from "./sinks/queue.ts";
 
 describe("BoundedQueue", () => {

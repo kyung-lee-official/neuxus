@@ -14,7 +14,7 @@
 
 import type { LogLevel } from "logixlysia";
 import type { LogRecord } from "./dal.ts";
-import { PostgresTransport } from "./sinks/postgres.ts";
+import { PostgresTransport } from "./sinks/postgres-transport.ts";
 
 function normalizeLevel(level: LogLevel): string {
   switch (level) {
