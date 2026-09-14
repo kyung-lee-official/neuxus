@@ -94,7 +94,7 @@ export const UserQueryKey = {
   ModelConfig: ["model-providers"] as const,
   TaskModelMap: ["server-setting", "task-model-map"] as const,
   CorpusSettings: ["knowledge", "corpus", "settings"] as const,
-  LogSettings: ["server-setting", "log"] as const,
+  LogSettings: ["log", "settings"] as const,
   RetrieveSettings: ["knowledge", "retriever", "settings"] as const,
   KnowledgePages: ["knowledge", "pages"] as const,
   KnowledgePage: (id: string) => ["knowledge", "pages", id] as const,
@@ -554,7 +554,7 @@ export type LogSettings = {
 };
 
 export async function getLogSettings(apiKey: string): Promise<LogSettings> {
-  return apiFetch<LogSettings>("/server-setting/log", { apiKey });
+  return apiFetch<LogSettings>("/log/settings", { apiKey });
 }
 
 export async function putLogSettings(input: {
@@ -566,7 +566,7 @@ export async function putLogSettings(input: {
     pretty: boolean | null;
   };
 }): Promise<LogSettings> {
-  return apiFetch<LogSettings>("/server-setting/log", {
+  return apiFetch<LogSettings>("/log/settings", {
     method: "PUT",
     apiKey: input.apiKey,
     body: JSON.stringify(input.settings),
@@ -574,7 +574,7 @@ export async function putLogSettings(input: {
 }
 
 export async function resetLogSettings(apiKey: string): Promise<LogSettings> {
-  return apiFetch<LogSettings>("/server-setting/log/reset", {
+  return apiFetch<LogSettings>("/log/settings/reset", {
     method: "POST",
     apiKey,
   });
@@ -583,7 +583,7 @@ export async function resetLogSettings(apiKey: string): Promise<LogSettings> {
 export async function purgeLogSettings(
   apiKey: string,
 ): Promise<{ deleted: number }> {
-  return apiFetch<{ deleted: number }>("/server-setting/log/purge", {
+  return apiFetch<{ deleted: number }>("/log/purge", {
     method: "POST",
     apiKey,
   });

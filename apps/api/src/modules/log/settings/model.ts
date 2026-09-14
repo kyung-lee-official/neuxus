@@ -11,6 +11,7 @@ const logFields = {
   pretty: t.Union([t.Boolean(), t.Null()]),
 };
 
+/** Schemas for the log settings routes (`app_log_settings` id `default`). */
 export const LogSettingsModel = {
   logBody: t.Object({
     ...logFields,
@@ -28,9 +29,6 @@ export const LogSettingsModel = {
       pretty: t.Boolean(),
     }),
     availableSinks: logSinkArrayReadonly,
-  }),
-  logPurgeResponse: t.Object({
-    deleted: t.Integer({ minimum: 0, examples: [42] }),
   }),
 } as const;
 

@@ -1,15 +1,19 @@
 import { Elysia } from "elysia";
 import { API_TAGS, bearerSecurity } from "../../../shared/openapi.ts";
 import { auth } from "../../auth/index.ts";
-import { deleteAllLogs, LogSettings } from "../../log/index.ts";
 import { LogSettingsModel } from "./model.ts";
+import { LogSettings } from "./service.ts";
 
 const logDetail = {
   security: [bearerSecurity],
-  tags: [API_TAGS.serverSettingLog],
+  tags: [API_TAGS.log],
 };
 
-export const logSettings = new Elysia({ prefix: "/log" })
+/**
+ * Log sink settings (`app_log_settings` id `default`), served under
+ * `/log/settings`.
+ */
+export const logSettings = new Elysia({ prefix: "/settings" })
   .use(auth)
   .get("/", () => LogSettings.admin(), {
     requireAdmin: true,
@@ -33,7 +37,7 @@ export const logSettings = new Elysia({ prefix: "/log" })
         ...logDetail,
         summary: "Update log settings",
         description:
-          "Empty / `null` fields are stored as null; runtime falls back to `defaults`. Returns the same shape as `GET /log`.",
+          "Empty / `null` fields are stored as null; runtime falls back to `defaults`. Returns the same shape as `GET /log/settings`.",
       },
     },
   )
@@ -43,15 +47,6 @@ export const logSettings = new Elysia({ prefix: "/log" })
       ...logDetail,
       summary: "Reset log settings to defaults",
       description:
-        "Writes hardcoded `LOG_DEFAULTS`: `sinks=['console']`, `queueSize=1000`, `drainTimeoutMs=2000`, `pretty=false`. Returns the same shape as `GET /log`.",
-    },
-  })
-  .post("/purge", async () => ({ deleted: await deleteAllLogs() }), {
-    requireAdmin: true,
-    response: LogSettingsModel.logPurgeResponse,
-    detail: {
-      ...logDetail,
-      summary: "Purge persisted log entries",
-      description: "Deletes every row in `app_log`.",
+        "Writes hardcoded `LOG_DEFAULTS`: `sinks=['console']`, `queueSize=1000`, `drainTimeoutMs=2000`, `pretty=false`. Returns the same shape as `GET /log/settings`.",
     },
   });

@@ -4,6 +4,7 @@ import { Elysia, status } from "elysia";
 import { health } from "./modules/health/index.ts";
 import { knowledge } from "./modules/knowledge/index.ts";
 import { Logger, LogSettings, PostgresTransport } from "./modules/log/index.ts";
+import { logRoutes } from "./modules/log/routes.ts";
 import { modelProviders } from "./modules/model-providers/index.ts";
 import { chatSessions } from "./modules/personal-data/chat-sessions/index.ts";
 import { query } from "./modules/query/index.ts";
@@ -69,6 +70,7 @@ const app = new Elysia()
   .use(health)
   .use(knowledge)
   .use(modelProviders)
+  .use(logRoutes)
   .use(serverSetting)
   .use(query)
   .use(chatSessions)
@@ -91,10 +93,17 @@ console.log(
 );
 console.log("Knowledge: GET /knowledge/pages, GET /knowledge/pages/*");
 console.log(
-  "Model providers: GET /model-providers/providers, GET/PUT/DELETE /model-providers/providers/:providerId/connection, POST /model-providers/providers/:providerId/test/embed|chat|image",
+  "Corpus: GET/PUT /knowledge/corpus/settings; POST /knowledge/corpus/clone, /knowledge/corpus/pull, /knowledge/corpus/chunkify, /knowledge/corpus/embed, /knowledge/corpus/sync; GET /knowledge/corpus/events",
 );
 console.log(
-  "Server setting: GET/PUT /server-setting/embed, /synthesis, /corpus, /log; POST /embed/reset, /synthesis/reset, /log/reset, /corpus/clone, /corpus/pull, /corpus/chunkify, /corpus/embed, /corpus/sync; GET /corpus/events; POST /nuke",
+  "Retriever: GET/PUT /knowledge/retriever/settings; POST /knowledge/retriever/settings/reset",
+);
+console.log(
+  "Model providers: GET /model-providers/providers, GET/PUT/DELETE /model-providers/providers/:providerId/connection, POST /model-providers/providers/:providerId/test/embed|chat|image",
+);
+console.log("Log: GET/PUT /log/settings; POST /log/settings/reset, /log/purge");
+console.log(
+  "Server setting: GET/PUT /server-setting/task-model-map; POST /server-setting/nuke",
 );
 
 export type App = typeof app;
