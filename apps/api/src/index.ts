@@ -5,9 +5,9 @@ import { health } from "./modules/health/index.ts";
 import { knowledge } from "./modules/knowledge/index.ts";
 import {
   installShutdownHandlers,
+  Logger,
   LogSettings,
   PostgresTransport,
-  setLogTransport,
   startLogWorker,
 } from "./modules/log/index.ts";
 import { chatSessions } from "./modules/personal-data/chat-sessions/index.ts";
@@ -20,7 +20,9 @@ import { apiTagList, bearerSecurityScheme } from "./shared/openapi.ts";
 const logSettings = await LogSettings.load();
 const usePostgres = logSettings.sinks.includes("postgres");
 if (usePostgres) {
-  setLogTransport(new PostgresTransport({ capacity: logSettings.queueSize }));
+  Logger.setTransport(
+    new PostgresTransport({ capacity: logSettings.queueSize }),
+  );
 }
 
 const app = new Elysia()

@@ -4,7 +4,7 @@
  * The logger is generic and business-agnostic; call sites import from here:
  *
  * ```ts
- * import { getRootLogger, childLogger, startLogWorker } from "modules/log";
+ * import { Logger, startLogWorker } from "modules/log";
  * ```
  */
 
@@ -18,13 +18,7 @@ export {
   type StoredLogSettings,
   storedLogSettings,
 } from "./defaults.ts";
-export type { AppLogger } from "./logger.ts";
-export {
-  childLogger,
-  getLogTransport,
-  getRootLogger,
-  setLogTransport,
-} from "./logger.ts";
+export { Logger } from "./logger.ts";
 export { BoundedQueue } from "./queue.ts";
 export { type AdminLogSettings, LogSettings } from "./service.ts";
 export {

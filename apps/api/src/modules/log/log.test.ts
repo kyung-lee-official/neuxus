@@ -4,12 +4,7 @@ import {
   type LogSettingsRow,
   resolveLogSettings,
 } from "./defaults.ts";
-import {
-  childLogger,
-  getLogTransport,
-  getRootLogger,
-  setLogTransport,
-} from "./logger.ts";
+import { Logger } from "./logger.ts";
 import { BoundedQueue } from "./queue.ts";
 import { PostgresTransport } from "./sinks/postgres.ts";
 
@@ -54,16 +49,16 @@ describe("BoundedQueue", () => {
   });
 });
 
-describe("AppLogger", () => {
+describe("Logger", () => {
   beforeEach(() => {
-    setLogTransport(new PostgresTransport());
-    getLogTransport().drain(10_000);
+    Logger.setTransport(new PostgresTransport());
+    Logger.getTransport().drain(10_000);
   });
 
-  test("getRootLogger().info enqueues one record with the right shape", () => {
-    getRootLogger().info("hello world", { requestId: "abc" });
+  test("Logger.root().info enqueues one record with the right shape", () => {
+    Logger.root().info("hello world", { requestId: "abc" });
 
-    const drained = getLogTransport().drain(10);
+    const drained = Logger.getTransport().drain(10);
     expect(drained).toHaveLength(1);
     const record = drained[0]!;
     expect(record.level).toBe("info");
@@ -73,11 +68,11 @@ describe("AppLogger", () => {
     expect(typeof record.time).toBe("string");
   });
 
-  test("childLogger merges bindings and stamps name", () => {
-    const log = childLogger({ module: "synthesis" }, "synthesis");
+  test("Logger.child merges bindings and stamps name", () => {
+    const log = Logger.child({ module: "synthesis" }, "synthesis");
     log.warn("slow request", { latencyMs: 1500 });
 
-    const drained = getLogTransport().drain(10);
+    const drained = Logger.getTransport().drain(10);
     expect(drained).toHaveLength(1);
     const record = drained[0]!;
     expect(record.level).toBe("warn");
@@ -87,11 +82,11 @@ describe("AppLogger", () => {
   });
 
   test("nested children stack bindings and keep the outermost name", () => {
-    const a = childLogger({ module: "auth" }, "auth");
+    const a = Logger.child({ module: "auth" }, "auth");
     const b = a.child({ step: "verify" });
     b.error("denied");
 
-    const drained = getLogTransport().drain(10);
+    const drained = Logger.getTransport().drain(10);
     expect(drained).toHaveLength(1);
     const record = drained[0]!;
     expect(record.name).toBe("auth");
