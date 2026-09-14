@@ -1,5 +1,2 @@
-export {
-  type IngestMarkdownResult,
-  ingestMarkdown,
-} from "./markdown.ts";
 export { normalizeBody, normalizeNewlines } from "./normalize.ts";
+export { Ingester, type IngestMarkdownResult } from "./service.ts";

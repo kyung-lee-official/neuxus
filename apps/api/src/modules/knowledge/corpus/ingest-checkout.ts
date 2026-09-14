@@ -4,7 +4,7 @@ import {
   ImageDescriptionEnricher,
   ImageDescValidationError,
 } from "../image-desc/index.ts";
-import { ingestMarkdown } from "../ingest/index.ts";
+import { Ingester } from "../ingest/index.ts";
 import {
   deleteKnowledgePagesMissingSourcePaths,
   findPageContentHash,
@@ -26,7 +26,7 @@ export async function ingestCorpusCheckout(
 
   for (const file of files) {
     const source = await readFile(file.absolutePath, "utf8");
-    const ingested = ingestMarkdown(source);
+    const ingested = Ingester.ingestMarkdown(source);
 
     // Run image-description enrichment before the body-hash check.
     // Orphan opener without closer fails the whole file; other enricher
