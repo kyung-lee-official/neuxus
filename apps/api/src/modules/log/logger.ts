@@ -13,7 +13,8 @@
  */
 
 import type { LogLevel } from "logixlysia";
-import { type LogRecord, PostgresTransport } from "./sinks/postgres.ts";
+import type { LogRecord } from "./dal.ts";
+import { PostgresTransport } from "./sinks/postgres.ts";
 
 function normalizeLevel(level: LogLevel): string {
   switch (level) {

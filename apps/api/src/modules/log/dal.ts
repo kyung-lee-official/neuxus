@@ -1,48 +1,47 @@
 /**
- * Log DAL. Owns the `app_log_settings` singleton row (id `default`) and the
- * `app_log` purge.
+ * App-log DAL. Owns the `app_log` table: the sink's inserts and the admin
+ * purge.
  *
- * Internal: only `service.ts` imports this file.
+ * Internal to the log module: `sinks/postgres.ts` imports it; `deleteAllLogs`
+ * is re-exported from the module barrel for the admin purge route.
  */
 
+import { hostname } from "node:os";
 import { getPrisma } from "../../shared/db.ts";
 
-const SETTINGS_ID = "default";
-
-/** Raw `app_log_settings` row (id `default`), columns verbatim. */
-export type LogSettingsRecord = {
-  sinks: string[];
-  queueSize: number | null;
-  drainTimeoutMs: number | null;
-  pretty: boolean | null;
+export type LogRecord = {
+  level: string;
+  msg: string;
+  name: string | null;
+  /** Optional owner. Set by the retrieve and synthesis domains only. */
+  userId: string | null;
+  meta: Record<string, unknown>;
+  /** Stamped at enqueue time (sync path). */
+  time: string;
 };
 
-/** Load `app_log_settings` id `default`, or null when no row exists. */
-export async function findLogSettingsRecord(): Promise<LogSettingsRecord | null> {
-  const row = await getPrisma().appLogSettings.findUnique({
-    where: { id: SETTINGS_ID },
-  });
-  if (!row) return null;
-  return {
-    sinks: row.sinks,
-    queueSize: row.queueSize,
-    drainTimeoutMs: row.drainTimeoutMs,
-    pretty: row.pretty,
+/** Insert one `app_log` row; returns false on a failed write (best-effort). */
+export async function insertLog(record: LogRecord): Promise<boolean> {
+  const meta = {
+    ...record.meta,
+    time: record.time,
+    pid: process.pid,
+    hostname: hostname(),
   };
-}
-
-/** Upsert `app_log_settings` id `default`. */
-export async function upsertLogSettings(fields: {
-  sinks: string[];
-  queueSize: number | null;
-  drainTimeoutMs: number | null;
-  pretty: boolean | null;
-}): Promise<void> {
-  await getPrisma().appLogSettings.upsert({
-    where: { id: SETTINGS_ID },
-    create: { id: SETTINGS_ID, ...fields },
-    update: { ...fields },
-  });
+  try {
+    await getPrisma().appLog.create({
+      data: {
+        level: record.level,
+        msg: record.msg,
+        name: record.name,
+        userId: record.userId,
+        meta,
+      },
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Delete every `app_log` row; returns the count removed. */
