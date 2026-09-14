@@ -1,8 +1,13 @@
 import { Elysia } from "elysia";
+import {
+  adminLogSettings,
+  purgeLogs,
+  resetLogSettings,
+  saveLogSettings,
+} from "../../../shared/log/index.ts";
 import { API_TAGS, bearerSecurity } from "../../../shared/openapi.ts";
 import { auth } from "../../auth/index.ts";
 import { LogSettingsModel } from "./model.ts";
-import { LogSettings } from "./service.ts";
 
 const logDetail = {
   security: [bearerSecurity],
@@ -11,7 +16,7 @@ const logDetail = {
 
 export const logSettings = new Elysia({ prefix: "/log" })
   .use(auth)
-  .get("/", () => LogSettings.get(), {
+  .get("/", () => adminLogSettings(), {
     requireAdmin: true,
     detail: {
       ...logDetail,
@@ -20,17 +25,24 @@ export const logSettings = new Elysia({ prefix: "/log" })
         "Returns the stored `app_log_settings` row (or nulls) plus hardcoded `defaults`. Shape: `{ sinks, queueSize, drainTimeoutMs, pretty, defaults, availableSinks }`. `sinks` and `availableSinks` are arrays of `'console' | 'postgres'`.",
     },
   })
-  .put("/", ({ body }) => LogSettings.put(body), {
-    requireAdmin: true,
-    body: LogSettingsModel.logBody,
-    detail: {
-      ...logDetail,
-      summary: "Update log settings",
-      description:
-        "Empty / `null` fields are stored as null; runtime falls back to `defaults`. Returns the same shape as `GET /log`.",
+  .put(
+    "/",
+    async ({ body }) => {
+      await saveLogSettings(body);
+      return adminLogSettings();
     },
-  })
-  .post("/reset", () => LogSettings.reset(), {
+    {
+      requireAdmin: true,
+      body: LogSettingsModel.logBody,
+      detail: {
+        ...logDetail,
+        summary: "Update log settings",
+        description:
+          "Empty / `null` fields are stored as null; runtime falls back to `defaults`. Returns the same shape as `GET /log`.",
+      },
+    },
+  )
+  .post("/reset", () => resetLogSettings(), {
     requireAdmin: true,
     detail: {
       ...logDetail,
@@ -39,7 +51,7 @@ export const logSettings = new Elysia({ prefix: "/log" })
         "Writes hardcoded `LOG_DEFAULTS`: `sinks=['console']`, `queueSize=1000`, `drainTimeoutMs=2000`, `pretty=false`. Returns the same shape as `GET /log`.",
     },
   })
-  .post("/purge", () => LogSettings.purge(), {
+  .post("/purge", () => purgeLogs(), {
     requireAdmin: true,
     response: LogSettingsModel.logPurgeResponse,
     detail: {
