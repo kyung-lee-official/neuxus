@@ -145,7 +145,7 @@ linking it to any task.
 
 ## HTTP surface (admin)
 
-`server-setting/model-providers`:
+`model-providers`:
 
 - `GET  /providers` — catalog (providers with nested models)
 - `GET  /providers/:providerId/connection` — read a provider's connection
