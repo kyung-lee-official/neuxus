@@ -2,11 +2,23 @@ import { Elysia } from "elysia";
 import { API_TAGS, bearerSecurity } from "../../shared/openapi.ts";
 import { auth } from "../auth/index.ts";
 import { Auth } from "../auth/service.ts";
-import { UsersModel } from "./model.ts";
+import { LogsModel, UsersModel } from "./model.ts";
 import { Users } from "./service.ts";
 
 export const users = new Elysia({ prefix: "/users" })
   .use(auth)
+  .get("/logs", ({ user, query }) => Users.listLogs(user, query), {
+    requireUser: true,
+    query: LogsModel.listQuery,
+    response: LogsModel.listResponse,
+    detail: {
+      tags: [API_TAGS.logs],
+      summary: "List logs for the current user",
+      description:
+        "Returns child-logger entries scoped to the bearer user. Defaults to `names=synthesis,retrieve`, `limit=50`.",
+      security: [bearerSecurity],
+    },
+  })
   .get("/", () => Users.list(), {
     detail: {
       tags: [API_TAGS.users],

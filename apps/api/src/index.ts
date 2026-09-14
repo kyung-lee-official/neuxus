@@ -3,7 +3,6 @@ import { cors } from "@elysiajs/cors";
 import { Elysia, status } from "elysia";
 import { health } from "./modules/health/index.ts";
 import { knowledge } from "./modules/knowledge/index.ts";
-import { logs } from "./modules/logs/index.ts";
 import { chatSessions } from "./modules/personal-data/chat-sessions/index.ts";
 import { query } from "./modules/query/index.ts";
 import { serverSetting } from "./modules/server-setting/index.ts";
@@ -72,7 +71,6 @@ const app = new Elysia()
   })
   .use(health)
   .use(knowledge)
-  .use(logs)
   .use(serverSetting)
   .use(query)
   .use(chatSessions)
@@ -88,15 +86,12 @@ console.log(`neuxus API listening on http://localhost:${app.server?.port}`);
 console.log(`OpenAPI docs: http://localhost:${app.server?.port}/openapi`);
 console.log(`OpenAPI spec: http://localhost:${app.server?.port}/openapi/json`);
 console.log(
-  "User CRUD: GET/POST /users, GET/PATCH/DELETE /users/:id, GET /users/:id/data, DELETE /users/:id/memories/:memoryId",
+  "User CRUD: GET/POST /users, GET/PATCH/DELETE /users/:id, GET /users/:id/data, DELETE /users/:id/memories/:memoryId; GET /users/logs (current user)",
 );
 console.log(
   "Sessions: GET/POST /sessions, PATCH /sessions/:id; POST /query accepts body.sessionId",
 );
 console.log("Knowledge: GET /knowledge/pages, GET /knowledge/pages/*");
-console.log(
-  "Logs: GET /logs?names=synthesis,retrieve&cursor=&limit=  (current user only)",
-);
 console.log(
   "Server setting: GET/PUT /server-setting/embed, /synthesis, /corpus, /log; POST /embed/reset, /synthesis/reset, /log/reset, /corpus/clone, /corpus/pull, /corpus/chunkify, /corpus/embed, /corpus/sync; GET /corpus/events; POST /nuke",
 );

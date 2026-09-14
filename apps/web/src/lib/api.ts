@@ -132,7 +132,7 @@ export async function getMyLogs(input: {
     params.set("limit", String(input.limit));
   }
   const qs = params.toString();
-  return apiFetch<MyLogsPage>(`/logs${qs ? `?${qs}` : ""}`, {
+  return apiFetch<MyLogsPage>(`/users/logs${qs ? `?${qs}` : ""}`, {
     apiKey: input.apiKey,
   });
 }

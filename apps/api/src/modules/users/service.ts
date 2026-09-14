@@ -7,17 +7,25 @@ import {
 } from "../personal-data/chat-sessions/service.ts";
 import { PersonalMemory } from "../personal-data/personal-memory/service.ts";
 import {
+  type AppLogRow,
   type AppUser,
   countUsers,
   createUser,
   deleteUser,
+  findLogsByUser,
   getUserByApiKey,
   getUserById,
   listUsers,
   updateUserApiKey,
   upsertUser,
 } from "./dal.ts";
-import type { UsersModel } from "./model.ts";
+import {
+  clampLogLimit,
+  type LogItem,
+  type LogsModel,
+  resolveLogNames,
+  type UsersModel,
+} from "./model.ts";
 
 export type { AppUser, AppUserRole } from "./dal.ts";
 
@@ -39,6 +47,38 @@ function userJson(user: AppUser) {
     role: user.role,
     createdAt: user.created_at?.toISOString?.() ?? user.created_at ?? null,
   };
+}
+
+export type LogListResult = {
+  items: LogItem[];
+  nextCursor: string | null;
+};
+
+function rowToLogItem(row: AppLogRow): LogItem {
+  return {
+    id: row.id.toString(),
+    level: row.level,
+    msg: row.msg,
+    name: row.name,
+    userId: row.userId,
+    meta: row.meta,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+/**
+ * Cursor is the `id` of the last row on the previous page. Rows are ordered by
+ * `id DESC` (autoincrement BigInt — strictly increasing with insert order).
+ */
+function parseLogCursor(raw: string | undefined): bigint | null {
+  if (!raw) return null;
+  try {
+    const n = BigInt(raw);
+    if (n <= 0n) return null;
+    return n;
+  } catch {
+    throw status(400, { error: "Invalid cursor" });
+  }
 }
 
 export abstract class Users {
@@ -161,6 +201,30 @@ export abstract class Users {
     const deleted = await PersonalMemory.deleteByUser(id, memoryId);
     if (!deleted) throw status(404, { error: "Memory not found" });
     return { deleted: true as const, id: memoryId };
+  }
+
+  /** The current user's `app_log` entries (newest first, cursor-paged). */
+  static async listLogs(
+    user: AppUser,
+    query: LogsModel["listQuery"],
+  ): Promise<LogListResult> {
+    const names = resolveLogNames(query.names);
+    const limit = clampLogLimit(query.limit);
+    const cursor = parseLogCursor(query.cursor);
+
+    const rows = await findLogsByUser(user.id, {
+      names,
+      take: limit + 1,
+      cursor,
+    });
+
+    const hasMore = rows.length > limit;
+    const pageRows = hasMore ? rows.slice(0, limit) : rows;
+    const lastRow = pageRows[pageRows.length - 1];
+    return {
+      items: pageRows.map(rowToLogItem),
+      nextCursor: hasMore && lastRow ? lastRow.id.toString() : null,
+    };
   }
 
   /** Resolve a user by API key (auth). */

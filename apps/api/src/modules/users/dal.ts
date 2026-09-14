@@ -1,6 +1,7 @@
 /**
- * Users DAL. Owns the `app_users` table: lookup, creation, API-key rotation,
- * deletion, and role mapping.
+ * Users DAL. Owns the `app_users` table (lookup, creation, API-key rotation,
+ * deletion, role mapping) and the read over `app_log` that backs a user's
+ * "My logs" view.
  *
  * Internal: only `service.ts` imports this file. Other modules use `service.ts`.
  */
@@ -120,4 +121,30 @@ export async function countUsers(): Promise<number> {
 export async function getUserByApiKey(apiKey: string): Promise<AppUser | null> {
   const row = await getPrisma().user.findUnique({ where: { apiKey } });
   return row ? mapUser(row) : null;
+}
+
+export type AppLogRow = {
+  id: bigint;
+  level: string;
+  msg: string;
+  name: string | null;
+  userId: string | null;
+  meta: unknown;
+  createdAt: Date;
+};
+
+/** A page of a user's `app_log` rows (newest first), filtered by logger name. */
+export async function findLogsByUser(
+  userId: string,
+  options: { names: string[]; take: number; cursor: bigint | null },
+): Promise<AppLogRow[]> {
+  return getPrisma().appLog.findMany({
+    where: {
+      userId,
+      name: { in: options.names },
+      ...(options.cursor ? { id: { lt: options.cursor } } : {}),
+    },
+    orderBy: { id: "desc" },
+    take: options.take,
+  });
 }
