@@ -8,6 +8,9 @@
  * ```
  */
 
+export { deleteAllLogs } from "./dal.ts";
+export { Logger } from "./logger.ts";
+export { BoundedQueue } from "./queue.ts";
 export {
   LOG_DEFAULTS,
   LOG_SINK_VALUES,
@@ -17,8 +20,6 @@ export {
   resolveLogSettings,
   type StoredLogSettings,
   storedLogSettings,
-} from "./defaults.ts";
-export { Logger } from "./logger.ts";
-export { BoundedQueue } from "./queue.ts";
-export { type AdminLogSettings, LogSettings } from "./service.ts";
+} from "./settings/defaults.ts";
+export { type AdminLogSettings, LogSettings } from "./settings/service.ts";
 export { PostgresTransport } from "./sinks/postgres.ts";

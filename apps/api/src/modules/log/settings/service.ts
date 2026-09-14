@@ -1,11 +1,9 @@
 /**
- * Log-settings domain. Single row `app_log_settings` id `default`, plus the
- * admin `app_log` purge (delegated to the app-log DAL, `../dal.ts`). The
- * logger engine itself (`logger.ts`, `queue.ts`, `sinks/`) stays
- * function/singleton based.
+ * Log-settings domain. Owns the `app_log_settings` singleton row (id
+ * `default`) only. The logger engine itself (`logger.ts`, `queue.ts`,
+ * `sinks/`) stays function/singleton based.
  */
 
-import { deleteAllLogs } from "../dal.ts";
 import { findLogSettingsRecord, upsertLogSettings } from "./dal.ts";
 import {
   LOG_DEFAULTS,
@@ -146,10 +144,5 @@ export abstract class LogSettings {
       pretty: LOG_DEFAULTS.pretty,
     });
     return LogSettings.admin();
-  }
-
-  /** Delete every row in `app_log`. Returns the count removed. */
-  static async purge(): Promise<{ deleted: number }> {
-    return { deleted: await deleteAllLogs() };
   }
 }
