@@ -86,8 +86,8 @@ export class PostgresTransport implements Transport {
   }
 
   /**
-   * Direct enqueue used by the app's own logger (`getRootLogger`,
-   * `childLogger`) — carries a `name` so child loggers populate the
+   * Direct enqueue used by the app's own logger (`Logger.root`,
+   * `Logger.child`) — carries a `name` so child loggers populate the
    * `app_log.name` column. The logixlysia {@link Transport.log} path
    * always sets `name: null` because the interface has no name slot.
    */

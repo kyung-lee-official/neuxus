@@ -2,7 +2,8 @@
  * App logger.
  *
  * - `Logger.root()` returns the process-wide root logger. It is safe to
- *   call before `startLogWorker()`: records are enqueued but not yet drained.
+ *   call before `Logger.startWorker()`: records are enqueued but not yet
+ *   drained.
  * - `Logger.child(bindings, name?)` returns a child logger that merges
  *   `bindings` into every record's meta and (optionally) stamps the `name`
  *   column for cheap filtering in the DB.
@@ -29,8 +30,9 @@ function normalizeLevel(level: LogLevel): string {
 
 export class Logger {
   private static transport: PostgresTransport | null = null;
+  private static shutdownInstalled = false;
 
-  /** Install the process-wide transport. Must be called before `startLogWorker()`. */
+  /** Install the process-wide transport. Must be called before `startWorker()`. */
   static setTransport(transport: PostgresTransport): void {
     Logger.transport = transport;
   }
@@ -38,6 +40,34 @@ export class Logger {
   static getTransport(): PostgresTransport {
     if (!Logger.transport) Logger.transport = new PostgresTransport();
     return Logger.transport;
+  }
+
+  /** Start the background worker that drains the queue into `app_log`. Idempotent. */
+  static startWorker(): void {
+    Logger.getTransport().start();
+  }
+
+  /**
+   * Install idempotent `SIGTERM`/`SIGINT` handlers that flush the transport
+   * within `timeoutMs`, then exit.
+   */
+  static installShutdownHandlers(timeoutMs: number): void {
+    if (Logger.shutdownInstalled) return;
+    Logger.shutdownInstalled = true;
+
+    const onSignal = (_signal: NodeJS.Signals) => {
+      void (async () => {
+        try {
+          await Logger.getTransport().flush(timeoutMs);
+        } catch {
+          // flush() never throws; defensive catch.
+        }
+        process.exit(0);
+      })();
+    };
+
+    process.on("SIGTERM", onSignal);
+    process.on("SIGINT", onSignal);
   }
 
   /** Root logger (no bindings, no name). */

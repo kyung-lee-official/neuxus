@@ -1,7 +1,7 @@
 /**
  * Log-settings domain. Single row `app_log_settings` id `default`; the
  * `app_log` purge lives here too. The logger engine itself (`logger.ts`,
- * `queue.ts`, `shutdown.ts`, `sinks/`) stays function/singleton based.
+ * `queue.ts`, `sinks/`) stays function/singleton based.
  */
 
 import {

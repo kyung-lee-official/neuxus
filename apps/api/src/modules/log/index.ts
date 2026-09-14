@@ -4,7 +4,7 @@
  * The logger is generic and business-agnostic; call sites import from here:
  *
  * ```ts
- * import { Logger, startLogWorker } from "modules/log";
+ * import { Logger } from "modules/log";
  * ```
  */
 
@@ -21,10 +21,4 @@ export {
 export { Logger } from "./logger.ts";
 export { BoundedQueue } from "./queue.ts";
 export { type AdminLogSettings, LogSettings } from "./service.ts";
-export {
-  flushLogs,
-  installShutdownHandlers,
-  logStats,
-  startLogWorker,
-} from "./shutdown.ts";
 export { PostgresTransport } from "./sinks/postgres.ts";

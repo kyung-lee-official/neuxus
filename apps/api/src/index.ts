@@ -3,13 +3,7 @@ import { cors } from "@elysiajs/cors";
 import { Elysia, status } from "elysia";
 import { health } from "./modules/health/index.ts";
 import { knowledge } from "./modules/knowledge/index.ts";
-import {
-  installShutdownHandlers,
-  Logger,
-  LogSettings,
-  PostgresTransport,
-  startLogWorker,
-} from "./modules/log/index.ts";
+import { Logger, LogSettings, PostgresTransport } from "./modules/log/index.ts";
 import { chatSessions } from "./modules/personal-data/chat-sessions/index.ts";
 import { query } from "./modules/query/index.ts";
 import { serverSetting } from "./modules/server-setting/index.ts";
@@ -80,8 +74,8 @@ const app = new Elysia()
   .listen(serverPort());
 
 if (usePostgres) {
-  startLogWorker();
-  installShutdownHandlers(logSettings.drainTimeoutMs);
+  Logger.startWorker();
+  Logger.installShutdownHandlers(logSettings.drainTimeoutMs);
 }
 
 console.log(`neuxus API listening on http://localhost:${app.server?.port}`);

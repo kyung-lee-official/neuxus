@@ -4,12 +4,12 @@ import {
   TASK_TEXT_SYNTHESIS,
 } from "../../modules/server-setting/task-model-map/service.ts";
 import type { RetrievedParent } from "../knowledge/retriever/index.ts";
-import { childLogger } from "../log/index.ts";
+import { Logger } from "../log/index.ts";
 import type { AppMessage } from "../personal-data/chat-messages/service.ts";
 import type { AppMemory } from "../personal-data/personal-memory/service.ts";
 import { buildSynthesisPrompt, stripMarkdownImageLines } from "./context.ts";
 
-const synthesisLog = childLogger({ module: "synthesis" }, "synthesis");
+const synthesisLog = Logger.child({ module: "synthesis" }, "synthesis");
 
 /**
  * Trim the prompt so estimated tokens + `maxTokens` fit the model window.

@@ -1,5 +1,5 @@
 import { sql } from "bun";
-import { childLogger } from "../../log/index.ts";
+import { Logger } from "../../log/index.ts";
 import {
   resolveTaskModelLink,
   TASK_EMBEDDING,
@@ -68,7 +68,7 @@ export function capParents(
   return out;
 }
 
-const retrieveLog = childLogger({ module: "retrieve" }, "retrieve");
+const retrieveLog = Logger.child({ module: "retrieve" }, "retrieve");
 
 /** One row of the raw top-K result from the vector scan. */
 type TopKHit = {
