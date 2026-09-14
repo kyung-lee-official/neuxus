@@ -1,5 +1,5 @@
 import { sql } from "bun";
-import { childLogger } from "../../../shared/log/index.ts";
+import { childLogger } from "../../log/index.ts";
 import {
   resolveTaskModelLink,
   TASK_EMBEDDING,

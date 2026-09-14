@@ -3,8 +3,8 @@ import {
   resolveTaskModelLink,
   TASK_TEXT_SYNTHESIS,
 } from "../../modules/server-setting/task-model-map/service.ts";
-import { childLogger } from "../../shared/log/index.ts";
 import type { RetrievedParent } from "../knowledge/retriever/index.ts";
+import { childLogger } from "../log/index.ts";
 import type { AppMessage } from "../personal-data/chat-messages/service.ts";
 import type { AppMemory } from "../personal-data/personal-memory/service.ts";
 import { buildSynthesisPrompt, stripMarkdownImageLines } from "./context.ts";

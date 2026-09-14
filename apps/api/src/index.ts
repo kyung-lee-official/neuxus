@@ -3,21 +3,21 @@ import { cors } from "@elysiajs/cors";
 import { Elysia, status } from "elysia";
 import { health } from "./modules/health/index.ts";
 import { knowledge } from "./modules/knowledge/index.ts";
+import {
+  installShutdownHandlers,
+  LogSettings,
+  PostgresTransport,
+  setLogTransport,
+  startLogWorker,
+} from "./modules/log/index.ts";
 import { chatSessions } from "./modules/personal-data/chat-sessions/index.ts";
 import { query } from "./modules/query/index.ts";
 import { serverSetting } from "./modules/server-setting/index.ts";
 import { users } from "./modules/users/index.ts";
 import { serverPort } from "./shared/config.ts";
-import {
-  installShutdownHandlers,
-  loadLogSettings,
-  PostgresTransport,
-  setLogTransport,
-  startLogWorker,
-} from "./shared/log/index.ts";
 import { apiTagList, bearerSecurityScheme } from "./shared/openapi.ts";
 
-const logSettings = await loadLogSettings();
+const logSettings = await LogSettings.load();
 const usePostgres = logSettings.sinks.includes("postgres");
 if (usePostgres) {
   setLogTransport(new PostgresTransport({ capacity: logSettings.queueSize }));

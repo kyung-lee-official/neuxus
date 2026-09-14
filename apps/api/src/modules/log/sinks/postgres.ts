@@ -11,7 +11,7 @@
 
 import { hostname } from "node:os";
 import type { LogLevel, Transport } from "logixlysia";
-import { getPrisma } from "../../db.ts";
+import { getPrisma } from "../../../shared/db.ts";
 import { BoundedQueue, type QueueStats } from "../queue.ts";
 
 const QUEUE_CAPACITY_DEFAULT = 1000;

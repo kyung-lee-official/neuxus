@@ -1,12 +1,7 @@
 import { Elysia } from "elysia";
-import {
-  adminLogSettings,
-  purgeLogs,
-  resetLogSettings,
-  saveLogSettings,
-} from "../../../shared/log/index.ts";
 import { API_TAGS, bearerSecurity } from "../../../shared/openapi.ts";
 import { auth } from "../../auth/index.ts";
+import { LogSettings } from "../../log/index.ts";
 import { LogSettingsModel } from "./model.ts";
 
 const logDetail = {
@@ -16,7 +11,7 @@ const logDetail = {
 
 export const logSettings = new Elysia({ prefix: "/log" })
   .use(auth)
-  .get("/", () => adminLogSettings(), {
+  .get("/", () => LogSettings.admin(), {
     requireAdmin: true,
     detail: {
       ...logDetail,
@@ -28,8 +23,8 @@ export const logSettings = new Elysia({ prefix: "/log" })
   .put(
     "/",
     async ({ body }) => {
-      await saveLogSettings(body);
-      return adminLogSettings();
+      await LogSettings.save(body);
+      return LogSettings.admin();
     },
     {
       requireAdmin: true,
@@ -42,7 +37,7 @@ export const logSettings = new Elysia({ prefix: "/log" })
       },
     },
   )
-  .post("/reset", () => resetLogSettings(), {
+  .post("/reset", () => LogSettings.reset(), {
     requireAdmin: true,
     detail: {
       ...logDetail,
@@ -51,7 +46,7 @@ export const logSettings = new Elysia({ prefix: "/log" })
         "Writes hardcoded `LOG_DEFAULTS`: `sinks=['console']`, `queueSize=1000`, `drainTimeoutMs=2000`, `pretty=false`. Returns the same shape as `GET /log`.",
     },
   })
-  .post("/purge", () => purgeLogs(), {
+  .post("/purge", () => LogSettings.purge(), {
     requireAdmin: true,
     response: LogSettingsModel.logPurgeResponse,
     detail: {
