@@ -289,15 +289,16 @@ function ModelRow({
   const user = useAdminUser();
 
   return (
-    <li className="flex flex-col gap-3 rounded border border-line bg-canvas p-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
+    <li className="flex flex-col rounded border border-line bg-canvas p-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="flex flex-col">
           <p className="m-0 font-display text-ink text-sm">
             {model.displayName}
           </p>
           <p className="m-0 font-mono text-muted text-xs">{model.identifier}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+
+        <div className="flex flex-wrap items-center gap-1.5">
           {Object.keys(model.capabilities).map((cap) => (
             <span
               key={cap}
@@ -312,32 +313,32 @@ function ModelRow({
             </span>
           ) : null}
         </div>
-      </div>
 
-      {model.capabilities.embedding ? (
-        <EmbeddingTester
-          apiKey={user.apiKey}
-          providerId={providerId}
-          modelId={model.modelId}
-          disabled={!canTest}
-        />
-      ) : null}
-      {model.capabilities.text ? (
-        <TextChatTester
-          apiKey={user.apiKey}
-          providerId={providerId}
-          modelId={model.modelId}
-          disabled={!canTest}
-        />
-      ) : null}
-      {model.capabilities.vision ? (
-        <ImageChatTester
-          apiKey={user.apiKey}
-          providerId={providerId}
-          modelId={model.modelId}
-          disabled={!canTest}
-        />
-      ) : null}
+        {model.capabilities.embedding ? (
+          <EmbeddingTester
+            apiKey={user.apiKey}
+            providerId={providerId}
+            modelId={model.modelId}
+            disabled={!canTest}
+          />
+        ) : null}
+        {model.capabilities.text ? (
+          <TextChatTester
+            apiKey={user.apiKey}
+            providerId={providerId}
+            modelId={model.modelId}
+            disabled={!canTest}
+          />
+        ) : null}
+        {model.capabilities.vision ? (
+          <ImageChatTester
+            apiKey={user.apiKey}
+            providerId={providerId}
+            modelId={model.modelId}
+            disabled={!canTest}
+          />
+        ) : null}
+      </div>
     </li>
   );
 }

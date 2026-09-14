@@ -16,7 +16,10 @@ function errorMessage(err: unknown): string {
 }
 
 const BUTTON_CLASS =
-  "self-start rounded border border-accent bg-accent px-3.5 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded border border-accent bg-accent px-2 py-1 text-xs text-white disabled:cursor-not-allowed disabled:opacity-60";
+
+/** Wraps to its own full-width line inside the model row's flex-wrap header. */
+const RESULT_CLASS = "m-0 basis-full text-xs";
 
 type TesterProps = {
   apiKey: string;
@@ -38,32 +41,30 @@ export function EmbeddingTester({
   const preview = result ? result.embedding.slice(0, 8) : [];
 
   return (
-    <div className="flex flex-col gap-2 rounded border border-line p-3">
-      <p className="m-0 font-display text-ink text-sm">Test embedding</p>
+    <>
       <button
         type="button"
         className={BUTTON_CLASS}
         disabled={disabled || mutation.isPending}
         onClick={() => mutation.mutate()}
       >
-        {mutation.isPending ? "Embedding…" : "Embed diagnostic string"}
+        {mutation.isPending ? "Embedding…" : "Test embed"}
       </button>
       {mutation.isError ? (
-        <p className="m-0 text-danger text-sm">
+        <p className={`${RESULT_CLASS} text-danger`}>
           {errorMessage(mutation.error)}
         </p>
       ) : null}
       {result && !mutation.isPending ? (
-        <p className="m-0 text-muted text-xs">
-          &ldquo;{result.inputText}&rdquo; · {result.modelId} · dim {result.dim}{" "}
-          ·{" "}
+        <p className={`${RESULT_CLASS} text-muted`}>
+          dim {result.dim} ·{" "}
           <span className="break-all font-mono text-ink">
             [{preview.map((n) => n.toFixed(4)).join(", ")}
             {result.embedding.length > preview.length ? ", …" : ""}]
           </span>
         </p>
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -78,25 +79,26 @@ export function TextChatTester({
   });
 
   return (
-    <div className="flex flex-col gap-2 rounded border border-line p-3">
-      <p className="m-0 font-display text-ink text-sm">Test text chat</p>
+    <>
       <button
         type="button"
         className={BUTTON_CLASS}
         disabled={disabled || mutation.isPending}
         onClick={() => mutation.mutate()}
       >
-        {mutation.isPending ? "Sending…" : "Send “Hello!”"}
+        {mutation.isPending ? "Sending…" : "Test chat"}
       </button>
       {mutation.isError ? (
-        <p className="m-0 text-danger text-sm">
+        <p className={`${RESULT_CLASS} text-danger`}>
           {errorMessage(mutation.error)}
         </p>
       ) : null}
       {mutation.data && !mutation.isPending ? (
-        <TestResultPanel caption="response" text={mutation.data.response} />
+        <p className={`${RESULT_CLASS} whitespace-pre-wrap text-ink`}>
+          {mutation.data.response}
+        </p>
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -111,33 +113,25 @@ export function ImageChatTester({
   });
 
   return (
-    <div className="flex flex-col gap-2 rounded border border-line p-3">
-      <p className="m-0 font-display text-ink text-sm">Test image chat</p>
+    <>
       <button
         type="button"
         className={BUTTON_CLASS}
         disabled={disabled || mutation.isPending}
         onClick={() => mutation.mutate()}
       >
-        {mutation.isPending ? "Sending…" : "Send test image"}
+        {mutation.isPending ? "Sending…" : "Test image"}
       </button>
       {mutation.isError ? (
-        <p className="m-0 text-danger text-sm">
+        <p className={`${RESULT_CLASS} text-danger`}>
           {errorMessage(mutation.error)}
         </p>
       ) : null}
       {mutation.data && !mutation.isPending ? (
-        <TestResultPanel caption="response" text={mutation.data.response} />
+        <p className={`${RESULT_CLASS} whitespace-pre-wrap text-ink`}>
+          {mutation.data.response}
+        </p>
       ) : null}
-    </div>
-  );
-}
-
-function TestResultPanel({ caption, text }: { caption: string; text: string }) {
-  return (
-    <div className="flex flex-col gap-1.5 rounded border border-line bg-canvas p-2.5">
-      <div className="font-mono text-muted text-xs">{caption}</div>
-      <p className="m-0 whitespace-pre-wrap text-ink text-sm">{text}</p>
-    </div>
+    </>
   );
 }
