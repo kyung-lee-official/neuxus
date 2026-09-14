@@ -6,6 +6,7 @@ const retrieverFields = {
   maxCharacters: t.Union([t.Integer({ minimum: 1 }), t.Null()]),
 };
 
+/** Schemas for the retriever settings routes (`kb_retrieve_settings` id `default`). */
 export const RetrieverSettingsModel = {
   retrieverBody: t.Object(retrieverFields),
   retrieverResponse: t.Object({

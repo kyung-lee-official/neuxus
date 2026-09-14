@@ -1,15 +1,19 @@
 import { Elysia } from "elysia";
-import { API_TAGS, bearerSecurity } from "../../../shared/openapi.ts";
-import { auth } from "../../auth/index.ts";
-import { RetrieverSettings } from "../../knowledge/retriever/index.ts";
+import { API_TAGS, bearerSecurity } from "../../../../shared/openapi.ts";
+import { auth } from "../../../auth/index.ts";
 import { RetrieverSettingsModel } from "./model.ts";
+import { RetrieverSettings } from "./service.ts";
 
 const retrieveDetail = {
   security: [bearerSecurity],
-  tags: [API_TAGS.serverSettingRetrieve],
+  tags: [API_TAGS.knowledgeRetriever],
 };
 
-export const retrieveSettings = new Elysia({ prefix: "/retrieve" })
+/**
+ * Retriever settings (`kb_retrieve_settings` id `default`), served under
+ * `/knowledge/retriever/settings`.
+ */
+export const retrieverSettings = new Elysia({ prefix: "/retriever/settings" })
   .use(auth)
   .get("/", () => RetrieverSettings.loadAdmin(), {
     requireAdmin: true,

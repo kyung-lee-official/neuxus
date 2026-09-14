@@ -1,7 +1,7 @@
 /**
  * OpenAPI tag names — one per module, with finer subgroups for modules
  * that expose several endpoint families (e.g. `knowledge` splits into
- * corpus, `server-setting` into task-model-map / log / retrieve / nuke).
+ * corpus / retriever, `server-setting` into task-model-map / log / nuke).
  * Use these constants so every route and the global `tags` list stay in
  * sync.
  */
@@ -12,10 +12,10 @@ export const API_TAGS = {
   query: "query",
   knowledge: "knowledge",
   knowledgeCorpus: "knowledge/corpus",
+  knowledgeRetriever: "knowledge/retriever",
   modelProviders: "model-providers",
   serverSettingTaskModelMap: "server-setting/task-model-map",
   serverSettingLog: "server-setting/log",
-  serverSettingRetrieve: "server-setting/retrieve",
   serverSettingNuke: "server-setting/nuke",
 };
 
@@ -40,6 +40,10 @@ export const apiTagList: { name: string; description: string }[] = [
       "Admin corpus sync: remote settings, clone, pull, chunkify, embed, SSE events",
   },
   {
+    name: API_TAGS.knowledgeRetriever,
+    description: "Admin knowledge-base retrieve settings",
+  },
+  {
     name: API_TAGS.modelProviders,
     description:
       "Admin model providers: saved connections + catalog + per-model diagnostics",
@@ -52,10 +56,6 @@ export const apiTagList: { name: string; description: string }[] = [
   {
     name: API_TAGS.serverSettingLog,
     description: "Admin log sink settings",
-  },
-  {
-    name: API_TAGS.serverSettingRetrieve,
-    description: "Admin knowledge-base retrieve settings",
   },
   {
     name: API_TAGS.serverSettingNuke,

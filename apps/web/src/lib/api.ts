@@ -95,7 +95,7 @@ export const UserQueryKey = {
   TaskModelMap: ["server-setting", "task-model-map"] as const,
   CorpusSettings: ["knowledge", "corpus", "settings"] as const,
   LogSettings: ["server-setting", "log"] as const,
-  RetrieveSettings: ["server-setting", "retrieve"] as const,
+  RetrieveSettings: ["knowledge", "retriever", "settings"] as const,
   KnowledgePages: ["knowledge", "pages"] as const,
   KnowledgePage: (id: string) => ["knowledge", "pages", id] as const,
   /** Page of the current user's own retrieve/synthesis logs. */
@@ -508,7 +508,9 @@ export type RetrieveSettings = {
 export async function getRetrieveSettings(
   apiKey: string,
 ): Promise<RetrieveSettings> {
-  return apiFetch<RetrieveSettings>("/server-setting/retrieve", { apiKey });
+  return apiFetch<RetrieveSettings>("/knowledge/retriever/settings", {
+    apiKey,
+  });
 }
 
 export async function putRetrieveSettings(input: {
@@ -519,7 +521,7 @@ export async function putRetrieveSettings(input: {
     maxCharacters: number | null;
   };
 }): Promise<RetrieveSettings> {
-  return apiFetch<RetrieveSettings>("/server-setting/retrieve", {
+  return apiFetch<RetrieveSettings>("/knowledge/retriever/settings", {
     method: "PUT",
     apiKey: input.apiKey,
     body: JSON.stringify(input.settings),
@@ -529,7 +531,7 @@ export async function putRetrieveSettings(input: {
 export async function resetRetrieveSettings(
   apiKey: string,
 ): Promise<RetrieveSettings> {
-  return apiFetch<RetrieveSettings>("/server-setting/retrieve/reset", {
+  return apiFetch<RetrieveSettings>("/knowledge/retriever/settings/reset", {
     method: "POST",
     apiKey,
   });
