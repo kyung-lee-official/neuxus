@@ -183,7 +183,7 @@ export abstract class Corpus {
   }
 
   static finish(err?: unknown): void {
-    if (err) lastError = errorMessage(err);
+    lastError = err ? errorMessage(err) : null;
     running = false;
     operation = null;
     stage = null;

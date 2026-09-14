@@ -45,6 +45,15 @@ type SyncHint = {
   text: string;
 };
 
+type ActionKey =
+  | "settings"
+  | "save"
+  | "clone"
+  | "pull"
+  | "chunkify"
+  | "embed"
+  | "sync";
+
 function hintClass(tone: SyncHint["tone"]): string {
   if (tone === "ok") return "m-0 text-ok text-sm";
   if (tone === "danger") return "m-0 text-danger text-sm";
@@ -129,6 +138,7 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<CorpusStatus | null>(null);
   const [finished, setFinished] = useState<CorpusOperation | null>(null);
+  const [lastAction, setLastAction] = useState<ActionKey>("settings");
   const wasRunning = useRef(false);
   const lastOpRef = useRef<CorpusOperation | null>(null);
   const settingsQuery = useQuery({
@@ -267,14 +277,19 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
     running ||
     form.formState.isSubmitting;
 
-  const actionError =
-    (saveMutation.isError ? errorMessage(saveMutation.error) : null) ||
-    (cloneMutation.isError ? errorMessage(cloneMutation.error) : null) ||
-    (pullMutation.isError ? errorMessage(pullMutation.error) : null) ||
-    (chunkifyMutation.isError ? errorMessage(chunkifyMutation.error) : null) ||
-    (embedMutation.isError ? errorMessage(embedMutation.error) : null) ||
-    (syncMutation.isError ? errorMessage(syncMutation.error) : null) ||
-    (settingsQuery.isError ? errorMessage(settingsQuery.error) : null);
+  // Only the most recently triggered action's error is relevant; showing any
+  // stale error from an earlier mutation would leave the hint stuck.
+  const errorByAction: Record<ActionKey, unknown> = {
+    settings: settingsQuery.error,
+    save: saveMutation.error,
+    clone: cloneMutation.error,
+    pull: pullMutation.error,
+    chunkify: chunkifyMutation.error,
+    embed: embedMutation.error,
+    sync: syncMutation.error,
+  };
+  const activeError = errorByAction[lastAction];
+  const actionError = activeError ? errorMessage(activeError) : null;
 
   const lastSyncedSha = settingsQuery.data?.lastSyncedSha;
   const hasSavedRepo = Boolean(settingsQuery.data?.repoUrl);
@@ -305,7 +320,10 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
       ) : (
         <form
           className="flex flex-col gap-3"
-          onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}
+          onSubmit={form.handleSubmit((values) => {
+            setLastAction("save");
+            saveMutation.mutate(values);
+          })}
         >
           <label className="flex flex-col gap-1.5 text-sm">
             <span>Repo URL</span>
@@ -353,7 +371,10 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
               type="button"
               className="rounded border border-line bg-transparent px-3.5 py-1.5 text-ink text-sm disabled:cursor-not-allowed disabled:opacity-60"
               disabled={busy || !hasSavedRepo}
-              onClick={() => cloneMutation.mutate()}
+              onClick={() => {
+                setLastAction("clone");
+                cloneMutation.mutate();
+              }}
             >
               {opButtonLabel("clone", "Clone")}
             </button>
@@ -361,7 +382,10 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
               type="button"
               className="rounded border border-line bg-transparent px-3.5 py-1.5 text-ink text-sm disabled:cursor-not-allowed disabled:opacity-60"
               disabled={busy || !hasSavedRepo}
-              onClick={() => pullMutation.mutate()}
+              onClick={() => {
+                setLastAction("pull");
+                pullMutation.mutate();
+              }}
             >
               {opButtonLabel("pull", "Pull")}
             </button>
@@ -369,7 +393,10 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
               type="button"
               className="rounded border border-line bg-transparent px-3.5 py-1.5 text-ink text-sm disabled:cursor-not-allowed disabled:opacity-60"
               disabled={busy || !hasPages}
-              onClick={() => chunkifyMutation.mutate()}
+              onClick={() => {
+                setLastAction("chunkify");
+                chunkifyMutation.mutate();
+              }}
             >
               {opButtonLabel("chunkify", "Chunkify")}
             </button>
@@ -377,7 +404,10 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
               type="button"
               className="rounded border border-line bg-transparent px-3.5 py-1.5 text-ink text-sm disabled:cursor-not-allowed disabled:opacity-60"
               disabled={busy || !hasPages}
-              onClick={() => embedMutation.mutate()}
+              onClick={() => {
+                setLastAction("embed");
+                embedMutation.mutate();
+              }}
             >
               {opButtonLabel("embed", "Embed")}
             </button>
@@ -385,7 +415,10 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
               type="button"
               className="rounded border border-accent bg-transparent px-3.5 py-1.5 text-accent text-sm disabled:cursor-not-allowed disabled:opacity-60"
               disabled={busy || !hasSavedRepo}
-              onClick={() => syncMutation.mutate()}
+              onClick={() => {
+                setLastAction("sync");
+                syncMutation.mutate();
+              }}
             >
               {opButtonLabel("sync", "Sync")}
             </button>
