@@ -5,7 +5,6 @@ export {
   cloneCorpusStream,
   corpusCheckoutDir,
   type PullStage,
-  parseCloneProgress,
   pullCorpus,
   pullCorpusStream,
   refreshCorpusCheckout,

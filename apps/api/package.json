@@ -19,7 +19,8 @@
     "elysia": "^1.4.29",
     "logixlysia": "^6.8.0",
     "pg": "^8.22.0",
-    "postgres": "^3.4.7"
+    "postgres": "^3.4.7",
+    "simple-git": "^3.36.0"
   },
   "devDependencies": {
     "@neuxus/typescript-config": "workspace:*",

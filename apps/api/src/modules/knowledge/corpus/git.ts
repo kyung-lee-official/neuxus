@@ -1,6 +1,11 @@
 import { existsSync } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
+import {
+  type SimpleGit,
+  type SimpleGitProgressEvent,
+  simpleGit,
+} from "simple-git";
 import type { StoredCorpusSettings } from "./settings/defaults.ts";
 import { CorpusSettings } from "./settings/service.ts";
 
@@ -46,80 +51,36 @@ function redact(text: string): string {
     .trim();
 }
 
-async function runGitStream(
-  args: string[],
-  cwd: string | undefined,
-  onStderrLine: (line: string) => void,
-): Promise<{ stdout: string; code: number }> {
-  const proc = Bun.spawn(["git", ...args], {
-    cwd,
-    stdout: "pipe",
-    stderr: "pipe",
-    env: {
-      ...process.env,
-      GIT_TERMINAL_PROMPT: "0",
-    },
-    signal: AbortSignal.timeout(GIT_TIMEOUT_MS),
-  });
-
-  const stdoutPromise = new Response(proc.stdout).text();
-
-  const stderrReader = (proc.stderr as ReadableStream<Uint8Array>).getReader();
-  const decoder = new TextDecoder();
-  let stderrBuf = "";
-  try {
-    while (true) {
-      const { done, value } = await stderrReader.read();
-      if (done) break;
-      stderrBuf += decoder.decode(value, { stream: true });
-      let nl = stderrBuf.indexOf("\n");
-      while (nl !== -1) {
-        const line = stderrBuf.slice(0, nl).replace(/\r$/, "");
-        stderrBuf = stderrBuf.slice(nl + 1);
-        onStderrLine(line);
-        nl = stderrBuf.indexOf("\n");
-      }
-    }
-    if (stderrBuf.length > 0) {
-      onStderrLine(stderrBuf);
-    }
-  } catch (err) {
-    const name = err instanceof Error ? err.name : "";
-    if (name === "TimeoutError" || name === "AbortError") {
-      throw new CorpusGitError(500, "git timed out");
-    }
-    throw err;
-  }
-
-  const stdout = await stdoutPromise;
-  const code = await proc.exited;
-  return { stdout, code };
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
-async function runGit(
-  args: string[],
+/**
+ * A `simple-git` instance bound to `cwd`. `GIT_TERMINAL_PROMPT=0` keeps a bad
+ * credential from hanging on an interactive prompt; the block timeout bounds
+ * every command. `onProgress` (clone only) enables the progress plugin.
+ */
+function gitFor(
   cwd?: string,
-): Promise<{ stdout: string; stderr: string; code: number }> {
-  const stderrLines: string[] = [];
-  const result = await runGitStream(args, cwd, (line) => {
-    stderrLines.push(line);
-  });
-  return {
-    stdout: result.stdout,
-    stderr: stderrLines.join("\n"),
-    code: result.code,
-  };
+  onProgress?: (event: SimpleGitProgressEvent) => void,
+): SimpleGit {
+  return simpleGit({
+    baseDir: cwd ?? process.cwd(),
+    timeout: { block: GIT_TIMEOUT_MS },
+    ...(onProgress ? { progress: onProgress } : {}),
+  }).env({ ...process.env, GIT_TERMINAL_PROMPT: "0" });
 }
 
 async function requireHeadSha(checkout: string): Promise<string> {
-  const result = await runGit(["rev-parse", "HEAD"], checkout);
-  if (result.code !== 0) {
+  let sha: string;
+  try {
+    sha = (await gitFor(checkout).revparse(["HEAD"])).trim();
+  } catch (err) {
     throw new CorpusGitError(
       500,
-      redact(result.stderr) || "Could not read HEAD",
+      redact(errorMessage(err)) || "Could not read HEAD",
     );
   }
-  const sha = result.stdout.trim();
   if (!/^[0-9a-f]{7,40}$/i.test(sha)) {
     throw new CorpusGitError(500, "Unexpected git HEAD output");
   }
@@ -140,7 +101,7 @@ async function requireRepoUrl(): Promise<
 
 async function cloneIntoCheckout(
   settings: StoredCorpusSettings & { repoUrl: string },
-  onStderrLine?: (line: string) => void,
+  onProgress?: (event: SimpleGitProgressEvent) => void,
 ): Promise<void> {
   const checkout = corpusCheckoutDir();
   if (existsSync(gitDir(checkout))) {
@@ -154,55 +115,47 @@ async function cloneIntoCheckout(
   }
 
   await mkdir(join(checkout, ".."), { recursive: true });
-  const args = ["clone"];
+  const args: string[] = [];
   if (settings.branch) {
     args.push("--branch", settings.branch, "--single-branch");
   }
-  args.push(settings.repoUrl, checkout);
-  const stderrLines: string[] = [];
-  const result = await runGitStream(args, undefined, (line) => {
-    stderrLines.push(line);
-    onStderrLine?.(line);
-  });
-  if (result.code !== 0) {
+  try {
+    await gitFor(undefined, onProgress).clone(settings.repoUrl, checkout, args);
+  } catch (err) {
     if (existsSync(checkout) && !existsSync(gitDir(checkout))) {
       await rm(checkout, { recursive: true, force: true });
     }
     throw new CorpusGitError(
       500,
-      redact(stderrLines.join("\n")) || "git clone failed",
+      redact(errorMessage(err)) || "git clone failed",
     );
   }
 }
 
 async function pullInCheckout(
   settings: StoredCorpusSettings & { repoUrl: string },
-  onStderrLine?: (line: string) => void,
+  onStage?: (stage: PullStage) => void,
 ): Promise<void> {
   const checkout = corpusCheckoutDir();
   if (!existsSync(gitDir(checkout))) {
     throw new CorpusGitError(400, "Not cloned yet. Use Clone.");
   }
 
-  const fetch = await runGit(["fetch", "origin"], checkout);
-  if (fetch.code !== 0) {
-    throw new CorpusGitError(500, redact(fetch.stderr) || "git fetch failed");
-  }
-  if (settings.branch) {
-    const checkoutBranch = await runGit(
-      ["checkout", settings.branch],
-      checkout,
-    );
-    if (checkoutBranch.code !== 0) {
-      throw new CorpusGitError(
-        500,
-        redact(checkoutBranch.stderr) || "git checkout failed",
-      );
+  const git = gitFor(checkout);
+  try {
+    onStage?.("fetch");
+    await git.fetch("origin");
+    if (settings.branch) {
+      onStage?.("checkout");
+      await git.checkout(settings.branch);
     }
-  }
-  const pull = await runGit(["pull", "--ff-only"], checkout);
-  if (pull.code !== 0) {
-    throw new CorpusGitError(500, redact(pull.stderr) || "git pull failed");
+    onStage?.("merge");
+    await git.pull(undefined, undefined, ["--ff-only"]);
+  } catch (err) {
+    throw new CorpusGitError(
+      500,
+      redact(errorMessage(err)) || "git pull failed",
+    );
   }
 }
 
@@ -220,7 +173,7 @@ export async function pullCorpus(): Promise<StoredCorpusSettings> {
   return CorpusSettings.saveLastSyncedSha(sha);
 }
 
-/** Parsed progress from `git clone`'s stderr stream. */
+/** Clone progress the UI cares about. */
 export type CloneProgress = {
   phase: "receiving" | "resolving" | "checking-out";
   percent: number;
@@ -228,38 +181,35 @@ export type CloneProgress = {
   total?: number;
 };
 
-const PROGRESS_PATTERN =
-  /^(Receiving objects|Resolving deltas|Checking out files):\s+(\d+)%(?:\s+\((\d+)\/(\d+)\))?/;
-
-export function parseCloneProgress(line: string): CloneProgress | null {
-  const m = line.match(PROGRESS_PATTERN);
-  if (!m) return null;
-  const kind = m[1];
-  const phase: CloneProgress["phase"] =
-    kind === "Receiving objects"
+/** Map a `simple-git` progress event to the clone phases the UI renders. */
+function toCloneProgress(event: SimpleGitProgressEvent): CloneProgress | null {
+  const phase =
+    event.stage === "receiving"
       ? "receiving"
-      : kind === "Resolving deltas"
+      : event.stage === "resolving"
         ? "resolving"
-        : "checking-out";
-  const percent = Number.parseInt(m[2] ?? "", 10);
-  const processed = m[3] ? Number.parseInt(m[3], 10) : undefined;
-  const total = m[4] ? Number.parseInt(m[4], 10) : undefined;
-  if (!Number.isFinite(percent)) return null;
-  return Number.isFinite(processed) && Number.isFinite(total)
-    ? { phase, percent, processed, total }
-    : { phase, percent };
+        : event.stage === "checking"
+          ? "checking-out"
+          : null;
+  if (phase === null) return null;
+  return {
+    phase,
+    percent: event.progress,
+    processed: event.processed,
+    total: event.total,
+  };
 }
 
 /** Pull stages the UI cares about. */
 export type PullStage = "fetch" | "checkout" | "merge";
 
-/** Clone with parsed progress emitted per stderr line. */
+/** Clone with progress mapped from the git progress stream. */
 export async function cloneCorpusStream(
   onProgress: (progress: CloneProgress) => void,
 ): Promise<StoredCorpusSettings> {
   const settings = await requireRepoUrl();
-  await cloneIntoCheckout(settings, (line) => {
-    const progress = parseCloneProgress(line);
+  await cloneIntoCheckout(settings, (event) => {
+    const progress = toCloneProgress(event);
     if (progress) onProgress(progress);
   });
   const sha = await requireHeadSha(corpusCheckoutDir());
@@ -271,37 +221,7 @@ export async function pullCorpusStream(
   onStage: (stage: PullStage) => void,
 ): Promise<StoredCorpusSettings> {
   const settings = await requireRepoUrl();
-  const checkout = corpusCheckoutDir();
-  if (!existsSync(gitDir(checkout))) {
-    throw new CorpusGitError(400, "Not cloned yet. Use Clone.");
-  }
-
-  onStage("fetch");
-  const fetch = await runGit(["fetch", "origin"], checkout);
-  if (fetch.code !== 0) {
-    throw new CorpusGitError(500, redact(fetch.stderr) || "git fetch failed");
-  }
-
-  if (settings.branch) {
-    onStage("checkout");
-    const checkoutBranch = await runGit(
-      ["checkout", settings.branch],
-      checkout,
-    );
-    if (checkoutBranch.code !== 0) {
-      throw new CorpusGitError(
-        500,
-        redact(checkoutBranch.stderr) || "git checkout failed",
-      );
-    }
-  }
-
-  onStage("merge");
-  const pull = await runGit(["pull", "--ff-only"], checkout);
-  if (pull.code !== 0) {
-    throw new CorpusGitError(500, redact(pull.stderr) || "git pull failed");
-  }
-
+  await pullInCheckout(settings, onStage);
   const sha = await requireHeadSha(corpusCheckoutDir());
   return CorpusSettings.saveLastSyncedSha(sha);
 }
