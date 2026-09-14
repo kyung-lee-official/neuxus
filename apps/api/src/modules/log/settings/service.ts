@@ -1,14 +1,12 @@
 /**
- * Log-settings domain. Single row `app_log_settings` id `default`; the
- * `app_log` purge lives here too. The logger engine itself (`logger.ts`,
- * `queue.ts`, `sinks/`) stays function/singleton based.
+ * Log-settings domain. Single row `app_log_settings` id `default`, plus the
+ * admin `app_log` purge (delegated to the app-log DAL, `../dal.ts`). The
+ * logger engine itself (`logger.ts`, `queue.ts`, `sinks/`) stays
+ * function/singleton based.
  */
 
-import {
-  deleteAllLogs,
-  findLogSettingsRecord,
-  upsertLogSettings,
-} from "./dal.ts";
+import { deleteAllLogs } from "../dal.ts";
+import { findLogSettingsRecord, upsertLogSettings } from "./dal.ts";
 import {
   LOG_DEFAULTS,
   LOG_SINK_VALUES,
