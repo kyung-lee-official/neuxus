@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { Logger } from "./logger.ts";
-import { BoundedQueue } from "./queue.ts";
 import {
   LOG_DEFAULTS,
   type LogSettingsRow,
   resolveLogSettings,
 } from "./settings/defaults.ts";
 import { PostgresTransport } from "./sinks/postgres.ts";
+import { BoundedQueue } from "./sinks/queue.ts";
 
 describe("BoundedQueue", () => {
   test("enqueues and drains in FIFO order", () => {

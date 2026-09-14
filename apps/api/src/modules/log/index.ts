@@ -10,7 +10,6 @@
 
 export { deleteAllLogs } from "./dal.ts";
 export { Logger } from "./logger.ts";
-export { BoundedQueue } from "./queue.ts";
 export {
   LOG_DEFAULTS,
   LOG_SINK_VALUES,

@@ -1,4 +1,10 @@
-/** Bounded async queue. Drop-oldest on overflow. */
+/**
+ * Bounded async queue. Drop-oldest on overflow.
+ *
+ * Internal buffer shared by the sink transports (`postgres.ts`, and future
+ * sinks): the sink owns one of these and its worker drains it into the
+ * destination. I/O-agnostic — pure in-memory array manipulation.
+ */
 
 export type QueueStats = {
   capacity: number;

@@ -9,10 +9,9 @@
  * meta), so the `name` column is always null for transport-emitted rows.
  */
 
-import { hostname } from "node:os";
 import type { LogLevel, Transport } from "logixlysia";
-import { getPrisma } from "../../../shared/db.ts";
-import { BoundedQueue, type QueueStats } from "../queue.ts";
+import { insertLog, type LogRecord } from "../dal.ts";
+import { BoundedQueue, type QueueStats } from "./queue.ts";
 
 const QUEUE_CAPACITY_DEFAULT = 1000;
 const DRAIN_BATCH_DEFAULT = 50;
@@ -22,17 +21,6 @@ export type PostgresTransportOptions = {
   capacity?: number;
   drainBatch?: number;
   flushTimeoutMs?: number;
-};
-
-export type LogRecord = {
-  level: string;
-  msg: string;
-  name: string | null;
-  /** Optional owner. Set by the retrieve and synthesis domains only. */
-  userId: string | null;
-  meta: Record<string, unknown>;
-  /** Stamped at enqueue time (sync path). */
-  time: string;
 };
 
 function normalizeLevel(level: LogLevel): string {
@@ -151,32 +139,9 @@ export class PostgresTransport implements Transport {
     if (batch.length === 0) return 0;
     let inserted = 0;
     for (const record of batch) {
-      const ok = await this.insertOne(record);
+      const ok = await insertLog(record);
       if (ok) inserted += 1;
     }
     return inserted;
-  }
-
-  private async insertOne(record: LogRecord): Promise<boolean> {
-    const meta = {
-      ...record.meta,
-      time: record.time,
-      pid: process.pid,
-      hostname: hostname(),
-    };
-    try {
-      await getPrisma().appLog.create({
-        data: {
-          level: record.level,
-          msg: record.msg,
-          name: record.name,
-          userId: record.userId,
-          meta,
-        },
-      });
-      return true;
-    } catch {
-      return false;
-    }
   }
 }
