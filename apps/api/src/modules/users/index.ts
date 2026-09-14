@@ -12,7 +12,7 @@ export const users = new Elysia({ prefix: "/users" })
     query: LogsModel.listQuery,
     response: LogsModel.listResponse,
     detail: {
-      tags: [API_TAGS.logs],
+      tags: [API_TAGS.users],
       summary: "List logs for the current user",
       description:
         "Returns child-logger entries scoped to the bearer user. Defaults to `names=synthesis,retrieve`, `limit=50`.",
