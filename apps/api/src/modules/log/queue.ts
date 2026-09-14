@@ -27,7 +27,12 @@ export class BoundedQueue<T> {
     this.items.push(item);
   }
 
-  /** Dequeue up to `max` items. Returns empty array when empty. */
+  /**
+   * Remove and return up to `max` items from the front (FIFO). This consumes
+   * the items for the caller to process — it does not discard them. Returns
+   * `[]` only when the queue is empty; `max` defaults to `capacity`, so a
+   * no-arg call drains the whole queue.
+   */
   drain(max = this.capacity): T[] {
     if (this.items.length === 0) return [];
     const take = Math.min(max, this.items.length);
