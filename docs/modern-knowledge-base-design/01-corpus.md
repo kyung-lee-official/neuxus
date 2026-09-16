@@ -14,11 +14,11 @@ A local directory that matches this layout is a valid checkout.
 
 ## Settings in the database
 
-How to **reach** the corpus (git remote, branch, optional docs-root override, last synced SHA) lives in Postgres (`kb_corpus_settings`), not in env. `DATABASE_URL` remains process env so the app can reach the database.
+Where the app reads the corpus from — the git repository URL, the branch, and an optional docs-root subfolder — is stored in Postgres (`kb_corpus_settings`), not in environment variables. The row also records the last synced SHA. `DATABASE_URL` stays an environment variable so the app can reach the database.
 
 Same shape as other knobs: single row `id = 'default'`, **nullable columns**, **app defaults in code** when missing.
 
-`repo_url` has **no** useful app default. Null / missing means the remote is not configured: do not clone. Local CLI may still walk a folder the operator already checked out. Do not log credentials if a later column is added for private remotes.
+`repo_url` has **no** useful app default. Null / missing means the repository is not configured: do not clone. Local CLI may still walk a folder the operator already checked out. Do not log credentials if a later column is added for private repositories.
 
 Changing `repo_url` / `branch` does not rewrite `kb_pages`. The next sync at a SHA applies this contract (including deletes).
 
