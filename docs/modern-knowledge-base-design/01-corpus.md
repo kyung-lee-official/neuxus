@@ -60,7 +60,7 @@ Walk **recursively** under the docs root.
 
 ## Hierarchy
 
-Nested folders group pages for humans and for **path prefixes**. `kb_pages` stays **flat**: one row per file, unique `source_path`.
+Folders organize the corpus repo and set each page's `source_path` and `id`. `kb_pages` is **flat** — one file → one row, at any folder depth. Folder depth is **not** the chunk parent/child tree.
 
 ```text
 # docs_root = "" (default)
@@ -73,13 +73,16 @@ README.md                      → id README
 <docs-root>/<parent>/<subdir>/<page>.md → id <parent>/<subdir>/<page>
 ```
 
-|           | Folders             | Chunk parents / children                            |
-| --------- | ------------------- | --------------------------------------------------- |
-| Meaning   | Site tree / path    | Retrieval vs LLM spans inside **one** `body`        |
-| Stored as | `source_path`, `id` | `kb_parents` / `kb_children`                        |
-| Depth     | Unlimited           | Independent; see [03.1-chunkify.md](./03.1-chunkify.md) |
+The two hierarchies, compared:
 
-Do **not** treat “layer 1 folder” as parent chunks. Do not invent a layer type system.
+|                    | Folders                                            | Chunk parents / children                                       |
+| ------------------ | -------------------------------------------------- | ------------------------------------------------------------- |
+| What it is         | The corpus repo's directory tree                    | The split of one page's `body`                                 |
+| What it decides    | A page's `source_path` and `id`                     | Children = units to search; parents = text sent to the LLM      |
+| Where it is stored | The repo; each `kb_pages` row records its file path | `kb_parents` / `kb_children`                                   |
+| Folder depth       | Unlimited nesting                                   | Not used — the split comes from the text ([03.1-chunkify.md](./03.1-chunkify.md)) |
+
+A folder level is **not** a parent chunk. Do not map folders onto chunks.
 
 Two files must not map to the same path (case-sensitive as git stores them). Prefer lowercase path segments so Windows checkouts do not collide.
 
