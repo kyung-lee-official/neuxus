@@ -1,6 +1,6 @@
 # Corpus (checkout → files)
 
-How a **markdown git tree** becomes the set of files ingest will read. One file → page columns is [02-ingest.md](./02-ingest.md). Then: [03.1-chunkify.md](./03.1-chunkify.md), [embed.md](./embed.md). Read path: [04-retrieval.md](./04-retrieval.md), [05-synthesis.md](./05-synthesis.md). Schema: [appendix-a-data-model.md](./appendix-a-data-model.md).
+How a **markdown git tree** becomes the set of files ingest will read. One file → page columns is [02-ingest.md](./02-ingest.md). Then: [03.1-chunkify.md](./03.1-chunkify.md). Read path: [04-retrieval.md](./04-retrieval.md), [05-synthesis.md](./05-synthesis.md). Schema: [appendix-a-data-model.md](./appendix-a-data-model.md).
 
 ```text
 kb.git @ SHA → docs root → *.md paths → ingestMarkdown(file) → persist / skip / delete
@@ -112,7 +112,7 @@ Callers pin a **git commit SHA** of the kb repo (not “whatever is on main late
 4. Delete `kb_pages` whose `source_path` is under this corpus and **missing** from the list
 ```
 
-Hash skip and replace-tree: [02-ingest.md](./02-ingest.md#incremental-updates-page-hash). Embed: [embed.md](./embed.md).
+Hash skip and replace-tree: [02-ingest.md](./02-ingest.md#incremental-updates-page-hash). 
 
 Deletes are part of this contract. A UI paste path that cannot name missing files is not a complete sync.
 

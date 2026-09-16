@@ -1,6 +1,6 @@
 # Appendix A — Knowledge data model (pages, parents, children)
 
-Relational store in **PostgreSQL**, with **pgvector** on `kb_children.embedding`. Corpus: [01-corpus.md](./01-corpus.md). Ingest: [02-ingest.md](./02-ingest.md). Chunking: [03.1-chunkify.md](./03.1-chunkify.md). Embed: [embed.md](./embed.md). Query: [04-retrieval.md](./04-retrieval.md). Synthesis: [05-synthesis.md](./05-synthesis.md).
+Relational store in **PostgreSQL**, with **pgvector** on `kb_children.embedding`. Corpus: [01-corpus.md](./01-corpus.md). Ingest: [02-ingest.md](./02-ingest.md). Chunking: [03.1-chunkify.md](./03.1-chunkify.md). Query: [04-retrieval.md](./04-retrieval.md). Synthesis: [05-synthesis.md](./05-synthesis.md).
 
 ## Entities
 
@@ -105,7 +105,7 @@ CREATE TABLE kb_chunk_settings (
 
 ## Embed settings table
 
-Runtime embed config ([embed.md](./embed.md#settings-in-the-database)): model **and** how to reach the provider (host, port, API key). Not env. Nullable columns; **defaults live in application code**, not SQL `DEFAULT`. Single row `id = 'default'`. Empty/missing row must still embed using those defaults.
+Runtime embed config: model **and** how to reach the provider (host, port, API key). Not env. Nullable columns; **defaults live in application code**, not SQL `DEFAULT`. Single row `id = 'default'`. Empty/missing row must still embed using those defaults.
 
 `embedding_model` is vector identity (compare to `kb_children.embedding_model`). `provider` / `host` / `port` / `api_key` are connection only — changing them does not stale children. Do not log `api_key`.
 

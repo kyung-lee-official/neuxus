@@ -1,6 +1,6 @@
 # Synthesis (prompt → answer)
 
-Turn a built prompt into an answer string. Retrieve (question → parents) is [04-retrieval.md](./04-retrieval.md). Schema: [appendix-a-data-model.md](./appendix-a-data-model.md). Embed: [embed.md](./embed.md).
+Turn a built prompt into an answer string. Retrieve (question → parents) is [04-retrieval.md](./04-retrieval.md). Schema: [appendix-a-data-model.md](./appendix-a-data-model.md). 
 
 ```text
 retrieve parents → build prompt (parents + personal memory + chat) → synthesize → answer
