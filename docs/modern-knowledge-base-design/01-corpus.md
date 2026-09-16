@@ -2,7 +2,7 @@
 
 How a **markdown git tree** becomes the set of files ingest will read.
 
-This doc is the **corpus layout contract**: docs root, include/exclude, path → `slug` / `source_path`, hierarchy, and what a sync must do at a SHA. GitHub Actions, webhooks, HTTP, and the local CLI are **callers**. They must not invent a second layout.
+This doc is the **corpus layout contract**: docs root, include/exclude, path → `source_path`, hierarchy, and what a sync must do at a SHA. GitHub Actions, webhooks, HTTP, and the local CLI are **callers**. They must not invent a second layout.
 
 Folder depth is **authoring**. It is not chunk parent/child ([03.1-chunkify.md](./03.1-chunkify.md)).
 
@@ -28,11 +28,11 @@ After clone/pull, only this tree is ingested:
 
 ```text
 kb.git/                       # docs root = repo root (default)
-  README.md                   # ingested (slug `README`)
+  README.md                   # ingested (id `README`)
   <parent>/
-    <page>.md                 # ingested (slug `<parent>/<page>`)
+    <page>.md                 # ingested (id `<parent>/<page>`)
     <subdir>/
-      <page>.md               # ingested (slug `<parent>/<subdir>/<page>`)
+      <page>.md               # ingested (id `<parent>/<subdir>/<page>`)
   CHANGELOG.md                # ingested
   .github/                    # not ingested (dot segment)
 ```
@@ -42,7 +42,7 @@ kb.git/                       # docs root = repo root (default)
 | Docs root       | empty → walk the cloned repo root (default)                      |
 | Docs root       | non-empty relative path → walk that subdirectory                 |
 | Missing path    | fail the sync (only when an explicit non-empty docs root is set) |
-| Path separators | POSIX `/` in stored `source_path` and `slug`, even on Windows    |
+| Path separators | POSIX `/` in stored `source_path`, even on Windows              |
 
 The `docs_root` column on `kb_corpus_settings` overrides the empty default. `null` and `""` both mean "walk the repo root". A non-empty value (e.g. `docs`, `content`) restricts the walk to that subdirectory.
 
@@ -56,32 +56,32 @@ Walk **recursively** under the docs root.
 | UTF-8 text                             | Symlinks that resolve **outside** the docs root |
 | Nested directories, any depth          | Non-`.md` files (images, assets — out of scope) |
 
-No `_index.md` convention in this prototype. `<docs-root>/README.md` **is** ingested (`slug` `README`) unless you later add an exclude. Empty files still go through ingest (empty `body` after normalize is allowed).
+No `_index.md` convention in this prototype. `<docs-root>/README.md` **is** ingested (`id` `README`) unless you later add an exclude. Empty files still go through ingest (empty `body` after normalize is allowed).
 
 ## Hierarchy
 
-Nested folders group pages for humans and for **slug prefixes**. `kb_pages` stays **flat**: one row per file, unique `slug`.
+Nested folders group pages for humans and for **path prefixes**. `kb_pages` stays **flat**: one row per file, unique `source_path`.
 
 ```text
 # docs_root = "" (default)
-<parent>/<page>.md             → slug <parent>/<page>
-<parent>/<subdir>/<page>.md    → slug <parent>/<subdir>/<page>
-README.md                      → slug README
+<parent>/<page>.md             → id <parent>/<page>
+<parent>/<subdir>/<page>.md    → id <parent>/<subdir>/<page>
+README.md                      → id README
 
 # docs_root = "<docs-root>"
-<docs-root>/<parent>/<page>.md          → slug <parent>/<page>
-<docs-root>/<parent>/<subdir>/<page>.md → slug <parent>/<subdir>/<page>
+<docs-root>/<parent>/<page>.md          → id <parent>/<page>
+<docs-root>/<parent>/<subdir>/<page>.md → id <parent>/<subdir>/<page>
 ```
 
-|           | Folders               | Chunk parents / children                            |
-| --------- | --------------------- | --------------------------------------------------- |
-| Meaning   | Site tree / slug      | Retrieval vs LLM spans inside **one** `body`        |
-| Stored as | `slug`, `source_path` | `kb_parents` / `kb_children`                        |
-| Depth     | Unlimited             | Independent; see [03.1-chunkify.md](./03.1-chunkify.md) |
+|           | Folders             | Chunk parents / children                            |
+| --------- | ------------------- | --------------------------------------------------- |
+| Meaning   | Site tree / path    | Retrieval vs LLM spans inside **one** `body`        |
+| Stored as | `source_path`, `id` | `kb_parents` / `kb_children`                        |
+| Depth     | Unlimited           | Independent; see [03.1-chunkify.md](./03.1-chunkify.md) |
 
 Do **not** treat “layer 1 folder” as parent chunks. Do not invent a layer type system.
 
-Two files must not map to the same slug (case-sensitive as git stores them). Prefer lowercase path segments so Windows checkouts do not collide.
+Two files must not map to the same path (case-sensitive as git stores them). Prefer lowercase path segments so Windows checkouts do not collide.
 
 ## Identity
 
@@ -90,8 +90,7 @@ v1 identity is the **path**, not frontmatter.
 | Field         | How it is set                                                                     |
 | ------------- | --------------------------------------------------------------------------------- |
 | `source_path` | POSIX path relative to docs root, including `.md` (example: `<parent>/<page>.md`) |
-| `slug`        | `source_path` without the `.md` suffix (`<parent>/<page>`)                        |
-| `kb_pages.id` | Same as `slug`                                                                    |
+| `kb_pages.id` | `source_path` without the `.md` suffix (`<parent>/<page>`)                        |
 
 `title` / `tags` / `type` still come from frontmatter inside ingest ([02-ingest.md](./02-ingest.md#frontmatter)). This contract does **not** add `id:` yet. A rename or move is **delete old path + insert new path** (hash skip will not carry embeddings across paths).
 
