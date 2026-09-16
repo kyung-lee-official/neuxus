@@ -1,87 +1,53 @@
-# Ingest (file → page `body`)
+# Ingest (files → pages + image policy)
 
-Which files exist is [01-corpus.md](./01-corpus.md). Ingest turns one markdown **file** into page columns.
+Ingest discovers the corpus files and turns each into a `kb_pages` row plus that page's image policy. Which files exist (docs root, include/exclude, `path → source_path` / `id`) is the [corpus layout contract](./01-corpus.md).
 
-`title` / `tags` come from frontmatter (columns). **`body`** is the remaining markdown after ingest. `chunkify` never strips frontmatter.
+`title` / `tags` come from frontmatter. **`body`** is the remaining markdown; `chunkify` never strips frontmatter. `body` keeps only the image syntax (`![alt](path)`); the caption is stored in `kb_image_descriptions`, not in the body ([03.2-image-descriptions.md](./03.2-image-descriptions.md)).
 
-## Flow
+## Files
 
-One `.md` file per walker iteration. The hash gate is the **whole-page** skip — there is no per-section or per-parent hash today. Image-description enrichment is a planned sub-step that runs between the body-hash mismatch and `chunkify`; its detail is in the next section.
+Ingest owns discovery: it runs the walker over the docs root and gets the included `*.md` files, one per page. The walk rules are the [corpus layout contract](./01-corpus.md).
 
-```mermaid
----
-title: Ingest flow (one .md file per iteration)
----
-flowchart TD
-  Walker([Walker iterates .md files]) --> Read[Read file bytes]
-  Read --> Parse["ingestMarkdown:<br/>strip YAML frontmatter, normalize body"]
-  Parse --> HashBody["pageContentHash:<br/>title, tags, body"]
-  HashBody --> Lookup["findPageContentHash:<br/>read stored hash from kb_pages"]
-  Lookup --> Match{stored<br/>== computed?}
-  Match -- yes --> Skip([skip: continue to next file])
-  Match -- no --> Enrich["Enrich images<br/>(per-image hash check, detail below)"]
-  Enrich --> Chunk["chunkify body<br/>→ parents + children"]
-  Chunk --> Tx[sql.begin]
-  Tx --> Upsert["UPSERT kb_pages<br/>with new content_hash + updated_at"]
-  Upsert --> Del["DELETE FROM kb_parents<br/>WHERE page_id"]
-  Del --> InsP[INSERT new parents]
-  InsP --> InsC[INSERT new children]
-  InsC --> Next[Next file]
-  Skip --> Next
-  Next --> Walker
-```
-
-After the loop, **prune rows that disappeared from the walker** (e.g. files deleted between syncs):
+After the list is processed, ingest deletes any `kb_pages` whose `source_path` is under this corpus but **missing** from the list (files deleted upstream):
 
 ```text
 DELETE FROM kb_pages WHERE source_path IS NOT NULL
   AND NOT (source_path = ANY(<walker source_paths>));
 ```
 
-## Image description enrichment (planned)
+## Flow
 
-This is the detail of the **`Enrich`** node in the main flowchart above — runs once per page where the body hash differs from stored (right before `chunkify`). The enricher walks the markdown body once and makes sure every image link has an LLM-generated description sitting in the body. Each image is hashed on its bytes; descriptions are stored in a side table so re-ingesting a page whose images haven't changed is a no-op for the per-image LLM call.
-
-The body that comes out is the same one `chunkify` then sees — descriptions are part of `kb_pages.body` and the new hash.
+One `.md` file per iteration. The skip gate is the **page** (`content_hash` + `meta_hash`); there is no per-section hash. Ingest does no provider work and does not chunk or embed.
 
 ```mermaid
 ---
-title: Image-description enrichment (per page, runs after body-hash mismatch)
+title: Ingest flow (one .md file per iteration)
+theme: neo-dark
 ---
 flowchart TD
-  Trigger([Body hash differs from stored]) -->   Extract["Extract image refs<br/>(markdown inline images)"]
-  Extract --> Loop{For each image?}
-  Loop -- no --> Done([no images changed])
-  Loop -- yes --> Read[Read image bytes from disk]
-  Read --> Hash["contentHash = sha256(image bytes)"]
-  Hash --> Lookup[Lookup stored hash<br/>from kb_image_descriptions]
-  Lookup --> Match{stored == contentHash?}
-  Match -- yes --> Skip([image unchanged: skip])
-  Match -- no --> Vision[POST image to vision LLM<br/>→ description text]
-  Vision --> Upsert[UPSERT kb_image_descriptions<br/>content_hash + description]
-  Upsert --> Inject["Inject image_desc block<br/>(open + close) after image line in body"]
-  Inject --> NextImg[Next image]
-  Skip --> NextImg
-  NextImg --> Loop
+  Walker([Walker iterates .md files]) --> Read["Read .md + sibling .meta.yaml"]
+  Read --> Parse["ingestMarkdown:<br/>strip frontmatter, normalize body"]
+  Parse --> Hash["content_hash + meta_hash"]
+  Hash --> Lookup["read stored hashes from kb_pages"]
+  Lookup --> Match{both match?}
+  Match -- yes --> Skip([skip page])
+  Match -- no --> Upsert["UPSERT kb_pages"]
+  Upsert --> Reconcile["Reconcile kb_image_descriptions<br/>(policy per image)"]
+  Reconcile --> Next[Next file]
+  Skip --> Next
+  Next --> Walker
 ```
 
-New table tracks (pageId, imagePath) → (bytes hash, description):
+## Image policy reconciliation
 
-```text
-kb_image_descriptions (
-  page_id      text,         -- e.g. "src/app/en-US/faq/latest/chitu-manager-faq"
-  image_path   text,         -- the path used inside the markdown body
-  content_hash text,         -- sha256 hex of the image bytes
-  description  text,         -- LLM-generated text
-  created_at   timestamptz default now(),
-  updated_at   timestamptz,
-  primary key (page_id, image_path)
-);
-```
+Runs once per page whose hashes differ. For each image the body references, ingest records what to do with it in `kb_image_descriptions`:
 
-**Idempotency:** if a `<!-- image_desc --> ... <!-- /image_desc -->` block already sits right after the image, the injector replaces it in place instead of appending a duplicate. Re-running the enricher on a body that already has descriptions is a no-op.
+- **Identity:** `(page_id, image_path)`.
+- **Policy:** from the sibling `*.meta.yaml` — `ignore`, `manual`, or `vision-captioning`; images not listed default to `vision-captioning`.
+- **`image_content_hash`:** sha256 of the image bytes, so a changed image is detectable.
+- **`manual` description:** taken from the sidecar when the policy is `manual`.
 
-**Hash unit:** image bytes (the file on disk), not the markdown line that references it. So changing the surrounding markdown text without swapping the image still re-describes that image (good — the description text gets the new context).
+Rows for images the page no longer references are deleted. This step is **policy only** — it never calls a model. The sidecar format, the caption pass, and the description vectors are [03.2-image-descriptions.md](./03.2-image-descriptions.md).
 
 ## Frontmatter
 
@@ -102,22 +68,26 @@ The same map is **idempotent**. `chunkify` may re-apply it; it does not strip YA
 
 Hashes, offsets, and parent/child slices use this string — not original file bytes.
 
-## Incremental updates (page hash)
+## Incremental updates (page and meta hashes)
 
-Skip gate is the **page**, not each child. Hash a stable encoding of the stored ingest-normalized fields, for example:
+Two hashes decide whether ingest redoes a page:
+
+| Hash           | Covers                                           |
+| -------------- | ------------------------------------------------ |
+| `content_hash` | `title` + `tags` + `body`                        |
+| `meta_hash`    | the bytes of the sibling `*.meta.yaml` (or null) |
+
+Skip the page only when **both** match the stored values. The content encoding is stable:
 
 ```ts
-sha256(
-  JSON.stringify({ title, tags: [...tags].sort(), body }),
-);
+sha256(JSON.stringify({ title, tags: [...tags].sort(), body }));
 ```
 
 Do not concatenate raw strings (`title + tags + body`) — `ab`+`c` and `a`+`bc` collide.
 
-| Situation                                                | Action                                                     |
-| -------------------------------------------------------- | ---------------------------------------------------------- |
-| Hash match                                               | Skip                                                       |
-| Hash differs                                             | Replace that page’s parent/child tree, then embed children |
-| Same markdown, new embedding model (`kb_embed_settings`) | Re-embed stale children     |
-
-Shared path: hash check → optional replace → `chunkify` → embed → update `content_hash` / `embedding_model`.
+| Situation                | Action                                                                                                         |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| Both match               | Skip the page                                                                                                  |
+| Either differs           | Upsert `kb_pages`, then reconcile `kb_image_descriptions`                                                      |
+| `content_hash` differs   | The page's chunk tree is stale — chunkify rebuilds it ([03.1-chunkify.md](./03.1-chunkify.md#chunk-freshness)) |
+| `meta_hash` differs only | Body and chunk tree stay; only the image rows are reconciled                                                   |
