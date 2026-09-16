@@ -86,16 +86,14 @@ Two files must not map to the same path (case-sensitive as git stores them). Pre
 
 ## Identity
 
-v1 identity is the **path**, not frontmatter.
+A page's identity is its **path**.
 
 | Field         | How it is set                                                                     |
 | ------------- | --------------------------------------------------------------------------------- |
 | `source_path` | POSIX path relative to docs root, including `.md` (example: `<parent>/<page>.md`) |
 | `kb_pages.id` | `source_path` without the `.md` suffix (`<parent>/<page>`)                        |
 
-`title` / `tags` / `type` still come from frontmatter inside ingest ([02-ingest.md](./02-ingest.md#frontmatter)). This contract does **not** add `id:` yet. A rename or move is **delete old path + insert new path** (hash skip will not carry embeddings across paths).
-
-Reserved for a later revision: optional frontmatter `id` as stable `kb_pages.id` so moves keep the row. Until ingest parses it, do not emit it.
+`title` / `tags` / `type` come from frontmatter during ingest ([02-ingest.md](./02-ingest.md#frontmatter)). A rename or move is **delete old path + insert new path** (the hash skip does not carry embeddings across paths).
 
 ## Sync at a SHA
 
