@@ -8,7 +8,7 @@ Ingest discovers the corpus files and turns each into a `kb_pages` row plus that
 
 Ingest owns discovery: it runs the walker over the docs root and gets the included `*.md` files, one per page. The walk rules are the [corpus layout contract](./01-corpus.md).
 
-After the list is processed, ingest deletes any `kb_pages` whose `source_path` is under this corpus but **missing** from the list (files deleted upstream):
+After processing the files, ingest deletes any `kb_pages` row whose `source_path` is set but not among the files the walker returned (the file was deleted upstream):
 
 ```text
 DELETE FROM kb_pages WHERE source_path IS NOT NULL
