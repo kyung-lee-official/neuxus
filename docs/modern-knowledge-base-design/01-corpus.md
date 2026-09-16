@@ -1,8 +1,6 @@
-# Corpus (checkout → files)
+# Corpus layout
 
-How a **markdown git tree** becomes the set of files ingest will read.
-
-This doc is the **corpus layout contract**: docs root, include/exclude, path → `source_path`, hierarchy.
+Walking the corpus is the [ingest stage's](./02-ingest.md) job. This doc defines the layout it relies on: docs root, include/exclude, path → `source_path` / `id`, and hierarchy.
 
 Folder depth is **authoring**. It is not chunk parent/child ([03.1-chunkify.md](./03.1-chunkify.md)).
 
@@ -18,13 +16,13 @@ Where the app reads the corpus from — the git repository URL, the branch, and 
 
 Same shape as other knobs: single row `id = 'default'`, **nullable columns**, **app defaults in code** when missing.
 
-`repo_url` has **no** useful app default. Null / missing means the repository is not configured: do not clone. Local CLI may still walk a folder the operator already checked out. Do not log credentials if a later column is added for private repositories.
+`repo_url` has **no** useful app default. Null / missing means the repository is not configured: do not clone.
 
-Changing `repo_url` / `branch` does not rewrite `kb_pages`. The next sync at a SHA applies this contract (including deletes).
+Changing `repo_url` / `branch` does not rewrite `kb_pages`; the next ingest re-applies this contract, including deletes.
 
 ## Docs root
 
-After clone/pull, only this tree is ingested:
+Only this tree is ingested:
 
 ```text
 kb.git/                       # docs root = repo root (default)
@@ -41,7 +39,7 @@ kb.git/                       # docs root = repo root (default)
 | --------------- | ---------------------------------------------------------------- |
 | Docs root       | empty → walk the cloned repo root (default)                      |
 | Docs root       | non-empty relative path → walk that subdirectory                 |
-| Missing path    | fail the sync (only when an explicit non-empty docs root is set) |
+| Missing path    | fail the walk (only when an explicit non-empty docs root is set) |
 | Path separators | POSIX `/` in stored `source_path`, even on Windows               |
 
 The `docs_root` column on `kb_corpus_settings` overrides the empty default. `null` and `""` both mean "walk the repo root". A non-empty value (e.g. `docs`, `content`) restricts the walk to that subdirectory.
@@ -54,7 +52,7 @@ Walk **recursively** under the docs root.
 | -------------------------------------- | ----------------------------------------------- |
 | Regular files whose name ends in `.md` | Any path with a component that starts with `.`  |
 | UTF-8 text                             | Symlinks that resolve **outside** the docs root |
-| Nested directories, any depth          | Non-`.md` files (images, assets — out of scope) |
+| Nested directories, any depth          | Non-`.md` files (not pages)                     |
 
 `<docs-root>/README.md` **is** ingested (`id` `README`). Empty files still go through ingest (empty `body` after normalize is allowed).
 
@@ -94,11 +92,3 @@ A page's identity is its **path**.
 | `kb_pages.id` | `source_path` without the `.md` suffix (`<parent>/<page>`)                        |
 
 `title` / `tags` come from frontmatter during ingest ([02-ingest.md](./02-ingest.md#frontmatter)). A rename or move is **delete old path + insert new path** (the hash skip does not carry embeddings across paths).
-
-## Out of scope
-
-- Authoring UX in the consumer
-- Binary assets and markdown image rewrite
-- Multiple corpora / multiple docs roots
-- Branch previews (sync `main` / the configured default branch only, until a later revision)
-- Mapping folder names onto `tags` (frontmatter only)
