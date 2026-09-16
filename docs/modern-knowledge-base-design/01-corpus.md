@@ -8,9 +8,9 @@ Folder depth is **authoring**. It is not chunk parent/child ([03.1-chunkify.md](
 
 ## Source of truth
 
-Canonical corpus is an **independent git repository** of markdown (separate from the consumer application). Authors edit and review there. The consumer reads a commit and inspects stored pages; it does not replace git as the editor.
+The markdown corpus lives in its **own git repository**, separate from the app. Authors write and review it there. The app only reads a chosen commit and shows the pages it imported; it never edits content — you change markdown in git, not the app.
 
-A local directory that matches this layout is a valid checkout. Same walker as CI.
+A local directory that matches this layout is a valid checkout.
 
 ## Settings in the database
 
