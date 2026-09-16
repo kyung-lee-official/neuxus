@@ -28,7 +28,6 @@ CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE kb_pages (
   id           TEXT PRIMARY KEY,
   title        TEXT NOT NULL,
-  type         TEXT,
   tags         TEXT[] NOT NULL DEFAULT '{}',
   body         TEXT NOT NULL,  -- ingest: newlines, strip trailing spaces, final \n
   source_path  TEXT,
