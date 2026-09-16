@@ -2,7 +2,7 @@
 
 How a **markdown git tree** becomes the set of files ingest will read.
 
-This doc is the **corpus layout contract**: docs root, include/exclude, path → `source_path`, hierarchy, and what a sync must do at a SHA. GitHub Actions, webhooks, HTTP, and the local CLI are **callers**. They must not invent a second layout.
+This doc is the **corpus layout contract**: docs root, include/exclude, path → `source_path`, hierarchy, and what a sync must do at a SHA.
 
 Folder depth is **authoring**. It is not chunk parent/child ([03.1-chunkify.md](./03.1-chunkify.md)).
 
@@ -98,7 +98,7 @@ Reserved for a later revision: optional frontmatter `id` as stable `kb_pages.id`
 
 ## Sync at a SHA
 
-Callers pin a **git commit SHA** of the kb repo (not “whatever is on main later”).
+A sync is pinned to a **git commit SHA** of the kb repo (not “whatever is on main later”).
 
 ```text
 1. Checkout that SHA
@@ -107,24 +107,13 @@ Callers pin a **git commit SHA** of the kb repo (not “whatever is on main late
 4. Delete `kb_pages` whose `source_path` is under this corpus and **missing** from the list
 ```
 
-Hash skip and replace-tree: [02-ingest.md](./02-ingest.md#incremental-updates-page-hash). 
+Hash skip and replace-tree: [02-ingest.md](./02-ingest.md#incremental-updates-page-hash).
 
 Deletes are part of this contract. A UI paste path that cannot name missing files is not a complete sync.
 
 Idempotent: the same SHA with unchanged files is all skips (unless embed settings made children stale).
 
-## Callers (not this contract)
-
-| Caller                               | Role                                                                  |
-| ------------------------------------ | --------------------------------------------------------------------- |
-| Local CLI / folder                   | Same walker on a checkout (dev)                                       |
-| Application admin Sync               | `POST <api-root>/corpus/sync` (or equivalent) in the consumer process |
-| GitHub Action on push to the kb repo | Checkout SHA, run walker or `POST` a sync job                         |
-| Push webhook                         | Only acceptable if it still checks out that SHA and uses this walker  |
-
-Do not send file bodies in the GitHub `push` payload. Do not keep a second include/exclude list in CI YAML.
-
-Retry, locking, and “one sync at a time” are application layer.
+The application exposes an API for sync.
 
 ## Out of scope
 
