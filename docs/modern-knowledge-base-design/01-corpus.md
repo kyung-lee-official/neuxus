@@ -56,7 +56,7 @@ Walk **recursively** under the docs root.
 | UTF-8 text                             | Symlinks that resolve **outside** the docs root |
 | Nested directories, any depth          | Non-`.md` files (images, assets — out of scope) |
 
-No `_index.md` convention in this prototype. `<docs-root>/README.md` **is** ingested (`id` `README`) unless you later add an exclude. Empty files still go through ingest (empty `body` after normalize is allowed).
+`<docs-root>/README.md` **is** ingested (`id` `README`). Empty files still go through ingest (empty `body` after normalize is allowed).
 
 ## Hierarchy
 
