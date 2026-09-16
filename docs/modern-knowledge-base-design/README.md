@@ -6,7 +6,7 @@ Read path: retrieval → synthesis.
 
 Vectors are produced and consumed through a shared embed utility, not a flow step.
 
-Every step is gated by a stored hash, so re-running a sync with unchanged input is all skips. Ingest and chunkify are **separate** steps: ingest writes `kb_pages` and the per-image policy; chunkify fills `kb_parents` / `kb_children` only when the page content changed.
+A **sync** runs the write path: at a chosen corpus commit it walks the files and runs the stages. Ingest writes each `kb_pages` row and its image policy; after that, chunkify fills `kb_parents` / `kb_children` and the image-description pass generates captions — the two are independent. Every stage is gated by a stored hash, so re-running a sync with unchanged input is all skips.
 
 ```mermaid
 ---

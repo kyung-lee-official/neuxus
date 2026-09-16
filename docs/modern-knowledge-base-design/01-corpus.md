@@ -97,20 +97,15 @@ A page's identity is its **path**.
 
 ## Sync at a SHA
 
-A sync is pinned to a **git commit SHA** of the kb repo (not “whatever is on main later”).
+The corpus side of a sync:
 
 ```text
 1. Checkout that SHA
-2. List included paths under the docs root
-3. For each file: ingest → persist (`content_hash` skip) → chunkify if replaced → embed stale children
-4. Delete `kb_pages` whose `source_path` is under this corpus and **missing** from the list
+2. List the included files under the docs root
+3. Delete `kb_pages` whose `source_path` is under this corpus and **missing** from the list
 ```
 
-Hash skip and replace-tree: [02-ingest.md](./02-ingest.md#incremental-updates-page-hash).
-
-Deletes are part of this contract. A UI paste path that cannot name missing files is not a complete sync.
-
-Idempotent: the same SHA with unchanged files is all skips (unless embed settings made children stale).
+Deletes are part of this contract. A caller that cannot name the missing files is not a complete sync.
 
 The application exposes an API for sync.
 
