@@ -82,8 +82,6 @@ The two hierarchies, compared:
 | Where it is stored | The repo; each `kb_pages` row records its file path | `kb_parents` / `kb_children`                                   |
 | Folder depth       | Unlimited nesting                                   | Not used — the split comes from the text ([03.1-chunkify.md](./03.1-chunkify.md)) |
 
-A folder level is **not** a parent chunk. Do not map folders onto chunks.
-
 Two files must not map to the same path (case-sensitive as git stores them). Prefer lowercase path segments so Windows checkouts do not collide.
 
 ## Identity
