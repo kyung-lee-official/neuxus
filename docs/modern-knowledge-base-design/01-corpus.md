@@ -93,7 +93,7 @@ A page's identity is its **path**.
 | `source_path` | POSIX path relative to docs root, including `.md` (example: `<parent>/<page>.md`) |
 | `kb_pages.id` | `source_path` without the `.md` suffix (`<parent>/<page>`)                        |
 
-`title` / `tags` / `type` come from frontmatter during ingest ([02-ingest.md](./02-ingest.md#frontmatter)). A rename or move is **delete old path + insert new path** (the hash skip does not carry embeddings across paths).
+`title` / `tags` come from frontmatter during ingest ([02-ingest.md](./02-ingest.md#frontmatter)). A rename or move is **delete old path + insert new path** (the hash skip does not carry embeddings across paths).
 
 ## Sync at a SHA
 
@@ -120,4 +120,4 @@ The application exposes an API for sync.
 - Binary assets and markdown image rewrite
 - Multiple corpora / multiple docs roots
 - Branch previews (sync `main` / the configured default branch only, until a later revision)
-- Mapping folder names onto `type` or `tags` (frontmatter only)
+- Mapping folder names onto `tags` (frontmatter only)
