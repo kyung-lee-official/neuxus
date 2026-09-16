@@ -1,10 +1,6 @@
 # Ingest (file → page `body`)
 
-Which files exist is [01-corpus.md](./01-corpus.md). Ingest turns one markdown **file** into page columns. Chunking starts after that: [03.1-chunkify.md](./03.1-chunkify.md). Query: [04-retrieval.md](./04-retrieval.md). Synthesis: [05-synthesis.md](./05-synthesis.md). Schema: [appendix-a-data-model.md](./appendix-a-data-model.md).
-
-```text
-file.md → strip leading YAML frontmatter → normalize → kb_pages.body → chunkify(body)
-```
+Which files exist is [01-corpus.md](./01-corpus.md). Ingest turns one markdown **file** into page columns.
 
 `title` / `tags` / `type` come from frontmatter (columns). **`body`** is the remaining markdown after ingest. `chunkify` never strips frontmatter.
 

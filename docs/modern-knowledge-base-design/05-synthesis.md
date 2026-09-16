@@ -1,10 +1,6 @@
 # Synthesis (prompt → answer)
 
-Turn a built prompt into an answer string. Retrieve (question → parents) is [04-retrieval.md](./04-retrieval.md). Schema: [appendix-a-data-model.md](./appendix-a-data-model.md). 
-
-```text
-retrieve parents → build prompt (parents + personal memory + chat) → synthesize → answer
-```
+Turn a built prompt into an answer string.
 
 This doc is the **synthesis contract**: read settings, call the provider, return text. Retry, timeouts, streaming, tools, and admin APIs are application layer. Ask HTTP is a caller, not this contract.
 
@@ -20,7 +16,7 @@ Talk to the provider through a **synthesizer** interface (`synthesize(prompt) �
 
 ## Settings in the database
 
-Dedicated table `app_synthesis_settings` (Ask/synthesis, not a `kb_*` retrieval table): single row `id = 'default'`, **nullable columns**, **app defaults in code** when missing. Schema: [appendix-a-data-model.md](./appendix-a-data-model.md#synthesis-settings-table).
+Dedicated table `app_synthesis_settings` (Ask/synthesis, not a `kb_*` retrieval table): single row `id = 'default'`, **nullable columns**, **app defaults in code** when missing.
 
 Unlike embed, nothing here is vector identity. Changing model or URL only affects the **next** `synthesize` call. Do not log `api_key`.
 

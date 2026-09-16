@@ -1,6 +1,6 @@
 # Query (question → parents)
 
-Read-path: embed the question, similarity-search `kb_children.embedding`, expand to parents for the LLM. Schema/index: [appendix-a-data-model.md](./appendix-a-data-model.md). Chunk roles: [03.1-chunkify.md](./03.1-chunkify.md). Synthesis: [05-synthesis.md](./05-synthesis.md).
+Read-path: embed the question, similarity-search `kb_children.embedding`, expand to parents for the LLM.
 
 ## Flow
 
@@ -37,7 +37,7 @@ This does not change parent/child spans. Skip the prefix until ingest needs it.
 
 ## Similarity SQL (cosine)
 
-`<=>` = cosine distance (lower is closer). Display score: `1 - distance`. Prefer HNSW with `vector_cosine_ops` ([appendix-a](./appendix-a-data-model.md)).
+`<=>` = cosine distance (lower is closer). Display score: `1 - distance`. Prefer HNSW with `vector_cosine_ops`.
 
 `$current_model` is `kb_embed_settings.embedding_model` after app default.
 

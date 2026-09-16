@@ -1,10 +1,6 @@
 # Corpus (checkout → files)
 
-How a **markdown git tree** becomes the set of files ingest will read. One file → page columns is [02-ingest.md](./02-ingest.md). Then: [03.1-chunkify.md](./03.1-chunkify.md). Read path: [04-retrieval.md](./04-retrieval.md), [05-synthesis.md](./05-synthesis.md). Schema: [appendix-a-data-model.md](./appendix-a-data-model.md).
-
-```text
-kb.git @ SHA → docs root → *.md paths → ingestMarkdown(file) → persist / skip / delete
-```
+How a **markdown git tree** becomes the set of files ingest will read.
 
 This doc is the **corpus layout contract**: docs root, include/exclude, path → `slug` / `source_path`, hierarchy, and what a sync must do at a SHA. GitHub Actions, webhooks, HTTP, and the local CLI are **callers**. They must not invent a second layout.
 
@@ -20,7 +16,7 @@ A local directory that matches this layout is a valid checkout. Same walker as C
 
 How to **reach** the corpus (git remote, branch, optional docs-root override, last synced SHA) lives in Postgres (`kb_corpus_settings`), not in env. `DATABASE_URL` remains process env so the app can reach the database.
 
-Same shape as other knobs: single row `id = 'default'`, **nullable columns**, **app defaults in code** when missing. Schema: [appendix-a-data-model.md](./appendix-a-data-model.md#corpus-settings-table).
+Same shape as other knobs: single row `id = 'default'`, **nullable columns**, **app defaults in code** when missing.
 
 `repo_url` has **no** useful app default. Null / missing means the remote is not configured: do not clone. Local CLI may still walk a folder the operator already checked out. Do not log credentials if a later column is added for private remotes.
 
@@ -64,7 +60,7 @@ No `_index.md` convention in this prototype. `<docs-root>/README.md` **is** inge
 
 ## Hierarchy
 
-Nested folders group pages for humans and for **slug prefixes**. `kb_pages` stays **flat**: one row per file, unique `slug` ([appendix-a](./appendix-a-data-model.md)).
+Nested folders group pages for humans and for **slug prefixes**. `kb_pages` stays **flat**: one row per file, unique `slug`.
 
 ```text
 # docs_root = "" (default)
