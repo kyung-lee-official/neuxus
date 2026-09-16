@@ -8,15 +8,15 @@ Folder depth is **authoring**. It is not chunk parent/child ([03.1-chunkify.md](
 
 The markdown corpus lives in its **own git repository**, separate from the app. Authors write and review it there. The app only reads a chosen commit and shows the pages it imported; it never edits content — you change markdown in git, not the app.
 
-A local directory that matches this layout is a valid checkout.
+A local directory that matches this layout is valid.
 
 ## Settings in the database
 
-Where the app reads the corpus from — the git repository URL, the branch, and an optional docs-root subfolder — is stored in Postgres (`kb_corpus_settings`), not in environment variables. The row also records the last synced SHA. `DATABASE_URL` stays an environment variable so the app can reach the database.
+Where the app reads the corpus from — the git repository URL, the branch, and an optional docs-root subfolder — is stored in Postgres (`kb_corpus_settings`), not in environment variables. The row also records the last commit ingested. `DATABASE_URL` stays an environment variable so the app can reach the database.
 
 Same shape as other knobs: single row `id = 'default'`, **nullable columns**, **app defaults in code** when missing.
 
-`repo_url` has **no** useful app default. Null / missing means the repository is not configured: do not clone.
+`repo_url` has **no** useful app default. Null / missing means no repository is configured.
 
 Changing `repo_url` / `branch` does not rewrite `kb_pages`; the next ingest re-applies this contract, including deletes.
 
@@ -37,7 +37,7 @@ kb.git/                       # docs root = repo root (default)
 
 | Rule            | Behavior                                                         |
 | --------------- | ---------------------------------------------------------------- |
-| Docs root       | empty → walk the cloned repo root (default)                      |
+| Docs root       | empty → walk the repo root (default)                             |
 | Docs root       | non-empty relative path → walk that subdirectory                 |
 | Missing path    | fail the walk (only when an explicit non-empty docs root is set) |
 | Path separators | POSIX `/` in stored `source_path`, even on Windows               |
