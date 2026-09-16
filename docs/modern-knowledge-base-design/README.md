@@ -32,6 +32,8 @@ flowchart LR
 | [05-synthesis.md](./05-synthesis.md)                       | Prompt → answer (image syntax replaced ephemerally)                                         |
 | [appendix-a-data-model.md](./appendix-a-data-model.md)     | Tables                                                                                     |
 
+Utility: [embed.md](./embed.md)
+
 ## Freshness keys
 
 | Unit            | Skip when                                                                                              |
