@@ -2,7 +2,7 @@
 
 Walking the corpus is the [ingest stage's](./02-ingest.md) job. This doc defines the layout it relies on: docs root, include/exclude, path → `source_path` / `id`, and hierarchy.
 
-Folder depth is **authoring**. It is not chunk parent/child ([03.1-chunkify.md](./03.1-chunkify.md)).
+Folder depth is an **authoring** choice: how authors organize the repo. It is not the chunk parent/child tree ([03.1-chunkify.md](./03.1-chunkify.md)).
 
 ## Source of truth
 
@@ -80,7 +80,7 @@ The two hierarchies, compared:
 | Where it is stored | The repo; each `kb_pages` row records its file path | `kb_parents` / `kb_children`                                                      |
 | Folder depth       | Unlimited nesting                                   | Not used — the split comes from the text ([03.1-chunkify.md](./03.1-chunkify.md)) |
 
-Two files must not map to the same path (case-sensitive as git stores them). Prefer lowercase path segments so Windows checkouts do not collide.
+Two files must not map to the same path (case-sensitive as git stores them). Prefer lowercase path segments so case-insensitive file systems do not collide.
 
 ## Identity
 

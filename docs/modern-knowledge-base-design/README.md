@@ -1,6 +1,6 @@
 # Knowledge-base design
 
-Write path: corpus → ingest → chunkify / image descriptions.
+Write path: corpus (source) → ingest → chunkify / image descriptions.
 
 Read path: retrieval → synthesis.
 
@@ -13,7 +13,7 @@ The stages are independent: each can run on its own, and its hash gate decides w
 theme: neo-dark
 ---
 flowchart LR
-  corpus[01 corpus] --> ingest[02 ingest]
+  corpus[01 corpus (source)] --> ingest[02 ingest]
   ingest --> chunkify[03.1 chunkify]
   ingest --> imagedesc[03.2 image descriptions]
   retrieval[04 retrieval] --> synthesis[05 synthesis]
@@ -34,11 +34,11 @@ flowchart LR
 
 ## Freshness keys
 
-| Unit            | Skip when                                                                                              |
-| --------------- | ------------------------------------------------------------------------------------------------------ |
-| Ingest (page)   | `kb_pages.content_hash` and `kb_pages.meta_hash` both match                                            |
-| Chunkify (page) | the page's chunk tree carries `source_page_hash` = `kb_pages.content_hash`                             |
-| Caption (image) | `image_content_hash`, `caption_model`, `caption_prompt_version`, and `policy` all match the stored row |
-| Any vector      | `embedding_model` = the current `embedding` task model `identifier` (`{providerId}::{modelId}`)        |
+| Unit                       | Skip when                                                                                              |
+| -------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Ingest (page)              | `kb_pages.content_hash` and `kb_pages.meta_hash` both match                                            |
+| Chunkify (page)            | the page's chunk tree carries `source_page_hash` = `kb_pages.content_hash`                             |
+| Image descriptions (image) | `image_content_hash`, `caption_model`, `caption_prompt_version`, and `policy` all match the stored row |
+| Any vector                 | `embedding_model` = the current `embedding` task model `identifier` (`{providerId}::{modelId}`)        |
 
 The embedding, captioning, and synthesis models are application wiring: [`app_model_task_config`](./appendix-a-data-model.md#model-config-tables) task links, with provider connections in `app_model_provider_config`. No `kb_*` settings table holds a model id.
