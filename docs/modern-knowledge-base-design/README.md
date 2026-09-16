@@ -24,7 +24,7 @@ flowchart LR
 
 | Doc                                                        | Contract                                                                                   |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| [01-corpus.md](./01-corpus.md)                             | Git checkout → markdown files + sibling `*.meta.yaml` (`slug`, `source_path`, sync at SHA) |
+| [01-corpus.md](./01-corpus.md)                             | Git checkout → markdown files + sibling `*.meta.yaml` (`id`, `source_path`, sync at SHA) |
 | [02-ingest.md](./02-ingest.md)                             | Markdown file → `kb_pages` + per-image policy in `kb_image_descriptions` (frontmatter, hash skip) |
 | [03.1-chunkify.md](./03.1-chunkify.md)                     | `kb_pages.body` → parents / children                                                       |
 | [03.2-image-descriptions.md](./03.2-image-descriptions.md) | `*.meta.yaml` → image captions + description vectors                                       |
