@@ -1,6 +1,6 @@
 # Embed (children → vectors)
 
-Write-path only: turn `kb_children.text` into `embedding` and store it. Query is [05-query.md](./05-query.md). Synthesis: [06-synthesis.md](./06-synthesis.md). Chunk roles: [03-chunkify.md](./03-chunkify.md). Schema: [appendix-a-data-model.md](./appendix-a-data-model.md). Ingest skip/replace: [02-ingest.md](./02-ingest.md). Corpus: [01-corpus.md](./01-corpus.md).
+Write-path only: turn `kb_children.text` into `embedding` and store it. Query is [04-retrieval.md](./04-retrieval.md). Synthesis: [05-synthesis.md](./05-synthesis.md). Chunk roles: [03.1-chunkify.md](./03.1-chunkify.md). Schema: [appendix-a-data-model.md](./appendix-a-data-model.md). Ingest skip/replace: [02-ingest.md](./02-ingest.md). Corpus: [01-corpus.md](./01-corpus.md).
 
 ```text
 hash check → optional replace → chunkify → persist (embeddings null) → embed children

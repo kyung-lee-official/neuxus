@@ -1,6 +1,6 @@
 # Corpus (checkout → files)
 
-How a **markdown git tree** becomes the set of files ingest will read. One file → page columns is [02-ingest.md](./02-ingest.md). Then: [03-chunkify.md](./03-chunkify.md), [04-embed.md](./04-embed.md). Read path: [05-query.md](./05-query.md), [06-synthesis.md](./06-synthesis.md). Schema: [appendix-a-data-model.md](./appendix-a-data-model.md).
+How a **markdown git tree** becomes the set of files ingest will read. One file → page columns is [02-ingest.md](./02-ingest.md). Then: [03.1-chunkify.md](./03.1-chunkify.md), [embed.md](./embed.md). Read path: [04-retrieval.md](./04-retrieval.md), [05-synthesis.md](./05-synthesis.md). Schema: [appendix-a-data-model.md](./appendix-a-data-model.md).
 
 ```text
 kb.git @ SHA → docs root → *.md paths → ingestMarkdown(file) → persist / skip / delete
@@ -8,7 +8,7 @@ kb.git @ SHA → docs root → *.md paths → ingestMarkdown(file) → persist /
 
 This doc is the **corpus layout contract**: docs root, include/exclude, path → `slug` / `source_path`, hierarchy, and what a sync must do at a SHA. GitHub Actions, webhooks, HTTP, and the local CLI are **callers**. They must not invent a second layout.
 
-Folder depth is **authoring**. It is not chunk parent/child ([03-chunkify.md](./03-chunkify.md)).
+Folder depth is **authoring**. It is not chunk parent/child ([03.1-chunkify.md](./03.1-chunkify.md)).
 
 ## Source of truth
 
@@ -81,7 +81,7 @@ README.md                      → slug README
 | --------- | --------------------- | --------------------------------------------------- |
 | Meaning   | Site tree / slug      | Retrieval vs LLM spans inside **one** `body`        |
 | Stored as | `slug`, `source_path` | `kb_parents` / `kb_children`                        |
-| Depth     | Unlimited             | Independent; see [03-chunkify.md](./03-chunkify.md) |
+| Depth     | Unlimited             | Independent; see [03.1-chunkify.md](./03.1-chunkify.md) |
 
 Do **not** treat “layer 1 folder” as parent chunks. Do not invent a layer type system.
 
@@ -112,7 +112,7 @@ Callers pin a **git commit SHA** of the kb repo (not “whatever is on main late
 4. Delete `kb_pages` whose `source_path` is under this corpus and **missing** from the list
 ```
 
-Hash skip and replace-tree: [02-ingest.md](./02-ingest.md#incremental-updates-page-hash). Embed: [04-embed.md](./04-embed.md).
+Hash skip and replace-tree: [02-ingest.md](./02-ingest.md#incremental-updates-page-hash). Embed: [embed.md](./embed.md).
 
 Deletes are part of this contract. A UI paste path that cannot name missing files is not a complete sync.
 

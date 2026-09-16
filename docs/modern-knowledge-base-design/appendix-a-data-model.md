@@ -1,6 +1,6 @@
 # Appendix A — Knowledge data model (pages, parents, children)
 
-Relational store in **PostgreSQL**, with **pgvector** on `kb_children.embedding`. Corpus: [01-corpus.md](./01-corpus.md). Ingest: [02-ingest.md](./02-ingest.md). Chunking: [03-chunkify.md](./03-chunkify.md). Embed: [04-embed.md](./04-embed.md). Query: [05-query.md](./05-query.md). Synthesis: [06-synthesis.md](./06-synthesis.md).
+Relational store in **PostgreSQL**, with **pgvector** on `kb_children.embedding`. Corpus: [01-corpus.md](./01-corpus.md). Ingest: [02-ingest.md](./02-ingest.md). Chunking: [03.1-chunkify.md](./03.1-chunkify.md). Embed: [embed.md](./embed.md). Query: [04-retrieval.md](./04-retrieval.md). Synthesis: [05-synthesis.md](./05-synthesis.md).
 
 ## Entities
 
@@ -88,7 +88,7 @@ CREATE TABLE kb_corpus_settings (
 
 ## Chunk knobs table
 
-Nullable columns; **defaults live in application code** ([03-chunkify.md](./03-chunkify.md#knobs)), not SQL `DEFAULT`. Shape: single row `id = 'default'`.
+Nullable columns; **defaults live in application code** ([03.1-chunkify.md](./03.1-chunkify.md#knobs)), not SQL `DEFAULT`. Shape: single row `id = 'default'`.
 
 ```sql
 CREATE TABLE kb_chunk_settings (
@@ -105,7 +105,7 @@ CREATE TABLE kb_chunk_settings (
 
 ## Embed settings table
 
-Runtime embed config ([04-embed.md](./04-embed.md#settings-in-the-database)): model **and** how to reach the provider (host, port, API key). Not env. Nullable columns; **defaults live in application code**, not SQL `DEFAULT`. Single row `id = 'default'`. Empty/missing row must still embed using those defaults.
+Runtime embed config ([embed.md](./embed.md#settings-in-the-database)): model **and** how to reach the provider (host, port, API key). Not env. Nullable columns; **defaults live in application code**, not SQL `DEFAULT`. Single row `id = 'default'`. Empty/missing row must still embed using those defaults.
 
 `embedding_model` is vector identity (compare to `kb_children.embedding_model`). `provider` / `host` / `port` / `api_key` are connection only — changing them does not stale children. Do not log `api_key`.
 
@@ -124,7 +124,7 @@ CREATE TABLE kb_embed_settings (
 
 ## Synthesis settings table
 
-Runtime synthesis config ([06-synthesis.md](./06-synthesis.md#settings-in-the-database)): how to reach the LLM (provider, model, base URL, API key, max tokens) and **`context_window_tokens`** (must be known before `synthesize`). Not env. Not a `kb_*` table — Ask uses this for memory + chat + knowledge parents. Nullable columns; **defaults live in application code**, not SQL `DEFAULT`. Single row `id = 'default'`. Empty/missing row must still synthesize using those defaults. Clearing columns is a reset to MiniMax.
+Runtime synthesis config ([05-synthesis.md](./05-synthesis.md#settings-in-the-database)): how to reach the LLM (provider, model, base URL, API key, max tokens) and **`context_window_tokens`** (must be known before `synthesize`). Not env. Not a `kb_*` table — Ask uses this for memory + chat + knowledge parents. Nullable columns; **defaults live in application code**, not SQL `DEFAULT`. Single row `id = 'default'`. Empty/missing row must still synthesize using those defaults. Clearing columns is a reset to MiniMax.
 
 Do not log `api_key`. Changing these fields does not stale embeddings.
 
