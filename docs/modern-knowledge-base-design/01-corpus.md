@@ -2,7 +2,7 @@
 
 How a **markdown git tree** becomes the set of files ingest will read.
 
-This doc is the **corpus layout contract**: docs root, include/exclude, path → `source_path`, hierarchy, and what a sync must do at a SHA.
+This doc is the **corpus layout contract**: docs root, include/exclude, path → `source_path`, hierarchy.
 
 Folder depth is **authoring**. It is not chunk parent/child ([03.1-chunkify.md](./03.1-chunkify.md)).
 
@@ -42,7 +42,7 @@ kb.git/                       # docs root = repo root (default)
 | Docs root       | empty → walk the cloned repo root (default)                      |
 | Docs root       | non-empty relative path → walk that subdirectory                 |
 | Missing path    | fail the sync (only when an explicit non-empty docs root is set) |
-| Path separators | POSIX `/` in stored `source_path`, even on Windows              |
+| Path separators | POSIX `/` in stored `source_path`, even on Windows               |
 
 The `docs_root` column on `kb_corpus_settings` overrides the empty default. `null` and `""` both mean "walk the repo root". A non-empty value (e.g. `docs`, `content`) restricts the walk to that subdirectory.
 
@@ -75,11 +75,11 @@ README.md                      → id README
 
 The two hierarchies, compared:
 
-|                    | Folders                                            | Chunk parents / children                                       |
-| ------------------ | -------------------------------------------------- | ------------------------------------------------------------- |
-| What it is         | The corpus repo's directory tree                    | The split of one page's `body`                                 |
-| What it decides    | A page's `source_path` and `id`                     | Children = units to search; parents = text sent to the LLM      |
-| Where it is stored | The repo; each `kb_pages` row records its file path | `kb_parents` / `kb_children`                                   |
+|                    | Folders                                             | Chunk parents / children                                                          |
+| ------------------ | --------------------------------------------------- | --------------------------------------------------------------------------------- |
+| What it is         | The corpus repo's directory tree                    | The split of one page's `body`                                                    |
+| What it decides    | A page's `source_path` and `id`                     | Children = units to search; parents = text sent to the LLM                        |
+| Where it is stored | The repo; each `kb_pages` row records its file path | `kb_parents` / `kb_children`                                                      |
 | Folder depth       | Unlimited nesting                                   | Not used — the split comes from the text ([03.1-chunkify.md](./03.1-chunkify.md)) |
 
 Two files must not map to the same path (case-sensitive as git stores them). Prefer lowercase path segments so Windows checkouts do not collide.
@@ -94,20 +94,6 @@ A page's identity is its **path**.
 | `kb_pages.id` | `source_path` without the `.md` suffix (`<parent>/<page>`)                        |
 
 `title` / `tags` come from frontmatter during ingest ([02-ingest.md](./02-ingest.md#frontmatter)). A rename or move is **delete old path + insert new path** (the hash skip does not carry embeddings across paths).
-
-## Sync at a SHA
-
-The corpus side of a sync:
-
-```text
-1. Checkout that SHA
-2. Run the walker over the docs root and get the included `*.md` files
-3. Delete `kb_pages` whose `source_path` is under this corpus and **missing** from the list
-```
-
-Deletes are part of this contract. A caller that cannot name the missing files is not a complete sync.
-
-The application exposes an API for sync.
 
 ## Out of scope
 
