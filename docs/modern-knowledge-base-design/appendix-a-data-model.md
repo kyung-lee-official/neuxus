@@ -10,7 +10,7 @@ Page ──* Parent ──* Child (embedding)
 
 | Entity     | Role                                                                                        | `vector`? |
 | ---------- | ------------------------------------------------------------------------------------------- | --------- |
-| **Page**   | Markdown file: slug, title, ingest-normalized [`body`](./02-ingest.md#body), `content_hash` | No        |
+| **Page**   | Markdown file: `id`, `source_path`, title, ingest-normalized [`body`](./02-ingest.md#body), `content_hash` | No        |
 | **Parent** | Generation slice of `body`                                                                  | No        |
 | **Child**  | Retrieval unit                                                                              | Yes       |
 
@@ -27,7 +27,6 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE TABLE kb_pages (
   id           TEXT PRIMARY KEY,
-  slug         TEXT NOT NULL UNIQUE,
   title        TEXT NOT NULL,
   type         TEXT,
   tags         TEXT[] NOT NULL DEFAULT '{}',
