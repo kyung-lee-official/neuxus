@@ -8,13 +8,13 @@ Relational store in **PostgreSQL**, with **pgvector** on `kb_children.embedding`
 Page ──* Parent ──* Child (embedding)
 ```
 
-| Entity     | Role                                                                                        | `vector`? |
-| ---------- | ------------------------------------------------------------------------------------------- | --------- |
+| Entity     | Role                                                                                                       | `vector`? |
+| ---------- | ---------------------------------------------------------------------------------------------------------- | --------- |
 | **Page**   | Markdown file: `id`, `source_path`, title, ingest-normalized [`body`](./02-ingest.md#body), `content_hash` | No        |
-| **Parent** | Generation slice of `body`                                                                  | No        |
-| **Child**  | Retrieval unit                                                                              | Yes       |
+| **Parent** | Generation slice of `body`; `source_page_hash` records the `kb_pages.content_hash` it was built from       | No        |
+| **Child**  | Retrieval unit                                                                                             | Yes       |
 
-FKs: `kb_parents.page_id → kb_pages`, `kb_children.parent_id → kb_parents`. Optional denormalized `kb_children.page_id`; optional `start_offset` / `end_offset` into page `body` ([normalized at ingest](./02-ingest.md#body)). On page change: delete that page’s parents/children, insert the new tree ([incremental updates](./02-ingest.md#incremental-updates-page-hash)).
+FKs: `kb_parents.page_id → kb_pages`, `kb_children.parent_id → kb_parents`. Optional denormalized `kb_children.page_id`; optional `start_offset` / `end_offset` into page `body` ([normalized at ingest](./02-ingest.md#body)). On page change: delete that page’s parents/children, insert the new tree ([incremental updates](./02-ingest.md#incremental-updates-page-and-meta-hashes)). Each parent records `source_page_hash`, the `kb_pages.content_hash` the tree was built from; chunkify rebuilds a page's tree when it differs from the current `content_hash` ([chunk freshness](./README.md#freshness-keys)).
 
 Keep `kb_*` namespaced apart from application tables (same database is fine).
 
@@ -36,10 +36,11 @@ CREATE TABLE kb_pages (
 );
 
 CREATE TABLE kb_parents (
-  id           TEXT PRIMARY KEY,
-  page_id      TEXT NOT NULL REFERENCES kb_pages (id) ON DELETE CASCADE,
-  parent_index INT NOT NULL,
-  text         TEXT NOT NULL,
+  id               TEXT PRIMARY KEY,
+  page_id          TEXT NOT NULL REFERENCES kb_pages (id) ON DELETE CASCADE,
+  parent_index     INT NOT NULL,
+  text             TEXT NOT NULL,
+  source_page_hash TEXT NOT NULL,  -- kb_pages.content_hash this tree was built from
   -- optional: start_offset INT, end_offset INT
   UNIQUE (page_id, parent_index)
 );
