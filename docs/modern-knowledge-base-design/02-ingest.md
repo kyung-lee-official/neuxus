@@ -2,7 +2,7 @@
 
 Which files exist is [01-corpus.md](./01-corpus.md). Ingest turns one markdown **file** into page columns.
 
-`title` / `tags` / `type` come from frontmatter (columns). **`body`** is the remaining markdown after ingest. `chunkify` never strips frontmatter.
+`title` / `tags` come from frontmatter (columns). **`body`** is the remaining markdown after ingest. `chunkify` never strips frontmatter.
 
 ## Flow
 
@@ -15,7 +15,7 @@ title: Ingest flow (one .md file per iteration)
 flowchart TD
   Walker([Walker iterates .md files]) --> Read[Read file bytes]
   Read --> Parse["ingestMarkdown:<br/>strip YAML frontmatter, normalize body"]
-  Parse --> HashBody["pageContentHash:<br/>title, type, tags, body"]
+  Parse --> HashBody["pageContentHash:<br/>title, tags, body"]
   HashBody --> Lookup["findPageContentHash:<br/>read stored hash from kb_pages"]
   Lookup --> Match{stored<br/>== computed?}
   Match -- yes --> Skip([skip: continue to next file])
@@ -87,7 +87,7 @@ kb_image_descriptions (
 
 Strip only if the file **begins** with `---\n` … closing `---\n` (optional newline after the closer). A later `---` in the body is a thematic break or content. Unclosed opening `---` is not frontmatter.
 
-Recognized keys: `title`, `tags` (inline `[a, b]` or a YAML list), `type`. Trim string values at ingest.
+Recognized keys: `title`, `tags` (inline `[a, b]` or a YAML list). Trim string values at ingest.
 
 ## Body
 
@@ -108,11 +108,11 @@ Skip gate is the **page**, not each child. Hash a stable encoding of the stored 
 
 ```ts
 sha256(
-  JSON.stringify({ title, type: type ?? null, tags: [...tags].sort(), body }),
+  JSON.stringify({ title, tags: [...tags].sort(), body }),
 );
 ```
 
-Do not concatenate raw strings (`title + type + tags + body`) — `ab`+`c` and `a`+`bc` collide.
+Do not concatenate raw strings (`title + tags + body`) — `ab`+`c` and `a`+`bc` collide.
 
 | Situation                                                | Action                                                     |
 | -------------------------------------------------------- | ---------------------------------------------------------- |

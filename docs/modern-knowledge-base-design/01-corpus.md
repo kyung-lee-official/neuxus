@@ -101,7 +101,7 @@ The corpus side of a sync:
 
 ```text
 1. Checkout that SHA
-2. List the included files under the docs root
+2. Run the walker over the docs root and get the included `*.md` files
 3. Delete `kb_pages` whose `source_path` is under this corpus and **missing** from the list
 ```
 
