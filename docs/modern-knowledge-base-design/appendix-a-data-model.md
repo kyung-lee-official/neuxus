@@ -67,7 +67,7 @@ CREATE TABLE kb_image_descriptions (
   policy                 TEXT NOT NULL,  -- ignore | manual | vision-captioning
   description            TEXT,           -- null for ignore / before caption
   caption_model          TEXT,           -- null for manual
-  caption_prompt_version INT,            -- null for manual
+  caption_prompt_hash    TEXT,           -- sha256 of the hardcoded caption prompt
   description_hash       TEXT,           -- sha256 of description
   embedding              vector(768),    -- adjust N to the embedding model
   embedding_model        TEXT,
