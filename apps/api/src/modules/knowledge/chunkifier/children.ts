@@ -23,25 +23,6 @@ function isFenceIntro(
   return countTokens(text, encoding) <= maxIntroTokens;
 }
 
-function takeGlueRun(
-  blocks: LexBlock[],
-  from: number,
-): { group: LexBlock[]; next: number } {
-  const first = blocks[from]!;
-  const group: LexBlock[] = [first];
-  let i = from;
-  if (first.glueGroupId != null) {
-    while (
-      i + 1 < blocks.length &&
-      blocks[i + 1]!.glueGroupId === first.glueGroupId
-    ) {
-      i++;
-      group.push(blocks[i]!);
-    }
-  }
-  return { group, next: i + 1 };
-}
-
 /** Exclusive ends / next starts: 0, text end, after sentence terminators, after each `\n`. */
 export function legalSnapIndices(text: string): number[] {
   const set = new Set<number>([0, text.length]);
@@ -208,7 +189,7 @@ export function packChildren(
     const blocks = parent.blocks;
     if (blocks.length === 0) continue;
 
-    // Expand units: fence-intro glue + glue groups
+    // Expand units: fence-intro pairs
     type Unit = LexBlock[];
     const units: Unit[] = [];
     let i = 0;
@@ -230,9 +211,8 @@ export function packChildren(
         i += 2;
         continue;
       }
-      const { group, next } = takeGlueRun(blocks, i);
-      units.push(group);
-      i = next;
+      units.push([cur]);
+      i += 1;
     }
 
     let current: LexBlock[] = [];
@@ -273,10 +253,8 @@ export function packChildren(
         continue;
       }
 
-      // Atomic / glue already over target → own child
-      const unitAtomic = unit.every(
-        (b) => b.atomic || b.glueGroupId != null || b.kind === "fence",
-      );
+      // Atomic unit already over target → own child
+      const unitAtomic = unit.every((b) => b.atomic);
       if (unitTokens > options.childTargetTokens && unitAtomic) {
         flushCurrent();
         const { start, end } = spanOf(unit);

@@ -8,7 +8,7 @@ import type { ChunkifyResult } from "./types.ts";
 export abstract class Chunkifier {
   /**
    * Pure parent–child chunkifier for GFM markdown `body`.
-   * @see docs/modern-knowledge-base-design/03-chunkify.md
+   * @see docs/modern-knowledge-base-design/03.1-chunkify.md
    */
   static chunkify(body: string, options?: ChunkifyOptions): ChunkifyResult {
     const resolved = resolveChunkifyOptions(options);

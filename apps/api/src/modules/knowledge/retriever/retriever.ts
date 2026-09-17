@@ -130,7 +130,7 @@ export abstract class Retriever {
    *                          with the raw top-K child hits + scores
    *  - `retrieve error`    (status: "error") on any throw; rethrown after logging
    *
-   * @see docs/modern-knowledge-base-design/05-query.md
+   * @see docs/modern-knowledge-base-design/04-retrieval.md
    */
   static async parentsByQuestion(
     question: string,

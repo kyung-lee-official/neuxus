@@ -47,7 +47,7 @@ export abstract class Embedder {
 
   /**
    * Embed each row; skip empty text or a failed provider call (leave DB unchanged).
-   * @see docs/modern-knowledge-base-design/04-embed.md
+   * @see docs/model-management/README.md
    */
   static async embedChildRows(
     rows: EmbedChildRow[],

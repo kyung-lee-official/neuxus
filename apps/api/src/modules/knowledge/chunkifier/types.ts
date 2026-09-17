@@ -25,7 +25,6 @@ export type BlockKind =
   | "html"
   | "indented_code"
   | "image"
-  | "image_desc"
   | "blank";
 
 export type LexBlock = {
@@ -35,6 +34,4 @@ export type LexBlock = {
   /** ATX heading level 1–6 */
   level?: number;
   atomic: boolean;
-  /** Same id ⇒ must stay in one parent and one child */
-  glueGroupId?: number;
 };

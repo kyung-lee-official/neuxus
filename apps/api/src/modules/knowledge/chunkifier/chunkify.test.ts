@@ -10,7 +10,6 @@ import {
   type ChunkifyResult,
   resolveChunkifyOptions,
 } from "./index.ts";
-import { lexBlocks } from "./lex.ts";
 import { countTokens } from "./tokenize.ts";
 
 const fixturesDir = join(import.meta.dir, "fixtures");
@@ -166,91 +165,6 @@ describe("chunkify fixtures", () => {
     expect(withFence).toBeDefined();
     expect(withFence!.text).toContain("Here is the setup code:");
     expect(withFence!.text).toContain("export const x = 1;");
-  });
-
-  test("image-desc-glue.md → image and desc same child", async () => {
-    const { children } = await runFixture("image-desc-glue.md");
-    const hit = children.find((c) => c.text.includes("A diagram of the flow."));
-    expect(hit).toBeDefined();
-    expect(hit!.text).toContain("![Alt](./a.png)");
-    expect(hit!.text).toContain("A diagram of the flow.");
-  });
-
-  test("image_desc without image is treated as image_desc (orphan opener falls through later)", () => {
-    const body = [
-      "## Fig",
-      "",
-      "<!-- image_desc -->",
-      "Orphan description.",
-      "<!-- /image_desc -->",
-      "",
-    ].join("\n");
-    const kinds = lexBlocks(body)
-      .filter((b) => b.kind !== "blank")
-      .map((b) => b.kind);
-    // The opener+closer pair is detected, but with no preceding image the
-    // second pass reclassifies the unglued image_desc to html.
-    expect(kinds).toEqual(["heading", "html"]);
-  });
-
-  test("image_desc opener without closer — orphan leaves no image_desc block", () => {
-    const body = [
-      "![Alt](./a.png)",
-      "",
-      "<!-- image_desc -->",
-      "Missing closer.",
-      "",
-    ].join("\n");
-    const kinds = lexBlocks(body)
-      .filter((b) => b.kind !== "blank")
-      .map((b) => b.kind);
-    expect(kinds).toEqual(["image", "html"]);
-    expect(kinds).not.toContain("image_desc");
-  });
-
-  test("image_desc matcher recognizes valid forms", () => {
-    const basic = lexBlocks(
-      "![Alt](./a.png)\n\n<!-- image_desc -->\nA diagram.\n<!-- /image_desc -->\n",
-    );
-    expect(basic.some((b) => b.kind === "image_desc")).toBe(true);
-
-    const multi = lexBlocks(
-      "![Alt](./a.png)\n\n<!-- image_desc -->\na multi word description\n<!-- /image_desc -->\n",
-    );
-    expect(multi.some((b) => b.kind === "image_desc")).toBe(true);
-
-    const empty = lexBlocks(
-      "![Alt](./a.png)\n\n<!-- image_desc -->\n<!-- /image_desc -->\n",
-    );
-    expect(empty.some((b) => b.kind === "image_desc")).toBe(true);
-
-    const leadingWs = lexBlocks(
-      "![Alt](./a.png)\n\n<!--  image_desc -->\nA diagram.\n<!-- /image_desc -->\n",
-    );
-    // Strict match: extra leading whitespace inside the `<!--` group is
-    // not normalized, so the opener is not recognized.
-    expect(leadingWs.some((b) => b.kind === "image_desc")).toBe(false);
-  });
-
-  test("image_desc with multi-line description preserves body", () => {
-    const body = [
-      "![Alt](./a.png)",
-      "",
-      "<!-- image_desc -->",
-      "Paragraph one.",
-      "",
-      "Paragraph two.",
-      "<!-- /image_desc -->",
-      "",
-    ].join("\n");
-    const blocks = lexBlocks(body);
-    const desc = blocks.find((b) => b.kind === "image_desc");
-    expect(desc).toBeDefined();
-    // text slice is body[desc.start..desc.end]; verify the description
-    // content (both paragraphs + the blank between) is preserved.
-    expect(body.slice(desc!.start, desc!.end)).toContain("Paragraph one.");
-    expect(body.slice(desc!.start, desc!.end)).toContain("Paragraph two.");
-    expect(body.slice(desc!.start, desc!.end)).toContain("\n\n");
   });
 
   test("blank-lines-preserved.md → blank line kept in slice", async () => {

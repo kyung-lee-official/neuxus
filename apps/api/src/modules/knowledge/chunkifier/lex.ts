@@ -38,28 +38,6 @@ const TABLE_DELIM = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/;
 const IMAGE_MD = /^![ \t]*\[.*?\]\(.*\)\s*$/;
 const IMAGE_HTML = /^<img\b[^>]*>\s*$/i;
 
-/**
- * Image description block: paired opener + closer.
- *   `<!-- image_desc -->`           ← opener (content follows on subsequent lines)
- *     description text…
- *   `<!-- /image_desc -->`           ← closer
- *
- * Block range: from end-of-opener-line through start-of-closer-line (excludes
- * the markers themselves; description text only). An unclosed opener leaves
- * no image_desc block — the orphan is caught by the body validator
- * (see modules/knowledge/image-desc/validate.ts) and fail-fasts the whole markdown file.
- */
-const IMAGE_DESC_OPEN_LINE = "<!-- image_desc -->";
-const IMAGE_DESC_CLOSE_LINE = "<!-- /image_desc -->";
-
-function isImageDescOpen(text: string): boolean {
-  return text.trim() === IMAGE_DESC_OPEN_LINE;
-}
-
-function isImageDescClose(text: string): boolean {
-  return text.trim() === IMAGE_DESC_CLOSE_LINE;
-}
-
 function isBlankLine(text: string): boolean {
   return text.trim() === "";
 }
@@ -76,7 +54,6 @@ export function lexBlocks(body: string): LexBlock[] {
   const lines = linesOf(body);
   const blocks: LexBlock[] = [];
   let i = 0;
-  let glueId = 0;
 
   const push = (block: LexBlock) => {
     blocks.push(block);
@@ -139,28 +116,6 @@ export function lexBlocks(body: string): LexBlock[] {
       continue;
     }
 
-    if (isImageDescOpen(line.text)) {
-      const openerEnd = line.end;
-      let j = i + 1;
-      while (j < lines.length && !isImageDescClose(lines[j]!.text)) {
-        j++;
-      }
-      if (j < lines.length && isImageDescClose(lines[j]!.text)) {
-        const closerStart = lines[j]!.start;
-        push({
-          kind: "image_desc",
-          start: openerEnd,
-          end: closerStart,
-          atomic: true,
-        });
-        i = j + 1;
-        continue;
-      }
-      // Orphan opener (no closer). Do not emit an image_desc block; the line
-      // falls through to the regular < handler (HTML block). The walker-level
-      // validator fail-fasts the whole file and logs an error.
-    }
-
     if (
       i + 1 < lines.length &&
       (TABLE_ROW.test(line.text) || /^\s*[^|]+\|.+/.test(line.text)) &&
@@ -206,12 +161,7 @@ export function lexBlocks(body: string): LexBlock[] {
           }
           break;
         }
-        if (
-          ATX_HEADING.test(t) ||
-          FENCE_OPEN.test(t) ||
-          HR.test(t) ||
-          isImageDescOpen(t)
-        ) {
+        if (ATX_HEADING.test(t) || FENCE_OPEN.test(t) || HR.test(t)) {
           break;
         }
         // New top-level paragraph that isn't a list item ends the list
@@ -287,7 +237,6 @@ export function lexBlocks(body: string): LexBlock[] {
         HR.test(t) ||
         LIST_ITEM.test(t) ||
         BLOCKQUOTE.test(t) ||
-        isImageDescOpen(t) ||
         (TABLE_ROW.test(t) &&
           i + 1 < lines.length &&
           TABLE_DELIM.test(lines[i + 1]!.text))
@@ -314,25 +263,6 @@ export function lexBlocks(body: string): LexBlock[] {
       end,
       atomic: isImage,
     });
-  }
-
-  // Glue image + following image_desc (blank between allowed)
-  for (let b = 0; b < blocks.length; b++) {
-    const cur = blocks[b]!;
-    if (cur.kind !== "image") continue;
-    let j = b + 1;
-    while (j < blocks.length && blocks[j]!.kind === "blank") j++;
-    if (j < blocks.length && blocks[j]!.kind === "image_desc") {
-      const id = ++glueId;
-      cur.glueGroupId = id;
-      blocks[j]!.glueGroupId = id;
-    }
-  }
-
-  for (const block of blocks) {
-    if (block.kind === "image_desc" && block.glueGroupId == null) {
-      block.kind = "html";
-    }
   }
 
   return blocks;

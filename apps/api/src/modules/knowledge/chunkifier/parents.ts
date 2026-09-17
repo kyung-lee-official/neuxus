@@ -35,7 +35,6 @@ function splitByHeadingLevel(blocks: LexBlock[], level: number): LexBlock[][] {
   return groups;
 }
 
-/** Never split a glue group across parents. */
 function packBySize(
   body: string,
   blocks: LexBlock[],
@@ -55,32 +54,18 @@ function packBySize(
     }
   };
 
-  for (let i = 0; i < blocks.length; i++) {
-    const b = blocks[i]!;
-    // Pull entire glue group together
-    const group: LexBlock[] = [b];
-    if (b.glueGroupId != null) {
-      while (
-        i + 1 < blocks.length &&
-        blocks[i + 1]!.glueGroupId === b.glueGroupId
-      ) {
-        i++;
-        group.push(blocks[i]!);
-      }
-      // Also skip blanks between glued members — they're not in contentBlocks
-    }
-
+  for (const b of blocks) {
     if (current.length === 0) {
-      current = group;
+      current = [b];
       continue;
     }
 
-    const trial = [...current, ...group];
+    const trial = [...current, b];
     if (tokensFor(body, trial, encoding) <= maxTokens) {
       current = trial;
     } else {
       flush();
-      current = group;
+      current = [b];
     }
   }
   flush();
