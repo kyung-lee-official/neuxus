@@ -1,6 +1,6 @@
 # Ingest (files → pages + image policy)
 
-Ingest discovers the corpus files and turns each into a `kb_pages` row plus that page's image policy. Which files exist (docs root, include/exclude, `path → source_path` / `id`) is the [corpus layout contract](./01-corpus.md).
+Ingest discovers the corpus files and turns each into a `kb_pages` row plus that page's image policy. Which files exist (docs root, include/exclude, how a path maps to `source_path` / `id`) is the [corpus layout contract](./01-corpus.md).
 
 `title` / `tags` come from frontmatter. **`body`** is the remaining markdown; `chunkify` never strips frontmatter. `body` keeps only the image syntax (`![alt](path)`); the caption is stored in `kb_image_descriptions`, not in the body ([03.2-image-descriptions.md](./03.2-image-descriptions.md)).
 
@@ -62,15 +62,14 @@ Canonical `kb_pages.body`:
 - `\r\n` / `\r` → `\n` (do this before detecting `---\n` so CRLF files still match)
 - strip trailing spaces on each line
 - ensure a single final `\n`
-- no Unicode NFC (not required)
 
-The same map is **idempotent**. `chunkify` may re-apply it; it does not strip YAML. CRLF round-trip is out of scope.
+The same map is **idempotent**. `chunkify` may re-apply it; it does not strip YAML.
 
 Hashes, offsets, and parent/child slices use this string — not original file bytes.
 
 ## Incremental updates (page and meta hashes)
 
-Two hashes decide whether ingest reprocesses a page:
+Two `kb_pages` hashes decide whether ingest reprocesses a page:
 
 | Hash           | Covers                                           |
 | -------------- | ------------------------------------------------ |
@@ -83,9 +82,9 @@ Skip the page only when **both** match the stored values. The content encoding i
 sha256(JSON.stringify({ title, tags: [...tags].sort(), body }));
 ```
 
-| Situation                | Action                                                                                                         |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------- |
-| Both match               | Skip the page                                                                                                  |
-| Either differs           | Upsert `kb_pages`, then reconcile `kb_image_descriptions`                                                      |
-| `content_hash` differs   | The page's chunk tree is stale — chunkify rebuilds it ([03.1-chunkify.md](./03.1-chunkify.md#chunk-freshness)) |
-| `meta_hash` differs only | Body and chunk tree stay; only the image rows are reconciled                                                   |
+| Situation                | Action                                                                                                |
+| ------------------------ | ----------------------------------------------------------------------------------------------------- |
+| Both match               | Skip the page                                                                                         |
+| Either differs           | Upsert `kb_pages`, then reconcile `kb_image_descriptions`                                             |
+| `content_hash` differs   | The page's chunk tree is stale — chunkify rebuilds it ([chunk freshness](./README.md#freshness-keys)) |
+| `meta_hash` differs only | Body and chunk tree stay; only the image rows are reconciled                                          |
