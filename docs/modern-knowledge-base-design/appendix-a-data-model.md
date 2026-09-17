@@ -9,12 +9,12 @@ Page ──* Parent ──* Child (embedding)
 Page ──* Image description (embedding)
 ```
 
-| Entity                | Role                                                                                                       | `vector`? |
-| --------------------- | ---------------------------------------------------------------------------------------------------------- | --------- |
-| **Page**              | Markdown file: `id`, `source_path`, title, ingest-normalized [`body`](./02-ingest.md#body), `content_hash` | No        |
-| **Parent**            | Generation slice of `body`; `source_page_hash` records the `kb_pages.content_hash` it was built from       | No        |
-| **Child**             | Retrieval unit                                                                                             | Yes       |
-| **Image description** | Per-image caption vector; identity `(page_id, image_path)`                                                 | Yes       |
+| Entity                | Role                                                                                                                    | `vector`? |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------- | --------- |
+| **Page**              | Markdown file: `id`, `source_path`, title, ingest-normalized [`body`](./02-ingest.md#body), `content_hash`, `meta_hash` | No        |
+| **Parent**            | Generation slice of `body`; `source_page_hash` records the `kb_pages.content_hash` it was built from                    | No        |
+| **Child**             | Retrieval unit                                                                                                          | Yes       |
+| **Image description** | Per-image caption vector; identity `(page_id, image_path)`                                                              | Yes       |
 
 FKs: `kb_parents.page_id → kb_pages`, `kb_children.parent_id → kb_parents`. Optional denormalized `kb_children.page_id`; optional `start_offset` / `end_offset` into page `body` ([normalized at ingest](./02-ingest.md#body)). On page change: delete that page’s parents/children, insert the new tree ([incremental updates](./02-ingest.md#incremental-updates-page-and-meta-hashes)). Each parent records `source_page_hash`, the `kb_pages.content_hash` the tree was built from; chunkify rebuilds a page's tree when it differs from the current `content_hash` ([chunk freshness](./README.md#freshness-keys)).
 
@@ -34,6 +34,7 @@ CREATE TABLE kb_pages (
   body         TEXT NOT NULL,  -- ingest: newlines, strip trailing spaces, final \n
   source_path  TEXT,
   content_hash TEXT NOT NULL,
+  meta_hash    TEXT,           -- sha256 of the sibling *.meta.yaml bytes; null when absent
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

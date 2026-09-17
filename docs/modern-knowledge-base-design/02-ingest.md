@@ -70,7 +70,7 @@ Hashes, offsets, and parent/child slices use this string — not original file b
 
 ## Incremental updates (page and meta hashes)
 
-Two hashes decide whether ingest redoes a page:
+Two hashes decide whether ingest reprocesses a page:
 
 | Hash           | Covers                                           |
 | -------------- | ------------------------------------------------ |
