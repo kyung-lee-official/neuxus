@@ -2,23 +2,15 @@
 
 Turn a built prompt into an answer string.
 
-This doc is the **synthesis contract**: read settings, call the provider, return text. Retry, timeouts, streaming, tools, and admin APIs are application layer. Ask HTTP is a caller, not this contract.
+This doc is the **synthesis contract**: resolve the model, call the provider, return text. Retry, timeouts, streaming, tools, and admin APIs are application layer. Ask HTTP is a caller, not this contract.
 
 ## Provider
 
-Talk to the provider through a **synthesizer** interface (`synthesize(prompt) → string`). The first implementation is **MiniMax** (Anthropic-compatible Messages API). Callers must not import MiniMax HTTP details.
+Call the provider's **`textChat`** capability with the current `text-synthesis` task model. Callers must not import provider HTTP details. The synthesis model and connection are application wiring, not vector identity — changing either affects only the next call. Do not log provider credentials.
 
-**All synthesis runtime config lives in Postgres** (`app_synthesis_settings`), not in env: provider, model, base URL, API key, max tokens, context window. `DATABASE_URL` remains process env so the app can reach the database.
+## Window
 
-**Reset / default** when the settings row is missing or a column is null: provider **`minimax`**, model **`MiniMax-M3`**, base URL **`https://api.minimaxi.com/anthropic`**, `max_tokens` **`4096`**, `context_window_tokens` **`1000000`**. Clearing columns back to null is a reset to those defaults.
-
-`context_window_tokens` is **must-known** for the current `synthesis_model`. If it is still unknown after applying defaults, do not call the provider. Prompt + `max_tokens` must fit in that window (tokens). Product caps (trim memory/chat/parents) sit inside the window; they do not replace it.
-
-## Settings in the database
-
-Dedicated table `app_synthesis_settings` (Ask/synthesis, not a `kb_*` retrieval table): single row `id = 'default'`, **nullable columns**, **app defaults in code** when missing.
-
-Unlike embed, nothing here is vector identity. Changing model or URL only affects the **next** `synthesize` call. Do not log `api_key`.
+The model declares its context window and max output tokens. If the window is unknown, do not call the provider. Prompt plus max output must fit the window (tokens); product caps (trim memory/chat/parents) sit inside it and do not replace it.
 
 ## Input
 
