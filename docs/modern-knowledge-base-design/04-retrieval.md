@@ -13,6 +13,8 @@ Read-path: embed the question, similarity-search `kb_children.embedding`, expand
 6. LLM gets parent texts (+ title) — not child windows alone ([05-synthesis.md](./05-synthesis.md))
 ```
 
+Separately, the same embedded question drives a second similarity search over `kb_image_descriptions.embedding` ([Image-description search](#image-description-search)).
+
 Vector-only for now. Optional later: hybrid FTS + RRF.
 
 ## Question embed
@@ -69,6 +71,26 @@ FROM kb_parents p
 JOIN kb_pages pg ON pg.id = p.page_id
 WHERE p.id = ANY($1::text[]);
 ```
+
+## Image-description search
+
+The same embedded question drives a **second vector search**, over `kb_image_descriptions.embedding`, independent of the child search. The description vectors are produced by [03.2-image-descriptions.md](./03.2-image-descriptions.md):
+
+```sql
+SELECT
+  d.page_id,
+  d.image_path,
+  d.description,
+  1 - (d.embedding <=> $1::vector) AS score
+FROM kb_image_descriptions d
+WHERE d.embedding IS NOT NULL
+  AND d.embedding_model IS NOT DISTINCT FROM $current_model
+  AND d.policy <> 'ignore'
+ORDER BY d.embedding <=> $1::vector
+LIMIT $2;
+```
+
+Its hits are capped and merged into the synthesis context, labelled with the page title.
 
 ## Stale vectors
 
