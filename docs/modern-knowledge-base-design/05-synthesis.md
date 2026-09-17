@@ -6,7 +6,7 @@ This doc is the **synthesis contract**: resolve the model, call the provider, re
 
 ## Provider
 
-Call the provider's **`textChat`** capability with the current `text-synthesis` task model. Callers must not import provider HTTP details. The synthesis model and connection are application wiring, not vector identity — changing either affects only the next call. Do not log provider credentials.
+Call the provider's **`textChat`** capability with the configured synthesis model. Callers must not import provider HTTP details. The synthesis model and connection are application wiring, not vector identity — changing either affects only the next call. Do not log provider credentials.
 
 ## Window
 

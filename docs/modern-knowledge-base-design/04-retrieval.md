@@ -17,13 +17,13 @@ Separately, the same embedded question drives a second similarity search over `k
 
 ## Question embed
 
-Embed the question with the current **`embedding`** task model — the same model the children were embedded with — so the question and children share one vector space.
+Embed the question with the current **embedding** model — the same model the children were embedded with — so the question and children share one vector space.
 
 ## Similarity SQL (cosine)
 
 `<=>` = cosine distance (lower is closer). Display score: `1 - distance`.
 
-`$current_model` is the current `embedding` task model `identifier` (`{providerId}::{modelId}`).
+`$current_model` is the current embedding model `identifier` (`{providerId}::{modelId}`).
 
 ```sql
 SELECT
@@ -70,4 +70,4 @@ Its hits are capped and merged into the synthesis context, labelled with the pag
 
 ## Stale vectors
 
-A null `embedding`, or an `embedding_model` that differs from the current `embedding` task model `identifier`, excludes the row from search; repair it with a re-embed pass. Provider connection changes do not make vectors stale.
+A null `embedding`, or an `embedding_model` that differs from the current embedding model `identifier`, excludes the row from search; repair it with a re-embed pass. Provider connection changes do not make vectors stale.
