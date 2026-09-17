@@ -7,10 +7,10 @@ Read-path: embed the question, similarity-search `kb_children.embedding`, expand
 ```text
 1. Embed the question (same model / dims as children)
 2. Similarity-search children
-3. Resolve parents (+ page title / slug)
+3. Resolve parents (+ page title)
 4. Dedupe parents; keep best child score per parent
 5. Cap by max parents / max characters
-6. LLM gets parent texts (+ title / slug) — not child windows alone ([05-synthesis.md](./05-synthesis.md))
+6. LLM gets parent texts (+ title) — not child windows alone ([05-synthesis.md](./05-synthesis.md))
 ```
 
 Vector-only for now. Optional later: hybrid FTS + RRF.
@@ -29,7 +29,7 @@ Title: Setup
 Here is the setup code:
 ```
 
-(`Setup` is the page title or slug; the rest is `child.text`.)
+(`Setup` is the page title; the rest is `child.text`.)
 
 If children are embedded with a prefix, embed the **question** with the same policy (same fields, same order). Mixing prefixed documents and a bare question mismatches the space.
 
@@ -37,7 +37,7 @@ This does not change parent/child spans. Skip the prefix until ingest needs it.
 
 ## Similarity SQL (cosine)
 
-`<=>` = cosine distance (lower is closer). Display score: `1 - distance`. Prefer HNSW with `vector_cosine_ops`.
+`<=>` = cosine distance (lower is closer). Display score: `1 - distance`. The default is an exact scan; an HNSW index with `vector_cosine_ops` is an optional scale-up ([appendix A](./appendix-a-data-model.md#tables-postgresql)).
 
 `$current_model` is `kb_embed_settings.embedding_model` after app default.
 
@@ -64,7 +64,7 @@ LIMIT $2;
 ## Expand to parents
 
 ```sql
-SELECT p.id, p.text, pg.slug, pg.title
+SELECT p.id, p.text, pg.title
 FROM kb_parents p
 JOIN kb_pages pg ON pg.id = p.page_id
 WHERE p.id = ANY($1::text[]);

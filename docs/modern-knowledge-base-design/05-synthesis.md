@@ -24,7 +24,7 @@ Unlike embed, nothing here is vector identity. Changing model or URL only affect
 
 The prompt is already assembled by the caller. It includes:
 
-- Knowledge **parent** texts (+ page title / slug) from [04-retrieval.md](./04-retrieval.md) — not child windows alone
+- Knowledge **parent** texts (+ page title) from [04-retrieval.md](./04-retrieval.md) — not child windows alone
 - Personal memory and recent chat when the Ask path has them
 
 Empty parent list is allowed (memory/chat-only). If the prompt context does not contain the answer, the model should say so. Exact prompt wording is application layer.
