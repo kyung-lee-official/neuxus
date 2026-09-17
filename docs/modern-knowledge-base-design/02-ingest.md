@@ -31,7 +31,7 @@ flowchart TD
   Hash --> Lookup["read stored hashes from kb_pages"]
   Lookup --> Match{both match?}
   Match -- yes --> Skip([skip page])
-  Match -- no --> Upsert["UPSERT kb_pages"]
+  Match -- no --> Upsert["UPSERT kb_pages (by id)"]
   Upsert --> Reconcile["Reconcile kb_image_descriptions<br/>(policy per image)"]
   Reconcile --> Next[Next file]
   Skip --> Next
@@ -63,7 +63,7 @@ Canonical `kb_pages.body`:
 - strip trailing spaces on each line
 - ensure a single final `\n`
 
-The same map is **idempotent**. `chunkify` may re-apply it; it does not strip YAML.
+The same map is **idempotent**; `chunkify` may re-apply it.
 
 Hashes, offsets, and parent/child slices use this string — not original file bytes.
 
@@ -71,10 +71,10 @@ Hashes, offsets, and parent/child slices use this string — not original file b
 
 Two `kb_pages` hashes decide whether ingest reprocesses a page:
 
-| Hash           | Covers                                           |
-| -------------- | ------------------------------------------------ |
-| `content_hash` | `title` + `tags` + `body`                        |
-| `meta_hash`    | the bytes of the sibling `*.meta.yaml` (or null) |
+| Hash           | Covers                                              |
+| -------------- | --------------------------------------------------- |
+| `content_hash` | `title` + `tags` + `body`                           |
+| `meta_hash`    | sha256 of the sibling `*.meta.yaml` bytes (or null) |
 
 Skip the page only when **both** match the stored values. The content encoding is stable:
 
@@ -85,6 +85,6 @@ sha256(JSON.stringify({ title, tags: [...tags].sort(), body }));
 | Situation                | Action                                                                                                |
 | ------------------------ | ----------------------------------------------------------------------------------------------------- |
 | Both match               | Skip the page                                                                                         |
-| Either differs           | Upsert `kb_pages`, then reconcile `kb_image_descriptions`                                             |
+| Either differs           | Upsert `kb_pages` by `id`, then reconcile `kb_image_descriptions`                                     |
 | `content_hash` differs   | The page's chunk tree is stale — chunkify rebuilds it ([chunk freshness](./README.md#freshness-keys)) |
 | `meta_hash` differs only | Body and chunk tree stay; only the image rows are reconciled                                          |
