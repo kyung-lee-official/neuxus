@@ -15,33 +15,15 @@ Embed the question, similarity-search `kb_children.embedding`, expand to parents
 
 Separately, the same embedded question drives a second similarity search over `kb_image_descriptions.embedding` ([Image-description search](#image-description-search)).
 
-Vector-only for now. Optional later: hybrid FTS + RRF.
-
 ## Question embed
 
-Read **`kb_embed_settings`** (same row as the write path): provider, host, port, API key, and current `embedding_model`, then apply app defaults for nulls. Embed the question with that client/model and `vector(N)`. Default model when unset: `nomic-embed-text:latest`.
-
-### Embed input prefix
-
-Stored `kb_children.text` is the chunk body from `chunkify` — no extra header. Optionally, **at embed time only**, prepend page context so similar children on different pages separate in vector space, for example:
-
-```text
-Title: Setup
-
-Here is the setup code:
-```
-
-(`Setup` is the page title; the rest is `child.text`.)
-
-If children are embedded with a prefix, embed the **question** with the same policy (same fields, same order). Mixing prefixed documents and a bare question mismatches the space.
-
-This does not change parent/child spans. Skip the prefix until ingest needs it.
+Resolve the **`embedding`** task link (catalog model + provider connection) and embed the question with that model/client and `vector(N)`. It must match the model the children were embedded with ([model-management](../model-management/README.md)).
 
 ## Similarity SQL (cosine)
 
 `<=>` = cosine distance (lower is closer). Display score: `1 - distance`. The default is an exact scan; an HNSW index with `vector_cosine_ops` is an optional scale-up ([appendix A](./appendix-a-data-model.md#tables-postgresql)).
 
-`$current_model` is `kb_embed_settings.embedding_model` after app default.
+`$current_model` is the current `embedding` task model `identifier` (`{providerId}::{modelId}`).
 
 ```sql
 SELECT
@@ -56,12 +38,6 @@ WHERE c.embedding IS NOT NULL
 ORDER BY c.embedding <=> $1::vector
 LIMIT $2;
 ```
-
-| Operator | Use                        |
-| -------- | -------------------------- |
-| `<=>`    | Cosine distance            |
-| `<->`    | L2                         |
-| `<#>`    | Inner product (watch sign) |
 
 ## Expand to parents
 
@@ -94,4 +70,4 @@ Its hits are capped and merged into the synthesis context, labelled with the pag
 
 ## Stale vectors
 
-Null `embedding` or `embedding_model` ≠ current `kb_embed_settings.embedding_model` (after app default) → exclude from search (or repair via re-embed; ). Host / port / API key changes do not make vectors stale.
+A null `embedding`, or an `embedding_model` that differs from the current `embedding` task model `identifier`, excludes the row from search; repair it with a re-embed pass. Provider connection changes do not make vectors stale.
