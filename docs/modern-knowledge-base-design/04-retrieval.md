@@ -1,6 +1,6 @@
 # Query (question → parents)
 
-Read-path: embed the question, similarity-search `kb_children.embedding`, expand to parents for the LLM.
+Embed the question, similarity-search `kb_children.embedding`, expand to parents for the LLM.
 
 ## Flow
 
