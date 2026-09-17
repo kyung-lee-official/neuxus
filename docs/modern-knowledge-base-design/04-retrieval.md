@@ -17,11 +17,11 @@ Separately, the same embedded question drives a second similarity search over `k
 
 ## Question embed
 
-Resolve the **`embedding`** task link (catalog model + provider connection) and embed the question with that model/client and `vector(N)`. It must match the model the children were embedded with ([model-management](../model-management/README.md)).
+Embed the question with the current **`embedding`** task model — the same model the children were embedded with — so the question and children share one vector space.
 
 ## Similarity SQL (cosine)
 
-`<=>` = cosine distance (lower is closer). Display score: `1 - distance`. The default is an exact scan; an HNSW index with `vector_cosine_ops` is an optional scale-up ([appendix A](./appendix-a-data-model.md#tables-postgresql)).
+`<=>` = cosine distance (lower is closer). Display score: `1 - distance`.
 
 `$current_model` is the current `embedding` task model `identifier` (`{providerId}::{modelId}`).
 
