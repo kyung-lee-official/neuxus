@@ -9,8 +9,8 @@ so it stays useful even as catalog entries or endpoint names change.
 Model handling is split into two self-contained modules so each concern changes
 independently:
 
-| Module             | Owns                                                                       | Changes when                |
-| ------------------ | -------------------------------------------------------------------------- | --------------------------- |
+| Module              | Owns                                                                        | Changes when                |
+| ------------------- | --------------------------------------------------------------------------- | --------------------------- |
 | **model-providers** | Providers, their models, connection payloads, capability calls, diagnostics | A vendor or model changes   |
 | **task-model-map**  | Which catalog model serves which app task                                   | An operator re-points a job |
 
@@ -54,12 +54,12 @@ module; the catalog just lists it.
 
 Today's set:
 
-| Provider                     | Protocol (hardcoded)          | Connection an operator supplies |
-| ---------------------------- | ----------------------------- | ------------------------------- |
-| Ollama (local)               | Ollama `/api/embed`           | base URL, port                  |
-| MiniMax (standard)           | Anthropic Messages            | API key                         |
-| MiniMax (token-plan billing) | Anthropic Messages            | API key                         |
-| DeepSeek                     | Anthropic Messages            | API key                         |
+| Provider                     | Protocol (hardcoded) | Connection an operator supplies |
+| ---------------------------- | -------------------- | ------------------------------- |
+| Ollama (local)               | Ollama `/api/embed`  | base URL, port                  |
+| MiniMax (standard)           | Anthropic Messages   | API key                         |
+| MiniMax (token-plan billing) | Anthropic Messages   | API key                         |
+| DeepSeek                     | Anthropic Messages   | API key                         |
 
 Two practical consequences:
 
