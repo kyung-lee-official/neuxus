@@ -83,8 +83,6 @@ Skip the page only when **both** match the stored values. The content encoding i
 sha256(JSON.stringify({ title, tags: [...tags].sort(), body }));
 ```
 
-Do not concatenate raw strings (`title + tags + body`) — `ab`+`c` and `a`+`bc` collide.
-
 | Situation                | Action                                                                                                         |
 | ------------------------ | -------------------------------------------------------------------------------------------------------------- |
 | Both match               | Skip the page                                                                                                  |
