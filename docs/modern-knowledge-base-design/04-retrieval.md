@@ -66,7 +66,7 @@ ORDER BY d.embedding <=> $1::vector
 LIMIT $2;
 ```
 
-Its hits are capped and merged into the synthesis context, labelled with the page title.
+Its hits are capped and merged into the synthesis context ([05-synthesis.md](./05-synthesis.md#image-handling)).
 
 ## Stale vectors
 
