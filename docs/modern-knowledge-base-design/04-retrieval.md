@@ -1,5 +1,7 @@
 # Retrieval (question → parents)
 
+Question (string) in → ranked rows out.
+
 Embed the question, similarity-search `kb_children.embedding`, expand to parents for the LLM.
 
 ## Flow
