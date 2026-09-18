@@ -1,4 +1,4 @@
-# Query (question → parents)
+# Retrieval (question → parents)
 
 Embed the question, similarity-search `kb_children.embedding`, expand to parents for the LLM.
 
@@ -66,7 +66,7 @@ ORDER BY d.embedding <=> $1::vector
 LIMIT $2;
 ```
 
-Its hits are capped and merged into the synthesis context ([05-synthesis.md](./05-synthesis.md#image-handling)).
+Its hits are capped and merged into the synthesis context ([05-synthesis.md](./05-synthesis.md#image-handling)); an image hit carries only its description and page title.
 
 ## Stale vectors
 
