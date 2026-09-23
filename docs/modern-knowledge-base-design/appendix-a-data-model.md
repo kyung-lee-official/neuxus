@@ -9,15 +9,19 @@ Knowledge base ──* Page ──* Parent ──* Child (embedding)
 Knowledge base ──* Page ──* Image description (embedding)
 ```
 
-| Entity                | Role                                                                                                                                                  | `vector`? |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| **Knowledge base**    | Isolated knowledge set (e.g. one product); pages and searches never cross it                                                                          | No        |
-| **Page**              | Markdown `body`: `origin` (`corpus` file or `agent` write), `id`, title, ingest-normalized [`body`](./02-ingest.md#body), `content_hash`, `meta_hash` | No        |
-| **Parent**            | Generation slice of `body`; `source_page_hash` records the `kb_pages.content_hash` it was built from                                                  | No        |
-| **Child**             | Retrieval unit                                                                                                                                        | Yes       |
-| **Image description** | Per-image caption vector; identity `(page_id, image_path)`                                                                                            | Yes       |
+| Entity                | Role                                                                                                                                                     | `vector`? |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| **Knowledge base**    | Isolated knowledge set (e.g. one product); `writable` false = corpus-backed (ingest-written), true = directly written; pages and searches never cross it | No        |
+| **Page**              | Markdown `body`: `id`, title, ingest-normalized [`body`](./02-ingest.md#body), `content_hash`, `meta_hash`                                               | No        |
+| **Parent**            | Generation slice of `body`; `source_page_hash` records the `kb_pages.content_hash` it was built from                                                     | No        |
+| **Child**             | Retrieval unit                                                                                                                                           | Yes       |
+| **Image description** | Per-image caption vector; identity `(page_id, image_path)`                                                                                               | Yes       |
 
-Every content table carries `knowledge_base_id`; primary and foreign keys are scoped to it (`(knowledge_base_id, id)`), and retrieval filters by it. `kb_children` also denormalizes `page_id` for its scans. Corpus sync touches only `origin = 'corpus'` rows of one knowledge base; `agent` rows have `source_path IS NULL` and are never deleted by sync. On page change: delete that page's parents/children, insert the new tree ([incremental updates](./02-ingest.md#incremental-updates-page-and-meta-hashes)). Each parent records `source_page_hash`, the `kb_pages.content_hash` the tree was built from; chunkify rebuilds a page's tree when it differs from the current `content_hash` ([chunk freshness](./README.md#freshness-keys)).
+- Every content table carries `knowledge_base_id`; primary and foreign keys are scoped to it (`(knowledge_base_id, id)`), and retrieval filters by it. `kb_children` also denormalizes `page_id` for its scans.
+- A **read-only** knowledge base (`kb_knowledge_bases.writable = false`) is written only by the **ingest** stage.
+- A **writable** knowledge base (`kb_knowledge_bases.writable = true`) is updated directly, never by the ingest stage.
+- On page change: delete that page's parents/children, insert the new tree ([incremental updates](./02-ingest.md#incremental-updates-page-and-meta-hashes)).
+- Each parent records `source_page_hash`, the `kb_pages.content_hash` the tree was built from; chunkify rebuilds a page's tree when it differs from the current `content_hash` ([chunk freshness](./README.md#freshness-keys)).
 
 Keep `kb_*` namespaced apart from application tables (same database is fine).
 
@@ -31,17 +35,17 @@ CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE kb_knowledge_bases (
   id         TEXT PRIMARY KEY,
   name       TEXT NOT NULL,
+  writable   BOOLEAN NOT NULL DEFAULT false,  -- false: corpus-backed (ingest-written); true: directly written
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE kb_pages (
   knowledge_base_id TEXT NOT NULL REFERENCES kb_knowledge_bases (id) ON DELETE CASCADE,
   id                TEXT NOT NULL,
-  origin            TEXT NOT NULL,  -- corpus (git file, read-only) | agent (API write)
   title             TEXT NOT NULL,
   tags              TEXT[] NOT NULL DEFAULT '{}',
   body              TEXT NOT NULL,  -- markdown; ingest-normalized
-  source_path       TEXT,           -- corpus only; null for agent
+  source_path       TEXT,           -- read-only KBs only; null otherwise
   content_hash      TEXT NOT NULL,
   meta_hash         TEXT,           -- sha256 of the sibling *.meta.yaml bytes; null when absent
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
