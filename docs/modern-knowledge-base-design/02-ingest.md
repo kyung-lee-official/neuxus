@@ -45,7 +45,7 @@ flowchart TD
 
 Runs once per page whose hashes differ. For each image the body references, ingest records what to do with it in `kb_image_descriptions`:
 
-- **Identity:** `(page_id, image_path)`.
+- **Identity:** `(knowledge_base_id, page_id, image_path)`.
 - **Policy:** from the sibling `*.meta.yaml` — `ignore`, `manual`, or `vision-captioning`; images not listed default to `vision-captioning`.
 - **`image_content_hash`:** sha256 of the image bytes, so a changed image is detectable.
 - **`manual` description:** taken from the sidecar when the policy is `manual`.
