@@ -34,7 +34,7 @@ flowchart TD
   Hash --> Lookup["read stored hashes from kb_pages"]
   Lookup --> Match{both match?}
   Match -- yes --> Skip([skip page])
-  Match -- no --> Upsert["UPSERT kb_pages (by id)"]
+  Match -- no --> Upsert["UPSERT kb_pages<br/>(by knowledge_base_id, id)"]
   Upsert --> Reconcile["Reconcile kb_image_descriptions<br/>(policy per image)"]
   Reconcile --> Next[Next file]
   Skip --> Next
@@ -88,6 +88,6 @@ sha256(JSON.stringify({ title, tags: [...tags].sort(), body }));
 | Situation                | Action                                                                                                |
 | ------------------------ | ----------------------------------------------------------------------------------------------------- |
 | Both match               | Skip the page                                                                                         |
-| Either differs           | Upsert `kb_pages` by `id`, then reconcile `kb_image_descriptions`                                     |
+| Either differs           | Upsert `kb_pages` by `(knowledge_base_id, id)`, then reconcile `kb_image_descriptions`                |
 | `content_hash` differs   | The page's chunk tree is stale — chunkify rebuilds it ([chunk freshness](./README.md#freshness-keys)) |
 | `meta_hash` differs only | Body and chunk tree stay; only the image rows are reconciled                                          |
