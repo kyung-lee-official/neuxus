@@ -59,7 +59,6 @@ CREATE TABLE kb_parents (
   parent_index      INT NOT NULL,
   text              TEXT NOT NULL,
   source_page_hash  TEXT NOT NULL,  -- kb_pages.content_hash this tree was built from
-  -- optional: start_offset INT, end_offset INT
   PRIMARY KEY (knowledge_base_id, id),
   UNIQUE (knowledge_base_id, page_id, parent_index),
   FOREIGN KEY (knowledge_base_id, page_id)

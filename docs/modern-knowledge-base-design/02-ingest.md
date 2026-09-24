@@ -68,7 +68,7 @@ Canonical `kb_pages.body`:
 
 The same map is **idempotent**; `chunkify` may re-apply it.
 
-Hashes, offsets, and parent/child slices use this string — not original file bytes.
+Hashes and parent/child slices use this string — not original file bytes.
 
 ## Incremental updates (page and meta hashes)
 

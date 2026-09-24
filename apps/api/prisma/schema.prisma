@@ -66,24 +66,42 @@ model Message {
     @@map("app_messages")
 }
 
-/// Corpus git remote (`kb_corpus_settings`). Nullable columns — app defaults
-/// live in code, not SQL DEFAULT. Single row: id = `"default"`.
-/// `repo_url` null means no remote (do not clone).
+/// Knowledge base (`kb_knowledge_bases`). All content and searches are scoped
+/// to one knowledge base. `writable` false = read-only (corpus-backed,
+/// ingest-written); true = updated directly.
+model KnowledgeBase {
+    id        String   @id
+    name      String
+    writable  Boolean  @default(false)
+    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+    pages            KnowledgePage[]
+    corpusSettings   KnowledgeCorpusSettings?
+    chunkSettings    KnowledgeChunkSettings?
+    retrieveSettings KnowledgeRetrieveSettings?
+
+    @@map("kb_knowledge_bases")
+}
+
+/// Corpus git remote (`kb_corpus_settings`), one row per knowledge base.
+/// Nullable columns — app defaults live in code. `repo_url` null means no remote.
 model KnowledgeCorpusSettings {
-    id String @id @default("default")
+    knowledgeBaseId String @id @map("knowledge_base_id")
 
     repoUrl       String? @map("repo_url")
     branch        String?
     docsRoot      String? @map("docs_root")
     lastSyncedSha String? @map("last_synced_sha")
 
+    knowledgeBase KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+
     @@map("kb_corpus_settings")
 }
 
-/// Chunkify knobs (`kb_chunk_settings`). Nullable columns — app defaults live in code
-/// (`CHUNKIFY_DEFAULTS`), not SQL DEFAULT. Single row: id = `"default"`.
+/// Chunkify knobs (`kb_chunk_settings`), one row per knowledge base. Nullable
+/// columns — app defaults live in code (`CHUNKIFY_DEFAULTS`).
 model KnowledgeChunkSettings {
-    id String @id @default("default")
+    knowledgeBaseId String @id @map("knowledge_base_id")
 
     childTargetTokens       Int?    @map("child_target_tokens")
     childHardMaxTokens      Int?    @map("child_hard_max_tokens")
@@ -93,47 +111,110 @@ model KnowledgeChunkSettings {
     fenceIntroGlueMaxTokens Int?    @map("fence_intro_glue_max_tokens")
     tokenizerEncoding       String? @map("tokenizer_encoding")
 
+    knowledgeBase KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+
     @@map("kb_chunk_settings")
 }
 
-/// Retrieval knobs (`kb_retrieve_settings`). Nullable columns — app defaults
-/// live in code (`RETRIEVE_DEFAULTS`), not SQL DEFAULT. Single row: id =
-/// `"default"`. Mirrors the other single-row config tables.
+/// Retrieval knobs (`kb_retrieve_settings`), one row per knowledge base.
+/// Nullable columns — app defaults live in code (`RETRIEVE_DEFAULTS`).
 model KnowledgeRetrieveSettings {
-    id String @id @default("default")
+    knowledgeBaseId String @id @map("knowledge_base_id")
 
     /// Top-K child hits from the vector distance scan.
-    childLimit     Int? @map("child_limit")
+    childLimit    Int? @map("child_limit")
     /// Max unique parent ids returned after dedup.
-    maxParents     Int? @map("max_parents")
+    maxParents    Int? @map("max_parents")
     /// Cap on total parent-text characters.
-    maxCharacters  Int? @map("max_characters")
+    maxCharacters Int? @map("max_characters")
+
+    knowledgeBase KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
 
     @@map("kb_retrieve_settings")
 }
 
-/// Per-image description cache (`kb_image_descriptions`). One row per
-/// (page, image) pair. The hash is the freshness marker; the description
-/// is what the enricher stored the last time it fetched one for these
-/// exact image bytes.
+/// Knowledge page (`kb_pages`). `body` is ingest-normalized. Identity is
+/// `(knowledge_base_id, id)`.
+model KnowledgePage {
+    knowledgeBaseId String   @map("knowledge_base_id")
+    id              String
+    title           String
+    tags            String[] @default([])
+    body            String
+    sourcePath      String?  @map("source_path")
+    contentHash     String   @map("content_hash")
+    metaHash        String?  @map("meta_hash")
+    updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+    knowledgeBase     KnowledgeBase              @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+    parents           KnowledgeParent[]
+    children          KnowledgeChild[]
+    imageDescriptions KnowledgeImageDescription[]
+
+    @@id([knowledgeBaseId, id])
+    @@map("kb_pages")
+}
+
+model KnowledgeParent {
+    knowledgeBaseId String @map("knowledge_base_id")
+    id              String
+    pageId          String @map("page_id")
+    parentIndex     Int    @map("parent_index")
+    text            String
+    /// `kb_pages.content_hash` this tree was built from.
+    sourcePageHash  String @map("source_page_hash")
+
+    page          KnowledgePage   @relation(fields: [knowledgeBaseId, pageId], references: [knowledgeBaseId, id], onDelete: Cascade)
+    children      KnowledgeChild[]
+
+    @@id([knowledgeBaseId, id])
+    @@unique([knowledgeBaseId, pageId, parentIndex])
+    @@map("kb_parents")
+}
+
+/// `embedding` is pgvector; set dimensions (e.g. vector(768)) in the migration.
+/// No HNSW index by default.
+model KnowledgeChild {
+    knowledgeBaseId String                      @map("knowledge_base_id")
+    id              String
+    parentId        String                      @map("parent_id")
+    pageId          String                      @map("page_id")
+    childIndex      Int                         @map("child_index")
+    text            String
+    embedding       Unsupported("vector")?
+    embeddingModel  String?                     @map("embedding_model")
+    embeddedAt      DateTime?                   @map("embedded_at") @db.Timestamptz(6)
+
+    parent        KnowledgeParent @relation(fields: [knowledgeBaseId, parentId], references: [knowledgeBaseId, id], onDelete: Cascade)
+    page          KnowledgePage   @relation(fields: [knowledgeBaseId, pageId], references: [knowledgeBaseId, id], onDelete: Cascade)
+
+    @@id([knowledgeBaseId, id])
+    @@unique([knowledgeBaseId, parentId, childIndex])
+    @@map("kb_children")
+}
+
+/// Per-image description cache (`kb_image_descriptions`), one row per
+/// `(knowledge_base_id, page_id, image_path)`. Read-only knowledge bases only.
 model KnowledgeImageDescription {
-    pageId      String   @map("page_id")
-    /// Path of the image as written inside the markdown body (relative
-    /// to the source file's directory). Combined with `pageId` this is
-    /// the unique key.
-    imagePath   String   @map("image_path")
-    /// sha256 hex of the image file's bytes. Compared to a fresh hash
-    /// of the image to decide "skip vs re-describe".
-    contentHash String   @map("content_hash")
-    /// LLM-generated description (single-line content, matching the
-    /// `<!-- image_desc: ... -->` lexer rule).
-    description String
-    createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-    updatedAt   DateTime @updatedAt          @map("updated_at") @db.Timestamptz(6)
+    knowledgeBaseId   String    @map("knowledge_base_id")
+    pageId            String    @map("page_id")
+    /// Path of the image as written inside the markdown body.
+    imagePath         String    @map("image_path")
+    /// sha256 hex of the image bytes. Compared to a fresh hash to decide skip vs re-describe.
+    imageContentHash  String    @map("image_content_hash")
+    /// `ignore` | `manual` | `vision-captioning`.
+    policy            String
+    description       String?
+    captionModel      String?   @map("caption_model")
+    captionPromptHash String?   @map("caption_prompt_hash")
+    descriptionHash   String?   @map("description_hash")
+    embedding         Unsupported("vector")?
+    embeddingModel    String?   @map("embedding_model")
+    embeddedAt        DateTime? @map("embedded_at") @db.Timestamptz(6)
 
-    page KnowledgePage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+    page          KnowledgePage @relation(fields: [knowledgeBaseId, pageId], references: [knowledgeBaseId, id], onDelete: Cascade)
 
-    @@id([pageId, imagePath])
+    @@id([knowledgeBaseId, pageId, imagePath])
     @@map("kb_image_descriptions")
 }
 
@@ -150,7 +231,7 @@ model AppModelProviderConfig {
 }
 
 /// App-level task→model assignment (`app_model_task_config`). Single row,
-/// id = `"default"`. Maps each app task (`embedding`, `llm-synthesis`,
+/// id = `"default"`. Maps each app task (`embedding`, `text-synthesis`,
 /// `md-image-captioning`) to a catalog `modelId` (or null). Kept apart from
 /// `app_model_provider_config`
 /// because it is application wiring, not provider info; task definitions and
@@ -158,64 +239,10 @@ model AppModelProviderConfig {
 model AppModelTaskConfig {
     id String @id @default("default")
 
-    /// Task → catalog `modelId` (or null). Keys: `embedding`, `llm-synthesis`, `md-image-captioning`.
+    /// Task → catalog `modelId` (or null). Keys: `embedding`, `text-synthesis`, `md-image-captioning`.
     tasks Json?
 
     @@map("app_model_task_config")
-}
-
-/// Knowledge page (`kb_pages`). `body` is ingest-normalized. Apply via your own migrate.
-model KnowledgePage {
-    id          String   @id
-    slug        String   @unique
-    title       String
-    type        String?
-    tags        String[] @default([])
-    body        String
-    sourcePath  String?  @map("source_path")
-    contentHash String   @map("content_hash")
-    updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-    parents  KnowledgeParent[]
-    children KnowledgeChild[]
-    imageDescriptions KnowledgeImageDescription[]
-
-    @@map("kb_pages")
-}
-
-model KnowledgeParent {
-    id          String @id
-    pageId      String @map("page_id")
-    parentIndex Int    @map("parent_index")
-    text        String
-    startOffset Int?   @map("start_offset")
-    endOffset   Int?   @map("end_offset")
-
-    page     KnowledgePage    @relation(fields: [pageId], references: [id], onDelete: Cascade)
-    children KnowledgeChild[]
-
-    @@unique([pageId, parentIndex])
-    @@map("kb_parents")
-}
-
-/// `embedding` is pgvector; set dimensions (e.g. vector(768)) in the migration. HNSW is not in this schema.
-model KnowledgeChild {
-    id             String                      @id
-    parentId       String                      @map("parent_id")
-    pageId         String                      @map("page_id")
-    childIndex     Int                         @map("child_index")
-    text           String
-    startOffset    Int?                        @map("start_offset")
-    endOffset      Int?                        @map("end_offset")
-    embedding      Unsupported("vector")?
-    embeddingModel String?                     @map("embedding_model")
-    embeddedAt     DateTime?                   @map("embedded_at") @db.Timestamptz(6)
-
-    parent KnowledgeParent @relation(fields: [parentId], references: [id], onDelete: Cascade)
-    page   KnowledgePage   @relation(fields: [pageId], references: [id], onDelete: Cascade)
-
-    @@unique([parentId, childIndex])
-    @@map("kb_children")
 }
 
 /// Generic structured app log row (`app_log`). One row per logixlysia
