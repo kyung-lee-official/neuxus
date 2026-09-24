@@ -1,4 +1,4 @@
-# Retrieval (question → parents)
+# Retrieval (question → ranked parents + image descriptions)
 
 Question (string) in → ranked rows out.
 
