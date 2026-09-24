@@ -29,7 +29,7 @@ flowchart LR
 
 | Doc                                                        | Contract                                                                                                          |
 | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| [01-corpus.md](./01-corpus.md)                             | Corpus layout: docs root, include/exclude, path → `source_path` / `id`                                            |
+| [01-corpus.md](./01-corpus.md)                             | Corpus layout: docs root, include/exclude, how a path maps to `source_path` / `id`                                |
 | [02-ingest.md](./02-ingest.md)                             | Discover files; markdown file → `kb_pages` + per-image policy in `kb_image_descriptions` (frontmatter, hash skip) |
 | [03.1-chunkify.md](./03.1-chunkify.md)                     | `kb_pages.body` → parents / children                                                                              |
 | [03.2-image-descriptions.md](./03.2-image-descriptions.md) | `*.meta.yaml` → image captions + description vectors                                                              |
