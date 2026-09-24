@@ -49,8 +49,11 @@ LIMIT $2;
 ```sql
 SELECT p.id, p.text, pg.title
 FROM kb_parents p
-JOIN kb_pages pg ON pg.id = p.page_id
-WHERE p.id = ANY($1::text[]);
+JOIN kb_pages pg
+  ON pg.knowledge_base_id = p.knowledge_base_id
+ AND pg.id = p.page_id
+WHERE p.knowledge_base_id = $kb
+  AND p.id = ANY($1::text[]);
 ```
 
 ## Image-description search
