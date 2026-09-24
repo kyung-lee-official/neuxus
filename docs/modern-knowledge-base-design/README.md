@@ -8,7 +8,7 @@ Vectors are produced and consumed through a shared embed utility, not a flow ste
 
 The stages are independent: each can run on its own, and its hash gate decides whether it does any work. Wiring them together (an application-level job, a "sync") is optional and application layer.
 
-Content lives in **knowledge bases**: each is either **read-only** (pages ingested from a corpus and written only by the ingest stage) or **writable** (pages updated directly, not by ingest). Every read and write is scoped to one knowledge base.
+Content lives in **knowledge bases**: each is either **read-only** (pages ingested from a corpus and written only by the ingest stage) or **writable** (pages updated directly, not by ingest). Every write targets one knowledge base; a search query binds one, and callers decide how many to search.
 
 ```mermaid
 ---
