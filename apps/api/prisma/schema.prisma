@@ -66,9 +66,9 @@ model Message {
     @@map("app_messages")
 }
 
-/// Knowledge base (`kb_knowledge_bases`). All content and searches are scoped
-/// to one knowledge base. `writable` false = read-only (corpus-backed,
-/// ingest-written); true = updated directly.
+/// Knowledge base (`kb_knowledge_bases`). Content belongs to one knowledge
+/// base, and a query is scoped to one. `writable` false = read-only
+/// (corpus-backed, ingest-written); true = updated directly.
 model KnowledgeBase {
     id        String   @id
     name      String
