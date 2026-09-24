@@ -1,8 +1,10 @@
 # Knowledge-base design
 
-Write path: corpus (source) → ingest → chunkify / image descriptions.
+- Write path
+  - read-only knowledge bases flow `corpus → ingest → chunkify / image descriptions`
+  - writable ones flow `direct write → chunkify`.
 
-Read path: retrieval → synthesis.
+- Read path: retrieval → synthesis.
 
 Vectors are produced and consumed through a shared embed utility, not a flow step.
 
@@ -15,9 +17,10 @@ Content lives in **knowledge bases**: each is either **read-only** (pages ingest
 theme: neo-dark
 ---
 flowchart LR
-  corpus[01 corpus (source)] --> ingest[02 ingest]
+  corpus["01 corpus (source)"] --> ingest[02 ingest]
   ingest --> chunkify[03.1 chunkify]
   ingest --> imagedesc[03.2 image descriptions]
+  direct[direct write] --> chunkify
   retrieval[04 retrieval] --> synthesis[05 synthesis]
   chunkify -. uses .-> embed[embed utility]
   imagedesc -. uses .-> embed
