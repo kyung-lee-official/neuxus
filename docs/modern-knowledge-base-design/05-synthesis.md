@@ -18,7 +18,7 @@ The prompt is already assembled by the caller. It includes:
 - Image-description hits from the second search in [04-retrieval.md](./04-retrieval.md#image-description-search)
 - Personal memory and recent chat when the Ask path has them
 
-Knowledge context comes from one knowledge base; memory and chat are separate. Empty parent list is allowed (memory/chat-only). If the prompt context does not contain the answer, the model should say so.
+Knowledge context comes from the caller's chosen knowledge base(s); memory and chat are separate. Empty parent list is allowed (memory/chat-only). If the prompt context does not contain the answer, the model should say so.
 
 ## Image handling
 
