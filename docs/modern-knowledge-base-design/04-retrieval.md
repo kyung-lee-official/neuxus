@@ -9,13 +9,15 @@ Embed the question, similarity-search `kb_children.embedding`, expand to parents
 ## Flow
 
 ```text
-1. Embed the question (same model / dims as children)
+1. Embed the question (same model as children)
 2. Similarity-search children
 3. Resolve parents (+ page title)
 4. Dedupe parents; keep best child score per parent
 5. Cap by max parents / max characters
 6. LLM gets parent texts (+ title) — not child windows alone ([05-synthesis.md](./05-synthesis.md))
 ```
+
+Cap knobs (`child_limit`, `max_parents`, `max_characters`) come from the knowledge base's [`kb_retrieve_settings`](./appendix-a-data-model.md#retrieval-knobs-table); app defaults when null.
 
 Separately, the same embedded question drives a second similarity search over `kb_image_descriptions.embedding` ([Image-description search](#image-description-search)).
 

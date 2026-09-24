@@ -147,6 +147,19 @@ CREATE TABLE kb_chunk_settings (
 );
 ```
 
+## Retrieval knobs table
+
+Per knowledge base. Nullable columns; **defaults live in application code**, not SQL `DEFAULT`.
+
+```sql
+CREATE TABLE kb_retrieve_settings (
+  knowledge_base_id TEXT PRIMARY KEY REFERENCES kb_knowledge_bases (id) ON DELETE CASCADE,
+  child_limit       INT,
+  max_parents       INT,
+  max_characters    INT
+);
+```
+
 ## Model config tables
 
 Model and provider wiring is application-level, not `kb_*`: `app_model_task_config` maps each app task to a catalog model, and `app_model_provider_config` holds provider connections. No `kb_*` table holds a model id.
