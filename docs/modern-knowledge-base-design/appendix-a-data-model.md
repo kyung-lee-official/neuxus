@@ -19,7 +19,7 @@ Knowledge base ──* Page ──* Image description (embedding)
 
 - Every content table carries `knowledge_base_id`; primary and foreign keys are scoped to it (`(knowledge_base_id, id)`), and retrieval filters by it. `kb_children` also denormalizes `page_id` for its scans.
 - A **read-only** knowledge base (`kb_knowledge_bases.writable = false`) is written only by the **ingest** stage.
-- A **writable** knowledge base (`kb_knowledge_bases.writable = true`) is updated directly, never by the ingest stage.
+- A **writable** knowledge base (`kb_knowledge_bases.writable = true`) is updated directly, never by the ingest stage, and is **text-only** (no `kb_image_descriptions`).
 - On page change: delete that page's parents/children, insert the new tree ([incremental updates](./02-ingest.md#incremental-updates-page-and-meta-hashes)).
 - Each parent records `source_page_hash`, the `kb_pages.content_hash` the tree was built from; chunkify rebuilds a page's tree when it differs from the current `content_hash` ([chunk freshness](./README.md#freshness-keys)).
 
