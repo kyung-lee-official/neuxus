@@ -8,12 +8,15 @@ Ingest discovers the corpus files and turns each into a `kb_pages` row plus that
 
 Ingest owns discovery: it runs the walker over the docs root and gets the included `*.md` files, one per page. The walk rules are the [corpus layout contract](./01-corpus.md).
 
-After processing the files, ingest deletes any `kb_pages` row whose `source_path` is set but not among the files the walker returned (the file was deleted upstream):
+After processing the files, ingest deletes any `kb_pages` row **of that knowledge base** whose `source_path` is set but not among the files the walker returned (the file was deleted upstream):
 
 ```text
-DELETE FROM kb_pages WHERE source_path IS NOT NULL
+DELETE FROM kb_pages WHERE knowledge_base_id = <kb>
+  AND source_path IS NOT NULL
   AND NOT (source_path = ANY(<walker source_paths>));
 ```
+
+Ingest processes one **read-only** knowledge base per run (`kb_knowledge_bases.writable = false`); writable knowledge bases are updated directly, never ingested.
 
 ## Flow
 
