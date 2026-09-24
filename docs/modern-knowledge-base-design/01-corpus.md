@@ -6,7 +6,7 @@ Folder depth is an **authoring** choice: how authors organize the repo. It is no
 
 ## Source of truth
 
-The markdown corpus lives in its **own git repository**, separate from the app. Authors write and review it there. The app only reads a chosen commit and shows the pages it imported; it never edits content — you change markdown in git, not the app. A corpus backs a **read-only** knowledge base: its pages are updated only by the ingest flow ([appendix A](./appendix-a-data-model.md)).
+The markdown corpus lives in its **own git repository**, separate from the app. Authors write and review it there. The app only reads a chosen commit and shows the pages it imported; it never edits the corpus — you change markdown in git, not the app. A corpus backs a **read-only** knowledge base: its pages are updated only by the ingest flow ([appendix A](./appendix-a-data-model.md)).
 
 A local directory that matches this layout is valid.
 
