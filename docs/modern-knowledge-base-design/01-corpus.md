@@ -1,24 +1,24 @@
 # Corpus layout
 
-Walking the corpus is the [ingest stage's](./02-ingest.md) job. This doc defines the layout it relies on: docs root, include/exclude, path → `source_path` / `id`, and hierarchy.
+Walking the corpus is the [ingest stage's](./02-ingest.md) job. This doc defines the layout it relies on: docs root, include/exclude, how a path maps to `source_path` / `id`, and hierarchy.
 
 Folder depth is an **authoring** choice: how authors organize the repo. It is not the chunk parent/child tree ([03.1-chunkify.md](./03.1-chunkify.md)).
 
 ## Source of truth
 
-The markdown corpus lives in its **own git repository**, separate from the app. Authors write and review it there. The app only reads a chosen commit and shows the pages it imported; it never edits content — you change markdown in git, not the app.
+The markdown corpus lives in its **own git repository**, separate from the app. Authors write and review it there. The app only reads a chosen commit and shows the pages it imported; it never edits content — you change markdown in git, not the app. A corpus backs a **read-only** knowledge base: its pages are updated only by the ingest flow ([appendix A](./appendix-a-data-model.md)).
 
 A local directory that matches this layout is valid.
 
 ## Settings in the database
 
-Where the app reads the corpus from — the git repository URL, the branch, and an optional docs-root subfolder — is stored in Postgres (`kb_corpus_settings`), not in environment variables. The row also records the last commit ingested. `DATABASE_URL` stays an environment variable so the app can reach the database.
+Where a knowledge base reads its corpus from — the git repository URL, the branch, and an optional docs-root subfolder — is stored in Postgres (`kb_corpus_settings`), not in environment variables. The row also records the last commit ingested. `DATABASE_URL` stays an environment variable so the app can reach the database.
 
-Same shape as other knobs: single row `id = 'default'`, **nullable columns**, **app defaults in code** when missing.
+One row per knowledge base, keyed by `knowledge_base_id`; **nullable columns**, **app defaults in code** when missing.
 
 `repo_url` has **no** useful app default. Null / missing means no repository is configured.
 
-Changing `repo_url` / `branch` does not rewrite `kb_pages`; the next ingest re-applies this contract, including deletes.
+Changing `repo_url` / `branch` does not rewrite `kb_pages`; the next ingest re-applies this contract for that knowledge base, including deletes.
 
 ## Docs root
 
@@ -84,11 +84,11 @@ Two files must not map to the same path (case-sensitive as git stores them). Pre
 
 ## Identity
 
-A page's identity is its **path**.
+A page's identity is its **path** within its knowledge base.
 
-| Field         | How it is set                                                                     |
-| ------------- | --------------------------------------------------------------------------------- |
-| `source_path` | POSIX path relative to docs root, including `.md` (example: `<parent>/<page>.md`) |
-| `kb_pages.id` | `source_path` without the `.md` suffix (`<parent>/<page>`)                        |
+| Field         | How it is set                                                                                |
+| ------------- | -------------------------------------------------------------------------------------------- |
+| `source_path` | POSIX path relative to docs root, including `.md` (example: `<parent>/<page>.md`)            |
+| `kb_pages.id` | `source_path` without the `.md` suffix (`<parent>/<page>`); unique within the knowledge base |
 
 `title` / `tags` come from frontmatter during ingest ([02-ingest.md](./02-ingest.md#frontmatter)). A rename or move is **delete old path + insert new path** (the hash skip does not carry embeddings across paths).
