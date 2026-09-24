@@ -2,6 +2,8 @@
 
 Question (string) in → ranked rows out.
 
+Each search query binds one knowledge base (`$kb`); the caller chooses which knowledge base(s) to search.
+
 Embed the question, similarity-search `kb_children.embedding`, expand to parents for the LLM.
 
 ## Flow
@@ -37,6 +39,7 @@ SELECT
 FROM kb_children c
 WHERE c.embedding IS NOT NULL
   AND c.embedding_model IS NOT DISTINCT FROM $current_model
+  AND c.knowledge_base_id = $kb
 ORDER BY c.embedding <=> $1::vector
 LIMIT $2;
 ```
@@ -63,6 +66,7 @@ SELECT
 FROM kb_image_descriptions d
 WHERE d.embedding IS NOT NULL
   AND d.embedding_model IS NOT DISTINCT FROM $current_model
+  AND d.knowledge_base_id = $kb
   AND d.policy <> 'ignore'
 ORDER BY d.embedding <=> $1::vector
 LIMIT $2;
