@@ -1,25 +1,25 @@
 /**
- * Retriever-settings DAL. Owns the `kb_retrieve_settings` singleton row
- * (id `default`).
+ * Retriever-settings DAL. Owns the `kb_retrieve_settings` table (one row per
+ * knowledge base, keyed by `knowledge_base_id`).
  *
  * Internal to the settings sub-module: only `service.ts` imports it.
  */
 
 import { getPrisma } from "../../../../shared/db.ts";
 
-const SETTINGS_ID = "default";
-
-/** Raw `kb_retrieve_settings` row (id `default`), columns verbatim. */
+/** Raw `kb_retrieve_settings` row, columns verbatim. */
 export type RetrieveSettingsRecord = {
   childLimit: number | null;
   maxParents: number | null;
   maxCharacters: number | null;
 };
 
-/** Load `kb_retrieve_settings` id `default`, or null when no row exists. */
-export async function findRetrieveSettings(): Promise<RetrieveSettingsRecord | null> {
+/** Load the retrieval settings for one knowledge base, or null when unset. */
+export async function findRetrieveSettings(
+  knowledgeBaseId: string,
+): Promise<RetrieveSettingsRecord | null> {
   const row = await getPrisma().knowledgeRetrieveSettings.findUnique({
-    where: { id: SETTINGS_ID },
+    where: { knowledgeBaseId },
   });
   if (!row) return null;
   return {
@@ -29,15 +29,18 @@ export async function findRetrieveSettings(): Promise<RetrieveSettingsRecord | n
   };
 }
 
-/** Upsert `kb_retrieve_settings` id `default`. */
-export async function upsertRetrieveSettings(fields: {
-  childLimit: number | null;
-  maxParents: number | null;
-  maxCharacters: number | null;
-}): Promise<void> {
+/** Upsert the retrieval settings for one knowledge base. */
+export async function upsertRetrieveSettings(
+  knowledgeBaseId: string,
+  fields: {
+    childLimit: number | null;
+    maxParents: number | null;
+    maxCharacters: number | null;
+  },
+): Promise<void> {
   await getPrisma().knowledgeRetrieveSettings.upsert({
-    where: { id: SETTINGS_ID },
-    create: { id: SETTINGS_ID, ...fields },
+    where: { knowledgeBaseId },
+    create: { knowledgeBaseId, ...fields },
     update: { ...fields },
   });
 }
