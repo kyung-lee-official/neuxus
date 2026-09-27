@@ -11,8 +11,6 @@ export type ParentRow = {
   id: string;
   parent_index: number;
   text: string | null;
-  start_offset: number | null;
-  end_offset: number | null;
 };
 
 export type ParentInsert = {
@@ -20,16 +18,19 @@ export type ParentInsert = {
   pageId: string;
   parentIndex: number;
   text: string;
-  startOffset: number;
-  endOffset: number;
+  /** `kb_pages.content_hash` this tree was built from. */
+  sourcePageHash: string;
 };
 
 /** Parent rows for one page, ordered by `parent_index`. */
-export async function findParentsByPage(pageId: string): Promise<ParentRow[]> {
+export async function findParentsByPage(
+  knowledgeBaseId: string,
+  pageId: string,
+): Promise<ParentRow[]> {
   return sql<ParentRow[]>`
-    SELECT id, parent_index, text, start_offset, end_offset
+    SELECT id, parent_index, text
     FROM kb_parents
-    WHERE page_id = ${pageId}
+    WHERE knowledge_base_id = ${knowledgeBaseId} AND page_id = ${pageId}
     ORDER BY parent_index
   `;
 }
@@ -37,22 +38,26 @@ export async function findParentsByPage(pageId: string): Promise<ParentRow[]> {
 /** Replace all parent rows for a page inside the caller's transaction. */
 export async function replaceParents(
   tx: SQL,
+  knowledgeBaseId: string,
   pageId: string,
   rows: ParentInsert[],
 ): Promise<void> {
-  await tx`DELETE FROM kb_parents WHERE page_id = ${pageId}`;
+  await tx`
+    DELETE FROM kb_parents
+    WHERE knowledge_base_id = ${knowledgeBaseId} AND page_id = ${pageId}
+  `;
   for (const row of rows) {
     await tx`
       INSERT INTO kb_parents (
-        id, page_id, parent_index, text, start_offset, end_offset
+        knowledge_base_id, id, page_id, parent_index, text, source_page_hash
       )
       VALUES (
+        ${knowledgeBaseId},
         ${row.id},
         ${row.pageId},
         ${row.parentIndex},
         ${row.text},
-        ${row.startOffset},
-        ${row.endOffset}
+        ${row.sourcePageHash}
       )
     `;
   }

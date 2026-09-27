@@ -2,8 +2,7 @@
  * Knowledge-pages DAL. Owns the `kb_pages` table (and its chunk-tree
  * transaction, delegating the parent/child statements to the sibling dals).
  *
- * Internal to the knowledge module: the `pages` domain files (`list.ts`,
- * `get.ts`, `persist.ts`) import it.
+ * Internal to the knowledge module: `pages/service.ts` imports it.
  */
 
 import { type SQL, sql } from "bun";
@@ -12,10 +11,9 @@ import { type ChildInsert, replaceChildren } from "./children.dal.ts";
 import { type ParentInsert, replaceParents } from "./parents.dal.ts";
 
 export type PageSummaryRow = {
+  knowledge_base_id: string;
   id: string;
-  slug: string;
   title: string | null;
-  type: string | null;
   tags: string[];
   source_path: string | null;
   content_hash: string | null;
@@ -25,61 +23,67 @@ export type PageSummaryRow = {
 };
 
 export type PageDetailRow = {
+  knowledge_base_id: string;
   id: string;
-  slug: string;
   title: string | null;
-  type: string | null;
   tags: string[];
   body: string | null;
   source_path: string | null;
   content_hash: string | null;
+  meta_hash: string | null;
   updated_at: Date | null;
 };
 
 /**
- * All `kb_pages` with parent/child counts, ordered by slug. No `body`.
+ * All `kb_pages` of one knowledge base with parent/child counts. No `body`.
  * The counts read `kb_parents`/`kb_children` as aggregates for the listing.
  */
-export async function listPageSummaries(): Promise<PageSummaryRow[]> {
+export async function listPageSummaries(
+  knowledgeBaseId: string,
+): Promise<PageSummaryRow[]> {
   return sql<PageSummaryRow[]>`
     SELECT
+      p.knowledge_base_id,
       p.id,
-      p.slug,
       p.title,
-      p.type,
       p.tags,
       p.source_path,
       p.content_hash,
       p.updated_at,
       (
-        SELECT COUNT(*)::int FROM kb_parents WHERE page_id = p.id
+        SELECT COUNT(*)::int FROM kb_parents
+        WHERE knowledge_base_id = p.knowledge_base_id AND page_id = p.id
       ) AS parent_count,
       (
-        SELECT COUNT(*)::int FROM kb_children WHERE page_id = p.id
+        SELECT COUNT(*)::int FROM kb_children
+        WHERE knowledge_base_id = p.knowledge_base_id AND page_id = p.id
       ) AS child_count
     FROM kb_pages p
-    ORDER BY p.slug
+    WHERE p.knowledge_base_id = ${knowledgeBaseId}
+    ORDER BY p.source_path, p.id
   `;
 }
 
-/** Page id + body for every `kb_pages` row (rechunk input). */
+/** Knowledge base + page id + body for every `kb_pages` row (rechunk input). */
 export async function listPageBodies(): Promise<
-  { id: string; body: string }[]
+  { knowledge_base_id: string; id: string; body: string }[]
 > {
-  return sql<{ id: string; body: string }[]>`
-    SELECT id, body FROM kb_pages
+  return sql<{ knowledge_base_id: string; id: string; body: string }[]>`
+    SELECT knowledge_base_id, id, body FROM kb_pages
   `;
 }
 
 /** One `kb_pages` row including `body`, or null when missing. */
 export async function findPageDetailRow(
+  knowledgeBaseId: string,
   pageId: string,
 ): Promise<PageDetailRow | null> {
   const rows = await sql<PageDetailRow[]>`
     SELECT
-      id, slug, title, type, tags, body, source_path, content_hash, updated_at
+      knowledge_base_id, id, title, tags, body, source_path, content_hash,
+      meta_hash, updated_at
     FROM kb_pages
-    WHERE id = ${pageId}
+    WHERE knowledge_base_id = ${knowledgeBaseId} AND id = ${pageId}
     LIMIT 1
   `;
   return rows[0] ?? null;
@@ -87,24 +91,27 @@ export async function findPageDetailRow(
 
 /** Stored `kb_pages.content_hash`, or null when the page is missing. */
 export async function findPageContentHash(
+  knowledgeBaseId: string,
   pageId: string,
 ): Promise<string | null> {
   const rows = await sql<{ content_hash: string | null }[]>`
-    SELECT content_hash FROM kb_pages WHERE id = ${pageId} LIMIT 1
+    SELECT content_hash FROM kb_pages
+    WHERE knowledge_base_id = ${knowledgeBaseId} AND id = ${pageId}
+    LIMIT 1
   `;
   const hash = rows[0]?.content_hash;
   return typeof hash === "string" ? hash : null;
 }
 
 export type UpsertPageWithChunksInput = {
+  knowledgeBaseId: string;
   id: string;
-  slug: string;
   title: string;
-  type: string | null;
   tags: string[];
   body: string;
   sourcePath: string | null;
   contentHash: string;
+  metaHash: string | null;
   chunks: ChunkifyResult;
 };
 
@@ -121,8 +128,7 @@ export async function upsertPageWithChunks(
     pageId: input.id,
     parentIndex: parent.index,
     text: parent.text,
-    startOffset: parent.start,
-    endOffset: parent.end,
+    sourcePageHash: input.contentHash,
   }));
 
   const childRows: ChildInsert[] = input.chunks.children.map((child) => {
@@ -133,15 +139,13 @@ export async function upsertPageWithChunks(
       pageId: input.id,
       childIndex: child.index,
       text: child.text,
-      startOffset: child.start,
-      endOffset: child.end,
     };
   });
 
   await sql.begin(async (tx) => {
     await upsertPageRow(tx, input);
-    await replaceParents(tx, input.id, parentRows);
-    await replaceChildren(tx, input.id, childRows);
+    await replaceParents(tx, input.knowledgeBaseId, input.id, parentRows);
+    await replaceChildren(tx, input.knowledgeBaseId, input.id, childRows);
   });
 }
 
@@ -152,57 +156,63 @@ async function upsertPageRow(
 ): Promise<void> {
   await tx`
     INSERT INTO kb_pages (
-      id, slug, title, type, tags, body, source_path, content_hash, updated_at
+      knowledge_base_id, id, title, tags, body, source_path, content_hash,
+      meta_hash, updated_at
     )
     VALUES (
+      ${input.knowledgeBaseId},
       ${input.id},
-      ${input.slug},
       ${input.title},
-      ${input.type},
       ${tx.array(input.tags)}::text[],
       ${input.body},
       ${input.sourcePath},
       ${input.contentHash},
+      ${input.metaHash},
       NOW()
     )
-    ON CONFLICT (id) DO UPDATE SET
-      slug = EXCLUDED.slug,
+    ON CONFLICT (knowledge_base_id, id) DO UPDATE SET
       title = EXCLUDED.title,
-      type = EXCLUDED.type,
       tags = EXCLUDED.tags,
       body = EXCLUDED.body,
       source_path = EXCLUDED.source_path,
       content_hash = EXCLUDED.content_hash,
+      meta_hash = EXCLUDED.meta_hash,
       updated_at = NOW()
   `;
 }
 
 /** Replace one page's parent/child tree in a transaction (no `kb_pages` write). */
 export async function replacePageChunks(
+  knowledgeBaseId: string,
   pageId: string,
   parents: ParentInsert[],
   children: ChildInsert[],
 ): Promise<void> {
   await sql.begin(async (tx) => {
-    await replaceParents(tx, pageId, parents);
-    await replaceChildren(tx, pageId, children);
+    await replaceParents(tx, knowledgeBaseId, pageId, parents);
+    await replaceChildren(tx, knowledgeBaseId, pageId, children);
   });
 }
 
 /**
- * Drop corpus pages whose `source_path` is not in the current walker list.
- * Rows with null `source_path` are left alone.
+ * Drop one knowledge base's corpus pages whose `source_path` is not in the
+ * current walker list. Rows with null `source_path` are left alone.
  */
 export async function deletePagesMissingSourcePaths(
+  knowledgeBaseId: string,
   keepSourcePaths: string[],
 ): Promise<void> {
   if (keepSourcePaths.length === 0) {
-    await sql`DELETE FROM kb_pages WHERE source_path IS NOT NULL`;
+    await sql`
+      DELETE FROM kb_pages
+      WHERE knowledge_base_id = ${knowledgeBaseId} AND source_path IS NOT NULL
+    `;
     return;
   }
   await sql`
     DELETE FROM kb_pages
-    WHERE source_path IS NOT NULL
+    WHERE knowledge_base_id = ${knowledgeBaseId}
+      AND source_path IS NOT NULL
       AND NOT (source_path = ANY(${sql.array(keepSourcePaths)}::text[]))
   `;
 }
