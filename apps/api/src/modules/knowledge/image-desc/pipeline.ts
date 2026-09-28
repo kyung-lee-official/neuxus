@@ -1,42 +1,34 @@
 /**
- * Image-description enricher pipeline. Reads the markdown body of a
- * page, finds every image reference, and ensures `kb_image_descriptions`
- * has an up-to-date row for each unique image. The body's content is
- * returned with any newly-injected image_desc block(s) folded in.
+ * Image-description caption pass. Runs after ingest, before embedding.
  *
- * Rules:
- *   - One image is identified by its `(absolutePath, contentHash)`.
- *   - If the body's image is immediately preceded by an
- *     `<!-- image_desc -->` opener, that opener is treated as the
- *     author's manual description: description text is whatever sits
- *     between the opener and the `<!-- /image_desc -->` closer.
- *     `content_hash` is refreshed to current image bytes.
- *   - Otherwise, the LLM vision provider is called to generate a
- *     description, which is wrapped in a fresh open/close pair and
- *     injected directly after the image line in the body.
- *   - The walker-level validator catches orphan openers (no closer)
- *     beforehand and fail-fasts the page; this pipeline never produces
- *     one.
+ * Reads `kb_image_descriptions` rows with `policy = 'vision-captioning'`,
+ * captions the stale ones with the model linked to the `md-image-captioning`
+ * task, and updates the row. It never touches `kb_pages.body` — descriptions
+ * live only in `kb_image_descriptions`.
+ *
+ * @see docs/modern-knowledge-base-design/03.2-image-descriptions.md
  */
 
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { extname } from "node:path";
+import { extname, join } from "node:path";
 
 import {
   resolveTaskModelLink,
   TASK_MD_IMAGE_CAPTIONING,
 } from "../../server-setting/task-model-map/service.ts";
-import { findImageDescription, upsertImageDescription } from "./dal.ts";
-import { dedupByPath, type ParsedImageRef, parseImageRefs } from "./parse.ts";
-import { findOrphanImageDescOpeners } from "./validate.ts";
+import { listVisionCaptionCandidates, updateImageCaption } from "./dal.ts";
+import { resolveImagePath } from "./resolve.ts";
 
-/** Business prompt for the `md-image-captioning` task. */
+/**
+ * Business prompt for the `md-image-captioning` task. Its `sha256` is stored
+ * as `caption_prompt_hash`; editing this text re-captions stored rows.
+ */
 const CAPTION_PROMPT =
   "Describe this image in one concise paragraph. Focus on the technical content: what is shown, the meaning of any labels or values, and any diagram relationships. Do not start with phrases like 'This image shows' — start directly with the subject. Do not repeat information that is already described in nearby text. Output only the description, no preamble.";
 
 /** A captioning client: image bytes in, one-line description out. */
-type ImageDescriber = {
+export type ImageDescriber = {
   describe(image: {
     absolutePath: string;
     bytes: Buffer;
@@ -63,222 +55,111 @@ function sha256Hex(bytes: Buffer): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-export type EnrichmentResult = {
-  /** The (possibly rewritten) body — description blocks folded in for LLM-described images. */
-  body: string;
-  /** Count of images that ended up calling the vision LLM. */
-  llmCalls: number;
-  /** Count of images whose stored description was reused (manual or cache hit). */
-  cachedCalls: number;
-};
-
-/**
- * Persistence hooks. Injected so the pipeline is testable without a real
- * Prisma client; production uses the default implementations from store.ts.
- */
-export type PersistHooks = {
-  findStored: typeof findImageDescription;
-  upsertStored: typeof upsertImageDescription;
-};
-
-export const defaultPersistHooks: PersistHooks = {
-  findStored: findImageDescription,
-  upsertStored: upsertImageDescription,
-};
-
-export type EnrichOptions = {
-  pageId: string;
-  /** Absolute filesystem path of the markdown source file (read-only). */
-  sourceAbsPath: string;
-  body: string;
-  /**
-   * Override the captioning client. If omitted, one is built from the
-   * model linked to the `md-image-captioning` task.
-   */
+export type CaptionPassOptions = {
+  knowledgeBaseId: string;
+  /** Local corpus checkout root (the knowledge base's working tree). */
+  checkoutDir: string;
+  /** Docs root within the checkout (POSIX; `""` walks the checkout root). */
+  docsRoot: string;
   describer?: ImageDescriber;
-  /**
-   * Override persistence hooks (used by tests). Defaults to the live
-   * Prisma-backed `store.ts` lookups.
-   */
-  persist?: PersistHooks;
+  /** Throw on the first failure instead of skipping the image. */
+  failFast?: boolean;
 };
 
-/**
- * Validate first (fail-fast the page if any image_desc opener has no
- * closer), then enrich each unique image and return the rewritten body.
- */
-export async function enrichImagesWithDescriptions(
-  options: EnrichOptions,
-): Promise<EnrichmentResult> {
-  const orphans = findOrphanImageDescOpeners(options.body);
-  if (orphans.length > 0) {
-    throw new ImageDescValidationError(
-      `image_desc opener without closer at line ${orphans[0]!.line}: ${orphans[0]!.text}`,
-    );
-  }
+export type CaptionPassResult = {
+  currentModel: string;
+  considered: number;
+  captioned: number;
+  skipped: number;
+  failed: number;
+};
 
-  const allRefs = parseImageRefs(options.body, options.sourceAbsPath);
-  const refs = dedupByPath(allRefs);
-
-  const describer = options.describer ?? (await buildDefaultDescriber());
-  const persist = options.persist ?? defaultPersistHooks;
-
-  let body = options.body;
-  let llmCalls = 0;
-  let cachedCalls = 0;
-
-  for (const ref of refs) {
-    const result = await enrichOne(
-      body,
-      ref,
-      describer,
-      persist,
-      options.pageId,
-    );
-    body = result.body;
-    llmCalls += result.llmCalls;
-    cachedCalls += result.cachedCalls;
-  }
-
-  return { body, llmCalls, cachedCalls };
-}
-
-export class ImageDescValidationError extends Error {}
-
-async function buildDefaultDescriber(): Promise<ImageDescriber> {
-  const link = await resolveTaskModelLink(TASK_MD_IMAGE_CAPTIONING);
-  if (!link) {
-    throw new Error("No model is linked to the md-image-captioning task");
-  }
-  return {
-    describe: ({ bytes, mimeType }) =>
-      link.provider.imageChat(link.model.modelId, CAPTION_PROMPT, {
-        bytes,
-        mimeType,
-      }),
-  };
-}
-
-async function enrichOne(
-  body: string,
-  ref: ParsedImageRef,
-  describer: ImageDescriber,
-  persist: PersistHooks,
-  pageId: string,
-): Promise<{ body: string; llmCalls: number; cachedCalls: number }> {
-  // Read image bytes + compute hash. A read failure aborts just this image;
-  // the caller decides whether to skip or fail-fast the page.
-  let bytes: Buffer;
-  try {
-    bytes = await readFile(ref.absolutePath);
-  } catch {
-    // Missing image file — leave the body untouched and the caller will
-    // log the warning. No LLM call, no DB write.
-    return { body, llmCalls: 0, cachedCalls: 0 };
-  }
-  const contentHash = sha256Hex(bytes);
-
-  // Manual description → keep author's wording, just refresh hash.
-  if (ref.hasManualDescription) {
-    const description = extractManualDescription(body, ref);
-    if (description === null) {
-      // No closer found — that's an orphan opener, but the validator
-      // already would have caught it before we got here. Defensive bail.
-      return { body, llmCalls: 0, cachedCalls: 0 };
+export class ImageCaptioner {
+  /** Caption every stale `vision-captioning` image in one knowledge base. */
+  static async captionStale(
+    options: CaptionPassOptions,
+  ): Promise<CaptionPassResult> {
+    const link = await resolveTaskModelLink(TASK_MD_IMAGE_CAPTIONING);
+    if (!link) {
+      throw new Error("No model is linked to the md-image-captioning task");
     }
-    await persist.upsertStored({
-      pageId,
-      imagePath: ref.imagePath,
-      contentHash,
-      description,
-    });
-    return { body, llmCalls: 0, cachedCalls: 1 };
+    const currentModel = link.model.identifier;
+    const currentPromptHash = sha256Hex(Buffer.from(CAPTION_PROMPT, "utf8"));
+    const describer: ImageDescriber = options.describer ?? {
+      describe: ({ bytes, mimeType }) =>
+        link.provider.imageChat(link.model.modelId, CAPTION_PROMPT, {
+          bytes,
+          mimeType,
+        }),
+    };
+
+    const candidates = await listVisionCaptionCandidates(
+      options.knowledgeBaseId,
+    );
+
+    let captioned = 0;
+    let skipped = 0;
+    let failed = 0;
+
+    for (const candidate of candidates) {
+      try {
+        const sourceAbsPath = join(
+          options.checkoutDir,
+          options.docsRoot,
+          candidate.sourcePath ?? "",
+        );
+        const imageAbsPath = resolveImagePath(
+          sourceAbsPath,
+          candidate.imagePath,
+        );
+        const bytes = await readFile(imageAbsPath);
+        const imageContentHash = sha256Hex(bytes);
+
+        const fresh =
+          imageContentHash === candidate.imageContentHash &&
+          candidate.captionModel === currentModel &&
+          candidate.captionPromptHash === currentPromptHash &&
+          candidate.descriptionHash != null;
+        if (fresh) {
+          skipped += 1;
+          continue;
+        }
+
+        const description = (
+          await describer.describe({
+            absolutePath: imageAbsPath,
+            bytes,
+            mimeType: mimeTypeFor(imageAbsPath),
+          })
+        )
+          .replace(/\s+/g, " ")
+          .trim();
+
+        await updateImageCaption(
+          options.knowledgeBaseId,
+          candidate.pageId,
+          candidate.imagePath,
+          {
+            imageContentHash,
+            description,
+            captionModel: currentModel,
+            captionPromptHash: currentPromptHash,
+            descriptionHash: sha256Hex(Buffer.from(description, "utf8")),
+          },
+        );
+        captioned += 1;
+      } catch (err) {
+        if (options.failFast) throw err;
+        failed += 1;
+      }
+    }
+
+    return {
+      currentModel,
+      considered: candidates.length,
+      captioned,
+      skipped,
+      failed,
+    };
   }
-
-  // No manual description → check the cache (by image path under the
-  // current page), then fall back to the LLM.
-  const stored = await persist.findStored(pageId, ref.imagePath);
-  if (stored && stored.contentHash === contentHash) {
-    return { body, llmCalls: 0, cachedCalls: 1 };
-  }
-
-  const mimeType = mimeTypeFor(ref.absolutePath);
-  let description: string;
-  try {
-    description = await describer.describe({
-      absolutePath: ref.absolutePath,
-      bytes,
-      mimeType,
-    });
-  } catch {
-    return { body, llmCalls: 0, cachedCalls: 0 };
-  }
-  description = description.replace(/\s+/g, " ").trim();
-
-  await persist.upsertStored({
-    pageId,
-    imagePath: ref.imagePath,
-    contentHash,
-    description,
-  });
-
-  const block = `<!-- image_desc -->\n${description}\n<!-- /image_desc -->`;
-  const newBody = injectImageDescBlock(body, ref, block);
-  return { body: newBody, llmCalls: 1, cachedCalls: 0 };
-}
-
-/**
- * Extract the description text from `<!-- image_desc -->` ... `<!-- /image_desc -->`.
- * The image line sits between the opener and the closer; the description
- * is whatever's between the image line and the closer.
- *
- * Returns null if the closer can't be found (validator should have
- * caught this earlier).
- */
-function extractManualDescription(
-  body: string,
-  ref: ParsedImageRef,
-): string | null {
-  if (ref.manualOpenerStart === undefined) return null;
-  // Opener line ends at the next \n (or EOF).
-  const openerLineEnd = body.indexOf("\n", ref.manualOpenerStart);
-  const openerEnd = openerLineEnd === -1 ? body.length : openerLineEnd + 1;
-  // The closer must come AFTER the opener, anywhere in the body up to
-  // the image line. Look for the first one after the opener — and verify
-  // it is actually before the image.
-  const closerIdx = body.indexOf("<!-- /image_desc -->", openerEnd);
-  if (closerIdx === -1 || closerIdx >= ref.imageStart) return null;
-  // Description = text between the opener line and the closer line.
-  return body.slice(openerEnd, closerIdx).trim();
-}
-
-/**
- * Insert an image_desc block immediately after the image line in `body`.
- * If a manual block is already present, replace its content with the new
- * block.
- */
-function injectImageDescBlock(
-  body: string,
-  ref: ParsedImageRef,
-  block: string,
-): string {
-  const imageLineEnd = body.indexOf("\n", ref.imageStart);
-  const imageLine =
-    imageLineEnd === -1
-      ? body.slice(ref.imageStart)
-      : body.slice(ref.imageStart, imageLineEnd + 1);
-  const afterImage = imageLineEnd === -1 ? "" : body.slice(imageLineEnd + 1);
-
-  // If the manual opener already exists, the existing block sits between
-  // the opener line and the image line; we only need to replace the body
-  // content between image line and closer line.
-  if (ref.hasManualDescription && ref.manualOpenerStart !== undefined) {
-    const closerIdx = body.indexOf("<!-- /image_desc -->", imageLineEnd);
-    if (closerIdx === -1) return body;
-    const before = body.slice(0, imageLineEnd + 1);
-    const after = body.slice(closerIdx);
-    return `${before}\n${block}\n${after}`;
-  }
-
-  return `${body.slice(0, imageLineEnd + 1)}\n${block}\n${afterImage}`;
 }

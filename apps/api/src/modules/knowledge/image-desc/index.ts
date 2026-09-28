@@ -1,33 +1,30 @@
 /**
- * Public surface of the image-description enricher.
+ * Public surface of the image-description caption pass.
  *
  * Modules:
- *   - validate.ts    : orphan-opener detection (fail-fast trigger)
- *   - parse.ts       : image-ref extraction + strict manual pair
+ *   - dal.ts         : CRUD + caption queries for `kb_image_descriptions`
+ *   - pipeline.ts    : caption pass (vision model → description rows)
  *   - resolve.ts     : body-relative path → absolute filesystem path
- *   - dal.ts         : Prisma CRUD for kb_image_descriptions
- *   - pipeline.ts    : ImageDescriptionEnricher orchestrator
+ *   - parse.ts       : image-ref extraction (for ingest policy reconciliation)
+ *   - validate.ts    : orphan-opener detection
  *
  * The vision model is selected at runtime from the `md-image-captioning`
- * task link (see `buildDefaultDescriber` in pipeline.ts).
+ * task link (see `ImageCaptioner` in pipeline.ts).
  */
 
 export {
+  type CaptionCandidate,
   findImageDescription,
+  type ImageCaptionFields,
+  listImageDescriptionsByPage,
+  listVisionCaptionCandidates,
+  updateImageCaption,
   upsertImageDescription,
 } from "./dal.ts";
-export { dedupByPath, type ParsedImageRef, parseImageRefs } from "./parse.ts";
 export {
-  defaultPersistHooks,
-  type EnrichmentResult,
-  type EnrichOptions,
-  ImageDescriptionEnricher,
-  ImageDescValidationError,
-  type PersistHooks,
+  type CaptionPassOptions,
+  type CaptionPassResult,
+  ImageCaptioner,
+  type ImageDescriber,
 } from "./pipeline.ts";
 export { resolveImagePath } from "./resolve.ts";
-export {
-  findOrphanImageDescBlocks,
-  findOrphanImageDescOpeners,
-  type OrphanImageDesc,
-} from "./validate.ts";
