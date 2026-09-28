@@ -13,9 +13,9 @@ import { CorpusSettings } from "./settings/service.ts";
 const GIT_TIMEOUT_MS = 120_000;
 const BRANCH_PATTERN = /^[A-Za-z0-9._/-]+$/;
 
-/** Local checkout of `kb_corpus_settings` (`apps/api/data/corpus`). */
-export function corpusCheckoutDir(): string {
-  return join(import.meta.dir, "../../../data/corpus");
+/** Local checkout of one knowledge base's corpus (`apps/api/data/corpus/<kb>`). */
+export function corpusCheckoutDir(knowledgeBaseId: string): string {
+  return join(import.meta.dir, "../../../data/corpus", knowledgeBaseId);
 }
 
 function gitDir(checkout: string): string {
@@ -78,10 +78,10 @@ async function requireHeadSha(checkout: string): Promise<string> {
   return sha;
 }
 
-async function requireRepoUrl(): Promise<
-  StoredCorpusSettings & { repoUrl: string }
-> {
-  const settings = await CorpusSettings.load();
+async function requireRepoUrl(
+  knowledgeBaseId: string,
+): Promise<StoredCorpusSettings & { repoUrl: string }> {
+  const settings = await CorpusSettings.load(knowledgeBaseId);
   if (!settings.repoUrl) {
     throw new CorpusGitError(400, "Save a repo URL first.");
   }
@@ -92,9 +92,9 @@ async function requireRepoUrl(): Promise<
 
 async function cloneIntoCheckout(
   settings: StoredCorpusSettings & { repoUrl: string },
+  checkout: string,
   onProgress?: (event: SimpleGitProgressEvent) => void,
 ): Promise<void> {
-  const checkout = corpusCheckoutDir();
   if (existsSync(gitDir(checkout))) {
     throw new CorpusGitError(409, "Already cloned. Use Pull.");
   }
@@ -125,9 +125,9 @@ async function cloneIntoCheckout(
 
 async function pullInCheckout(
   settings: StoredCorpusSettings & { repoUrl: string },
+  checkout: string,
   onStage?: (stage: PullStage) => void,
 ): Promise<void> {
-  const checkout = corpusCheckoutDir();
   if (!existsSync(gitDir(checkout))) {
     throw new CorpusGitError(400, "Not cloned yet. Use Clone.");
   }
@@ -163,10 +163,12 @@ export type PullStage = "fetch" | "checkout" | "merge";
 
 /** Clone, mapping git progress to the phases the UI renders. */
 export async function cloneCorpusStream(
+  knowledgeBaseId: string,
   onProgress: (progress: CloneProgress) => void,
 ): Promise<StoredCorpusSettings> {
-  const settings = await requireRepoUrl();
-  await cloneIntoCheckout(settings, (event) => {
+  const settings = await requireRepoUrl(knowledgeBaseId);
+  const checkout = corpusCheckoutDir(knowledgeBaseId);
+  await cloneIntoCheckout(settings, checkout, (event) => {
     const phase =
       event.stage === "receiving"
         ? "receiving"
@@ -183,31 +185,35 @@ export async function cloneCorpusStream(
       total: event.total,
     });
   });
-  const sha = await requireHeadSha(corpusCheckoutDir());
-  return CorpusSettings.saveLastSyncedSha(sha);
+  const sha = await requireHeadSha(checkout);
+  return CorpusSettings.saveLastSyncedSha(knowledgeBaseId, sha);
 }
 
 /** Pull with stage transitions emitted as each git subcommand starts. */
 export async function pullCorpusStream(
+  knowledgeBaseId: string,
   onStage: (stage: PullStage) => void,
 ): Promise<StoredCorpusSettings> {
-  const settings = await requireRepoUrl();
-  await pullInCheckout(settings, onStage);
-  const sha = await requireHeadSha(corpusCheckoutDir());
-  return CorpusSettings.saveLastSyncedSha(sha);
+  const settings = await requireRepoUrl(knowledgeBaseId);
+  const checkout = corpusCheckoutDir(knowledgeBaseId);
+  await pullInCheckout(settings, checkout, onStage);
+  const sha = await requireHeadSha(checkout);
+  return CorpusSettings.saveLastSyncedSha(knowledgeBaseId, sha);
 }
 
 /**
  * Clone if missing, otherwise pull. Returns HEAD; does not write
  * `last_synced_sha` (full Sync writes that after ingest + embed).
  */
-export async function refreshCorpusCheckout(): Promise<string> {
-  const settings = await requireRepoUrl();
-  const checkout = corpusCheckoutDir();
+export async function refreshCorpusCheckout(
+  knowledgeBaseId: string,
+): Promise<string> {
+  const settings = await requireRepoUrl(knowledgeBaseId);
+  const checkout = corpusCheckoutDir(knowledgeBaseId);
   if (existsSync(gitDir(checkout))) {
-    await pullInCheckout(settings);
+    await pullInCheckout(settings, checkout);
   } else {
-    await cloneIntoCheckout(settings);
+    await cloneIntoCheckout(settings, checkout);
   }
   return requireHeadSha(checkout);
 }

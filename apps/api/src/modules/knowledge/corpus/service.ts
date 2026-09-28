@@ -1,14 +1,15 @@
 /**
- * Corpus service. Owns the corpus operations (clone / pull / rechunk /
- * embed / sync) and the single-operation lock + progress stream they share.
+ * Corpus service. Owns the per-knowledge-base corpus operations (clone / pull /
+ * rechunk / embed / sync) and the single-operation lock + progress stream they
+ * share.
  *
- * Lower-level pieces stay separate: `git.ts` (git plumbing), `dal.ts` (chunk
- * rows), `settings/` (kb_corpus_settings). The checkout → pages write path
- * (walk + ingest + chunkify + persist) lives in `ingest/`.
+ * Lower-level pieces stay separate: `git.ts` (git plumbing), `settings/`
+ * (`kb_corpus_settings`), and the checkout → pages write path in `../ingest/`.
  */
 
 import { Chunkifier } from "../chunkifier/index.ts";
 import { Embedder, type EmbedStaleChildrenResult } from "../embedder/index.ts";
+import { ImageCaptioner } from "../image-desc/index.ts";
 import { ingestCorpusCheckout } from "../ingest/index.ts";
 import { listPageBodies, replacePageChunks } from "../pages/index.ts";
 import {
@@ -192,10 +193,13 @@ export abstract class Corpus {
   }
 
   /** Clone the configured repo into the local checkout. */
-  static async clone(): Promise<StoredCorpusSettings> {
+  static async clone(knowledgeBaseId: string): Promise<StoredCorpusSettings> {
     if (!Corpus.tryStart(CORPUS_OP_CLONE)) throw new CorpusLockedError();
     try {
-      const result = await cloneCorpusStream(Corpus.emitProgress);
+      const result = await cloneCorpusStream(
+        knowledgeBaseId,
+        Corpus.emitProgress,
+      );
       Corpus.finish();
       return result;
     } catch (err) {
@@ -205,10 +209,10 @@ export abstract class Corpus {
   }
 
   /** Pull the latest commit into the local checkout. */
-  static async pull(): Promise<StoredCorpusSettings> {
+  static async pull(knowledgeBaseId: string): Promise<StoredCorpusSettings> {
     if (!Corpus.tryStart(CORPUS_OP_PULL)) throw new CorpusLockedError();
     try {
-      const result = await pullCorpusStream(Corpus.emitStage);
+      const result = await pullCorpusStream(knowledgeBaseId, Corpus.emitStage);
       Corpus.finish();
       return result;
     } catch (err) {
@@ -217,32 +221,28 @@ export abstract class Corpus {
     }
   }
 
-  /** Re-chunk every `kb_pages` row into fresh parent/child rows. */
-  static async rechunk(): Promise<{
+  /** Re-chunk every `kb_pages` row of one knowledge base into fresh trees. */
+  static async rechunk(knowledgeBaseId: string): Promise<{
     pagesProcessed: number;
     pagesSkipped: number;
   }> {
     if (!Corpus.tryStart(CORPUS_OP_CHUNKIFY)) throw new CorpusLockedError();
     try {
       Corpus.emitStage(CORPUS_STG_CHUNKIFY);
-      const pages = await listPageBodies();
+      const pages = await listPageBodies(knowledgeBaseId);
 
       let pagesProcessed = 0;
       let pagesSkipped = 0;
 
       for (const page of pages) {
         const chunks = Chunkifier.chunkify(page.body);
-        const parentRows = chunks.parents.map((parent) => {
-          const id = `${page.id}:p:${parent.index}`;
-          return {
-            id,
-            pageId: page.id,
-            parentIndex: parent.index,
-            text: parent.text,
-            startOffset: parent.start,
-            endOffset: parent.end,
-          };
-        });
+        const parentRows = chunks.parents.map((parent) => ({
+          id: `${page.id}:p:${parent.index}`,
+          pageId: page.id,
+          parentIndex: parent.index,
+          text: parent.text,
+          sourcePageHash: page.content_hash,
+        }));
         const childRows = chunks.children.map((child) => {
           const parentId = `${page.id}:p:${child.parentIndex}`;
           return {
@@ -251,12 +251,15 @@ export abstract class Corpus {
             pageId: page.id,
             childIndex: child.index,
             text: child.text,
-            startOffset: child.start,
-            endOffset: child.end,
           };
         });
 
-        await replacePageChunks(page.id, parentRows, childRows);
+        await replacePageChunks(
+          knowledgeBaseId,
+          page.id,
+          parentRows,
+          childRows,
+        );
 
         pagesProcessed += 1;
         if (chunks.parents.length === 0) pagesSkipped += 1;
@@ -271,11 +274,16 @@ export abstract class Corpus {
   }
 
   /** Embed children whose `embedding_model` is missing or stale. */
-  static async embed(): Promise<EmbedStaleChildrenResult> {
+  static async embed(
+    knowledgeBaseId: string,
+  ): Promise<EmbedStaleChildrenResult> {
     if (!Corpus.tryStart(CORPUS_OP_EMBED)) throw new CorpusLockedError();
     try {
       Corpus.emitStage(CORPUS_STG_EMBED);
-      const result = await Embedder.embedStaleChildren({ failFast: true });
+      const result = await Embedder.embedStaleChildren({
+        knowledgeBaseId,
+        failFast: true,
+      });
       Corpus.finish();
       return result;
     } catch (err) {
@@ -284,26 +292,33 @@ export abstract class Corpus {
     }
   }
 
-  /** Start the full sync pipeline (fetch → ingest → embed → record sha). */
-  static sync(): void {
+  /** Start the full sync pipeline (fetch → ingest → caption → embed → record sha). */
+  static sync(knowledgeBaseId: string): void {
     if (!Corpus.tryStart(CORPUS_OP_SYNC)) throw new CorpusLockedError();
-    void Corpus.runSync().catch(() => {
+    void Corpus.runSync(knowledgeBaseId).catch(() => {
       /* errors already recorded in status via finish(err) */
     });
   }
 
-  private static async runSync(): Promise<void> {
+  private static async runSync(knowledgeBaseId: string): Promise<void> {
     try {
+      const checkout = corpusCheckoutDir(knowledgeBaseId);
       Corpus.emitStage(CORPUS_STG_FETCH);
-      const sha = await refreshCorpusCheckout();
+      const sha = await refreshCorpusCheckout(knowledgeBaseId);
       const settings: ResolvedCorpusSettings = resolveCorpusSettings(
-        await CorpusSettings.load(),
+        await CorpusSettings.load(knowledgeBaseId),
       );
       Corpus.emitStage(CORPUS_STG_INGEST);
-      await ingestCorpusCheckout(corpusCheckoutDir(), settings.docsRoot);
+      await ingestCorpusCheckout(knowledgeBaseId, checkout, settings.docsRoot);
+      await ImageCaptioner.captionStale({
+        knowledgeBaseId,
+        checkoutDir: checkout,
+        docsRoot: settings.docsRoot,
+        failFast: true,
+      });
       Corpus.emitStage(CORPUS_STG_EMBED);
-      await Embedder.embedStaleChildren({ failFast: true });
-      await CorpusSettings.saveLastSyncedSha(sha);
+      await Embedder.embedStaleChildren({ knowledgeBaseId, failFast: true });
+      await CorpusSettings.saveLastSyncedSha(knowledgeBaseId, sha);
       Corpus.finish();
     } catch (err) {
       Corpus.finish(err);

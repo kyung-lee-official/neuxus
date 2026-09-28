@@ -64,12 +64,13 @@ export async function listPageSummaries(
   `;
 }
 
-/** Knowledge base + page id + body for every `kb_pages` row (rechunk input). */
-export async function listPageBodies(): Promise<
-  { knowledge_base_id: string; id: string; body: string }[]
-> {
-  return sql<{ knowledge_base_id: string; id: string; body: string }[]>`
-    SELECT knowledge_base_id, id, body FROM kb_pages
+/** Page id + body + content_hash for one knowledge base (rechunk input). */
+export async function listPageBodies(
+  knowledgeBaseId: string,
+): Promise<{ id: string; body: string; content_hash: string }[]> {
+  return sql<{ id: string; body: string; content_hash: string }[]>`
+    SELECT id, body, content_hash FROM kb_pages
+    WHERE knowledge_base_id = ${knowledgeBaseId}
   `;
 }
 
