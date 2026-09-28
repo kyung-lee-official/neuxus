@@ -3,7 +3,7 @@
  * resolve each to an absolute filesystem path against the source file.
  */
 
-import { resolveImagePath } from "./resolve.ts";
+import { dirname, isAbsolute, normalize } from "node:path";
 
 const IMAGE_MD = /^!\[.*?\]\(.*\)\s*$/;
 const IMAGE_HTML = /^<img\b[^>]*>\s*$/i;
@@ -66,6 +66,16 @@ function pathFromHtml(line: string): string | null {
   const m =
     /src\s*=\s*"([^"]+)"/i.exec(line) ?? /src\s*=\s*'([^']+)'/i.exec(line);
   return m ? m[1]! : null;
+}
+
+/**
+ * Body references are relative to the page: join onto the source file's
+ * directory. Absolute paths and URLs are returned unchanged.
+ */
+function resolveImagePath(sourceAbsPath: string, imagePath: string): string {
+  if (isAbsolute(imagePath)) return imagePath;
+  if (imagePath.includes("://")) return imagePath;
+  return normalize(`${dirname(sourceAbsPath)}/${imagePath}`);
 }
 
 /** Dedup by `(absolutePath)` so the same image file isn't processed twice. */

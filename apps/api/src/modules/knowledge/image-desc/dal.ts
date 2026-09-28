@@ -104,6 +104,87 @@ export async function upsertImageDescription(
   });
 }
 
+export type ImagePolicyInput = {
+  /** Stored value; this layer attaches no meaning to it. */
+  policy: string;
+  imageContentHash: string;
+  /**
+   * `description` to write: a string, or `null` to clear it. Omit to leave the
+   * stored value untouched (the embed/caption passes own those fields).
+   */
+  description?: string | null;
+};
+
+/**
+ * Upsert one row's `policy` + `image_content_hash` (+ `description` when the
+ * caller supplies it) by composite key. Storage only — which fields a policy
+ * implies is the caller's concern. The pgvector `embedding` is not written
+ * here.
+ */
+export async function upsertImagePolicy(
+  knowledgeBaseId: string,
+  pageId: string,
+  imagePath: string,
+  input: ImagePolicyInput,
+): Promise<void> {
+  const { policy, imageContentHash, description } = input;
+  await getPrisma().knowledgeImageDescription.upsert({
+    where: {
+      knowledgeBaseId_pageId_imagePath: { knowledgeBaseId, pageId, imagePath },
+    },
+    create: {
+      knowledgeBaseId,
+      pageId,
+      imagePath,
+      policy,
+      imageContentHash,
+      description: description ?? null,
+      captionModel: null,
+      captionPromptHash: null,
+      descriptionHash: null,
+    },
+    update: {
+      policy,
+      imageContentHash,
+      ...(description !== undefined ? { description } : {}),
+    },
+  });
+}
+
+/**
+ * Null the derived caption fields and the pgvector `embedding` for one row so
+ * they re-derive. Storage only — the caller decides when.
+ */
+export async function resetImageDerivedFields(
+  knowledgeBaseId: string,
+  pageId: string,
+  imagePath: string,
+): Promise<void> {
+  await sql`
+    UPDATE kb_image_descriptions
+    SET
+      caption_model = NULL,
+      caption_prompt_hash = NULL,
+      description_hash = NULL,
+      embedding = NULL
+    WHERE knowledge_base_id = ${knowledgeBaseId}
+      AND page_id = ${pageId}
+      AND image_path = ${imagePath}
+  `;
+}
+
+/** Delete rows for one page whose `image_path` is not in `imagePaths`. */
+export async function deleteImageDescriptionsNotIn(
+  knowledgeBaseId: string,
+  pageId: string,
+  imagePaths: string[],
+): Promise<number> {
+  const { count } = await getPrisma().knowledgeImageDescription.deleteMany({
+    where: { knowledgeBaseId, pageId, imagePath: { notIn: imagePaths } },
+  });
+  return count;
+}
+
 export type ImageDescriptionUpdate = {
   imageContentHash: string;
   description: string;

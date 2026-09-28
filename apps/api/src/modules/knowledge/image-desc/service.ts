@@ -21,7 +21,6 @@ import {
   listImageDescriptionsByPolicy,
   updateImageDescription,
 } from "./dal.ts";
-import { resolveImagePath } from "./resolve.ts";
 
 /**
  * Business prompt for the `md-image-captioning` task. Its `sha256` is stored
@@ -107,13 +106,9 @@ export class ImageCaptioner {
 
     for (const candidate of candidates) {
       try {
-        const sourceAbsPath = join(
+        const imageAbsPath = join(
           options.checkoutDir,
           options.docsRoot,
-          candidate.sourcePath ?? "",
-        );
-        const imageAbsPath = resolveImagePath(
-          sourceAbsPath,
           candidate.imagePath,
         );
         const bytes = await readFile(imageAbsPath);
