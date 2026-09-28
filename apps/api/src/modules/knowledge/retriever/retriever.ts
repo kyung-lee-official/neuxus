@@ -1,10 +1,10 @@
-import { sql } from "bun";
 import { Logger } from "../../log/index.ts";
 import {
   resolveTaskModelLink,
   TASK_EMBEDDING,
 } from "../../server-setting/task-model-map/service.ts";
 import { Embedder, type EmbedFn } from "../embedder/index.ts";
+import { findParentsByIds, scanChildVectors } from "./dal.ts";
 import {
   type RetrieveOptions,
   resolveRetrieveOptions,
@@ -21,7 +21,6 @@ export type ChildHit = {
 export type RetrievedParent = {
   parentId: string;
   pageId: string;
-  slug: string;
   title: string;
   text: string;
   score: number;
@@ -81,6 +80,8 @@ type TopKHit = {
 };
 
 export type RetrieveParentsByQuestionOptions = RetrieveOptions & {
+  /** The knowledge base to search. A query binds exactly one. */
+  knowledgeBaseId: string;
   embedder?: EmbedFn;
   /**
    * Owner of the request. Stamped on every `app_log` row this call emits so
@@ -92,22 +93,6 @@ export type RetrieveParentsByQuestionOptions = RetrieveOptions & {
 export type RetrieveParentsByQuestionResult = {
   currentModel: string;
   parents: RetrievedParent[];
-};
-
-type ChildHitRow = {
-  child_id: string;
-  parent_id: string;
-  page_id: string;
-  child_text: string | null;
-  score: number | string;
-};
-
-type ParentRow = {
-  id: string;
-  page_id: string;
-  text: string | null;
-  slug: string;
-  title: string | null;
 };
 
 function numberFromSql(value: unknown): number {
@@ -134,7 +119,7 @@ export abstract class Retriever {
    */
   static async parentsByQuestion(
     question: string,
-    options?: RetrieveParentsByQuestionOptions,
+    options: RetrieveParentsByQuestionOptions,
   ): Promise<RetrieveParentsByQuestionResult> {
     const trimmed = question.trim();
     const knobs = resolveRetrieveOptions(options);
@@ -147,7 +132,7 @@ export abstract class Retriever {
 
     if (trimmed === "") {
       retrieveLog.info("retrieve skipped", {
-        userId: options?.userId,
+        userId: options.userId,
         status: "empty_question",
         embeddingModel: currentModel,
         childLimit: knobs.childLimit,
@@ -158,7 +143,7 @@ export abstract class Retriever {
 
     try {
       const embedder =
-        options?.embedder ??
+        options.embedder ??
         ((texts: string[]) => link.provider.embed(link.model.modelId, texts));
       const vectors = await embedder([trimmed]);
       const vector = vectors[0];
@@ -166,20 +151,12 @@ export abstract class Retriever {
         throw new Error("Question embed returned no vector");
       }
 
-      const literal = Embedder.pgvectorLiteral(vector);
-      const childRows = await sql<ChildHitRow[]>`
-        SELECT
-          c.id AS child_id,
-          c.parent_id,
-          c.page_id,
-          c.text AS child_text,
-          1 - (c.embedding <=> ${literal}::vector) AS score
-        FROM kb_children c
-        WHERE c.embedding IS NOT NULL
-          AND c.embedding_model IS NOT DISTINCT FROM ${currentModel}
-        ORDER BY c.embedding <=> ${literal}::vector
-        LIMIT ${knobs.childLimit}
-      `;
+      const childRows = await scanChildVectors({
+        knowledgeBaseId: options.knowledgeBaseId,
+        currentModel,
+        embeddingLiteral: Embedder.pgvectorLiteral(vector),
+        limit: knobs.childLimit,
+      });
 
       const topK: TopKHit[] = childRows.map((row) => ({
         childId: row.child_id,
@@ -190,7 +167,7 @@ export abstract class Retriever {
       }));
 
       retrieveLog.info(topK.length === 0 ? "retrieve no_hits" : "retrieve ok", {
-        userId: options?.userId,
+        userId: options.userId,
         status: topK.length === 0 ? "no_hits" : "ok",
         question: trimmed,
         embeddingModel: currentModel,
@@ -217,12 +194,10 @@ export abstract class Retriever {
       }
 
       const scores = scoreByParentFromHits(hits);
-      const parentRows = await sql<ParentRow[]>`
-        SELECT p.id, p.page_id, p.text, pg.slug, pg.title
-        FROM kb_parents p
-        JOIN kb_pages pg ON pg.id = p.page_id
-        WHERE p.id = ANY(${sql.array(parentIds, "text[]")})
-      `;
+      const parentRows = await findParentsByIds(
+        options.knowledgeBaseId,
+        parentIds,
+      );
 
       const byId = new Map(
         parentRows.map((row) => [
@@ -230,7 +205,6 @@ export abstract class Retriever {
           {
             parentId: row.id,
             pageId: row.page_id,
-            slug: row.slug,
             title: row.title ?? "",
             text: row.text ?? "",
             score: scores.get(row.id) ?? 0,
@@ -251,7 +225,7 @@ export abstract class Retriever {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       retrieveLog.error("retrieve error", {
-        userId: options?.userId,
+        userId: options.userId,
         status: "error",
         question: trimmed,
         embeddingModel: currentModel,
