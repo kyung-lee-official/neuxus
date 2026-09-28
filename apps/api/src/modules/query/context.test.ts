@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { buildSynthesisPrompt } from "./context.ts";
 
 describe("buildSynthesisPrompt", () => {
-  test("includes parent title, slug, and text", () => {
+  test("includes parent title and text", () => {
     const prompt = buildSynthesisPrompt(
       [],
       "How do I setup?",
@@ -11,7 +11,6 @@ describe("buildSynthesisPrompt", () => {
         {
           parentId: "1",
           pageId: "p",
-          slug: "setup",
           title: "Setup",
           text: "Run bun install.",
           score: 0.9,
@@ -19,7 +18,7 @@ describe("buildSynthesisPrompt", () => {
       ],
     );
     expect(prompt).toContain("Knowledge base (parent context):");
-    expect(prompt).toContain("Setup · setup");
+    expect(prompt).toContain("### Setup");
     expect(prompt).toContain("Run bun install.");
     expect(prompt).toContain("How do I setup?");
   });

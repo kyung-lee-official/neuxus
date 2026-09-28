@@ -39,10 +39,7 @@ export function buildSynthesisPrompt(
 function formatParents(parents: RetrievedParent[]): string {
   if (parents.length === 0) return "";
   return parents
-    .map((p) => {
-      const heading = [p.title, p.slug].filter((s) => s.length > 0).join(" · ");
-      return heading ? `### ${heading}\n${p.text}` : p.text;
-    })
+    .map((p) => (p.title ? `### ${p.title}\n${p.text}` : p.text))
     .join("\n\n");
 }
 
@@ -63,23 +60,4 @@ function formatPersonalMemories(memories: AppMemory[]): string {
 function trimToMax(text: string, max: number): string {
   if (text.length <= max) return text;
   return `${text.slice(0, max)}\n\n[context truncated]`;
-}
-
-/**
- * Strip markdown image-reference lines (`![alt](path)` and the optional
- * ` "title"` suffix) from `text`. The image information lives on disk and
- * the LLM provider does not need to re-receive it; the
- * `<!-- image_desc ... -->` comment is kept so the description is still
- * available.
- *
- * - Strips a trailing newline so we don't leave a blank line where the
- *   image used to be.
- * - Per-line (`m` flag), so image references inside code fences are
- *   matched but won't appear here in practice (chunkify fences already
- *   isolate them).
- * - Multi-line image syntax and `<img>` HTML are not handled — the
- *   corpus stores `![…]()` only.
- */
-export function stripMarkdownImageLines(text: string): string {
-  return text.replace(/^!\[.*?\]\(.*?\)\s*\n?/gm, "");
 }

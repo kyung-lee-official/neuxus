@@ -7,7 +7,7 @@ import { Logger } from "../log/index.ts";
 import type { Model } from "../model-providers/core/types.ts";
 import type { AppMessage } from "../personal-data/chat-messages/service.ts";
 import type { AppMemory } from "../personal-data/personal-memory/service.ts";
-import { buildSynthesisPrompt, stripMarkdownImageLines } from "./context.ts";
+import { buildSynthesisPrompt } from "./context.ts";
 
 const synthesisLog = Logger.child({ module: "synthesis" }, "synthesis");
 
@@ -56,23 +56,15 @@ export async function answerFromContext(
     model,
     maxTokens,
   );
-  // Strip markdown image references before sending to the LLM. The image
-  // bytes stay on disk; the description lives in the corresponding
-  // `<!-- image_desc ... -->` comment which we keep.
-  const promptWithoutImages = stripMarkdownImageLines(prompt);
-
   const start = performance.now();
   try {
-    const response = await provider.textChat(
-      model.modelId,
-      promptWithoutImages,
-    );
+    const response = await provider.textChat(model.modelId, prompt);
     synthesisLog.info("synthesis ok", {
       userId: userId ?? null,
       providerId: provider.id,
       modelId: model.modelId,
       maxTokens,
-      promptChars: promptWithoutImages.length,
+      promptChars: prompt.length,
       response,
       latencyMs: Math.round(performance.now() - start),
       status: "ok",
@@ -84,7 +76,7 @@ export async function answerFromContext(
       userId: userId ?? null,
       providerId: provider.id,
       modelId: model.modelId,
-      promptChars: promptWithoutImages.length,
+      promptChars: prompt.length,
       error: message,
       latencyMs: Math.round(performance.now() - start),
       status: "error",
