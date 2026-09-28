@@ -17,7 +17,10 @@ import {
   resolveTaskModelLink,
   TASK_MD_IMAGE_CAPTIONING,
 } from "../../server-setting/task-model-map/service.ts";
-import { listVisionCaptionCandidates, updateImageCaption } from "./dal.ts";
+import {
+  listImageDescriptionsByPolicy,
+  updateImageDescription,
+} from "./dal.ts";
 import { resolveImagePath } from "./resolve.ts";
 
 /**
@@ -93,8 +96,9 @@ export class ImageCaptioner {
         }),
     };
 
-    const candidates = await listVisionCaptionCandidates(
+    const candidates = await listImageDescriptionsByPolicy(
       options.knowledgeBaseId,
+      "vision-captioning",
     );
 
     let captioned = 0;
@@ -135,7 +139,7 @@ export class ImageCaptioner {
           .replace(/\s+/g, " ")
           .trim();
 
-        await updateImageCaption(
+        await updateImageDescription(
           options.knowledgeBaseId,
           candidate.pageId,
           candidate.imagePath,

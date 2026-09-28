@@ -1,7 +1,6 @@
 /**
  * DAL for `kb_image_descriptions`. One row per
- * `(knowledge_base_id, page_id, image_path)`. Used by the image-description
- * caption pass (see ./pipeline.ts). Read-only knowledge bases only.
+ * `(knowledge_base_id, page_id, image_path)`. Read-only knowledge bases only.
  */
 
 import { sql } from "bun";
@@ -47,6 +46,31 @@ export async function listImageDescriptionsByPage(
   });
 }
 
+/** An image-description row plus the owning page's `source_path`. */
+export type ImageDescriptionWithSource = ImageDescriptionRow & {
+  sourcePath: string | null;
+};
+
+/**
+ * Rows for one `policy` in a knowledge base, each with its page's
+ * `source_path` (so a caller can resolve the image file). No domain meaning
+ * is attached to `policy` here — the argument names the stored value.
+ */
+export async function listImageDescriptionsByPolicy(
+  knowledgeBaseId: string,
+  policy: string,
+): Promise<ImageDescriptionWithSource[]> {
+  const rows = await getPrisma().knowledgeImageDescription.findMany({
+    where: { knowledgeBaseId, policy },
+    include: { page: { select: { sourcePath: true } } },
+    orderBy: [{ pageId: "asc" }, { imagePath: "asc" }],
+  });
+  return rows.map(({ page, ...row }) => ({
+    ...row,
+    sourcePath: page.sourcePath,
+  }));
+}
+
 /**
  * Upsert one row by its composite key. The pgvector `embedding` is not written
  * here — the embed pass owns it (raw SQL).
@@ -80,47 +104,7 @@ export async function upsertImageDescription(
   });
 }
 
-/** A `vision-captioning` row plus the page's `source_path`, for the caption pass. */
-export type CaptionCandidate = {
-  pageId: string;
-  imagePath: string;
-  /** Docs-root-relative source path of the page; null for pages without one. */
-  sourcePath: string | null;
-  imageContentHash: string;
-  captionModel: string | null;
-  captionPromptHash: string | null;
-  descriptionHash: string | null;
-};
-
-/** Rows with `policy = 'vision-captioning'` in one knowledge base. */
-export async function listVisionCaptionCandidates(
-  knowledgeBaseId: string,
-): Promise<CaptionCandidate[]> {
-  const rows = await getPrisma().knowledgeImageDescription.findMany({
-    where: { knowledgeBaseId, policy: "vision-captioning" },
-    select: {
-      pageId: true,
-      imagePath: true,
-      imageContentHash: true,
-      captionModel: true,
-      captionPromptHash: true,
-      descriptionHash: true,
-      page: { select: { sourcePath: true } },
-    },
-    orderBy: [{ pageId: "asc" }, { imagePath: "asc" }],
-  });
-  return rows.map((row) => ({
-    pageId: row.pageId,
-    imagePath: row.imagePath,
-    sourcePath: row.page.sourcePath,
-    imageContentHash: row.imageContentHash,
-    captionModel: row.captionModel,
-    captionPromptHash: row.captionPromptHash,
-    descriptionHash: row.descriptionHash,
-  }));
-}
-
-export type ImageCaptionFields = {
+export type ImageDescriptionUpdate = {
   imageContentHash: string;
   description: string;
   captionModel: string;
@@ -128,12 +112,12 @@ export type ImageCaptionFields = {
   descriptionHash: string;
 };
 
-/** Write a fresh caption and clear the pgvector `embedding` so it re-embeds. */
-export async function updateImageCaption(
+/** Write new description fields and clear the pgvector `embedding` to re-embed. */
+export async function updateImageDescription(
   knowledgeBaseId: string,
   pageId: string,
   imagePath: string,
-  fields: ImageCaptionFields,
+  fields: ImageDescriptionUpdate,
 ): Promise<void> {
   await sql`
     UPDATE kb_image_descriptions

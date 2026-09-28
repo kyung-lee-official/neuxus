@@ -13,12 +13,13 @@
  */
 
 export {
-  type CaptionCandidate,
   findImageDescription,
-  type ImageCaptionFields,
+  type ImageDescriptionRow,
+  type ImageDescriptionUpdate,
+  type ImageDescriptionWithSource,
   listImageDescriptionsByPage,
-  listVisionCaptionCandidates,
-  updateImageCaption,
+  listImageDescriptionsByPolicy,
+  updateImageDescription,
   upsertImageDescription,
 } from "./dal.ts";
 export {
