@@ -19,5 +19,5 @@ export function resolveImagePath(
 ): string {
   if (isAbsolute(imagePath)) return imagePath;
   if (imagePath.includes("://")) return imagePath;
-  return normalize(dirname(sourceAbsPath) + "/" + imagePath);
+  return normalize(`${dirname(sourceAbsPath)}/${imagePath}`);
 }
