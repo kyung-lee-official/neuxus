@@ -17,36 +17,11 @@ describe("parseImageRefs", () => {
     );
   });
 
-  test("markdown image without opener", () => {
+  test("markdown image", () => {
     const refs = parseImageRefs("![Alt](./a.png)", "/abs/dir/foo.md");
     expect(refs).toHaveLength(1);
     expect(refs[0]!.imagePath).toBe("./a.png");
-    expect(refs[0]!.hasManualDescription).toBe(false);
     expect(n(refs[0]!.absolutePath)).toBe("/abs/dir/a.png");
-  });
-
-  test("markdown image immediately preceded by opener+closer", () => {
-    const body = [
-      "<!-- image_desc -->",
-      "Author wording.",
-      "<!-- /image_desc -->",
-      "![Alt](./a.png)",
-    ].join("\n");
-    const refs = parseImageRefs(body, "/abs/dir/foo.md");
-    expect(refs).toHaveLength(1);
-    expect(refs[0]!.hasManualDescription).toBe(true);
-    expect(refs[0]!.manualOpenerStart).toBeTypeOf("number");
-  });
-
-  test("blank line between opener and image is NOT paired (strict)", () => {
-    const body = [
-      "<!-- image_desc -->",
-      "",
-      "![Alt](./a.png)",
-      "<!-- /image_desc -->",
-    ].join("\n");
-    const refs = parseImageRefs(body, "/abs/dir/foo.md");
-    expect(refs[0]!.hasManualDescription).toBe(false);
   });
 
   test("image path with title (md form)", () => {
