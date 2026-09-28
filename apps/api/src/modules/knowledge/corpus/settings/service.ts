@@ -1,7 +1,7 @@
 /**
- * Corpus-settings domain. Single row `kb_corpus_settings` id `default`;
- * nulls stay null (the walker applies `CORPUS_DEFAULTS` when it needs a
- * concrete value).
+ * Corpus-settings domain. One row per knowledge base (`kb_corpus_settings`,
+ * keyed by `knowledge_base_id`); nulls stay null (the walker applies
+ * `CORPUS_DEFAULTS` when it needs a concrete value).
  */
 
 import {
@@ -22,10 +22,10 @@ function blankToNull(value: string | null | undefined): string | null {
 }
 
 export abstract class CorpusSettings {
-  /** Load `kb_corpus_settings` id `default`. Nulls stay null. */
-  static async load(): Promise<StoredCorpusSettings> {
+  /** Load the corpus settings for one knowledge base. Nulls stay null. */
+  static async load(knowledgeBaseId: string): Promise<StoredCorpusSettings> {
     return (
-      (await findCorpusSettings()) ?? {
+      (await findCorpusSettings(knowledgeBaseId)) ?? {
         repoUrl: null,
         branch: null,
         docsRoot: null,
@@ -34,19 +34,25 @@ export abstract class CorpusSettings {
     );
   }
 
-  /** Upsert `kb_corpus_settings` id `default`. Empty strings stored as null. */
-  static async save(row: CorpusSettingsRow): Promise<StoredCorpusSettings> {
-    await upsertCorpusRemoteSettings({
+  /** Upsert the remote fields for one knowledge base. Empty strings stored as null. */
+  static async save(
+    knowledgeBaseId: string,
+    row: CorpusSettingsRow,
+  ): Promise<StoredCorpusSettings> {
+    await upsertCorpusRemoteSettings(knowledgeBaseId, {
       repoUrl: blankToNull(row.repoUrl),
       branch: blankToNull(row.branch),
       docsRoot: normalizeDocsRoot(row.docsRoot) ?? null,
     });
-    return CorpusSettings.load();
+    return CorpusSettings.load(knowledgeBaseId);
   }
 
   /** Record `last_synced_sha` after clone/pull. Does not change remote fields. */
-  static async saveLastSyncedSha(sha: string): Promise<StoredCorpusSettings> {
-    await upsertCorpusLastSyncedSha(sha);
-    return CorpusSettings.load();
+  static async saveLastSyncedSha(
+    knowledgeBaseId: string,
+    sha: string,
+  ): Promise<StoredCorpusSettings> {
+    await upsertCorpusLastSyncedSha(knowledgeBaseId, sha);
+    return CorpusSettings.load(knowledgeBaseId);
   }
 }

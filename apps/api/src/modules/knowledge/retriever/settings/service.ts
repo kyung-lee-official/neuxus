@@ -1,7 +1,7 @@
 /**
- * Retriever-settings domain. Mirrors the `kb_embed_settings` /
- * `kb_chunk_settings` pattern: single row `id = "default"`, nullable
- * columns, code defaults in `RETRIEVE_DEFAULTS` apply when a column is null.
+ * Retriever-settings domain. One row per knowledge base
+ * (`kb_retrieve_settings`, keyed by `knowledge_base_id`); nullable columns,
+ * with code defaults in `RETRIEVE_DEFAULTS` applied when a column is null.
  */
 
 import { findRetrieveSettings, upsertRetrieveSettings } from "./dal.ts";
@@ -48,14 +48,18 @@ export type AdminRetrieveSettings = StoredRetrieveSettings & {
 };
 
 export abstract class RetrieverSettings {
-  /** Resolved knobs used by the retriever (stored values or code defaults). */
-  static async load(): Promise<ResolvedRetrieveOptions> {
-    return resolveRetrieveOptions(await findRetrieveSettings());
+  /** Resolved knobs for one knowledge base (stored values or code defaults). */
+  static async load(knowledgeBaseId: string): Promise<ResolvedRetrieveOptions> {
+    return resolveRetrieveOptions(await findRetrieveSettings(knowledgeBaseId));
   }
 
   /** Stored values + code defaults, for the admin form. */
-  static async loadAdmin(): Promise<AdminRetrieveSettings> {
-    const stored = storedRetrieveSettings(await findRetrieveSettings());
+  static async loadAdmin(
+    knowledgeBaseId: string,
+  ): Promise<AdminRetrieveSettings> {
+    const stored = storedRetrieveSettings(
+      await findRetrieveSettings(knowledgeBaseId),
+    );
     return {
       ...stored,
       defaults: {
@@ -66,26 +70,27 @@ export abstract class RetrieverSettings {
     };
   }
 
-  /** Upsert `kb_retrieve_settings` id `default`. Invalid values stored as null. */
+  /** Upsert the retrieval settings for one knowledge base. Invalid values stored as null. */
   static async save(
+    knowledgeBaseId: string,
     row: RetrieveSettingsRow,
   ): Promise<ResolvedRetrieveOptions> {
-    await upsertRetrieveSettings({
+    await upsertRetrieveSettings(knowledgeBaseId, {
       childLimit: positiveIntOrNull(row.childLimit),
       maxParents: positiveIntOrNull(row.maxParents),
       maxCharacters: positiveIntOrNull(row.maxCharacters),
     });
 
-    return RetrieverSettings.load();
+    return RetrieverSettings.load(knowledgeBaseId);
   }
 
   /** Write `RETRIEVE_DEFAULTS` into the row. */
-  static async reset(): Promise<AdminRetrieveSettings> {
-    await RetrieverSettings.save({
+  static async reset(knowledgeBaseId: string): Promise<AdminRetrieveSettings> {
+    await RetrieverSettings.save(knowledgeBaseId, {
       childLimit: RETRIEVE_DEFAULTS.childLimit,
       maxParents: RETRIEVE_DEFAULTS.maxParents,
       maxCharacters: RETRIEVE_DEFAULTS.maxCharacters,
     });
-    return RetrieverSettings.loadAdmin();
+    return RetrieverSettings.loadAdmin(knowledgeBaseId);
   }
 }
