@@ -8,8 +8,6 @@
  */
 
 import { status } from "elysia";
-import { Prisma } from "../../../generated/prisma/client.ts";
-import { getPrisma } from "../../../shared/db.ts";
 import {
   type AnyProvider,
   getModelByIdentifier,
@@ -23,9 +21,8 @@ import {
   MODEL_IDENTIFIER_DELIMITER,
   type Model,
 } from "../../model-providers/core/types.ts";
+import { findTaskLinks, saveTaskLinks } from "./dal.ts";
 import type { TaskModelMapModel } from "./model.ts";
-
-const CONFIG_ID = "default";
 
 type TaskId =
   | typeof TASK_EMBEDDING
@@ -87,14 +84,7 @@ function validateTaskModelLink(
 
 /** Read the persisted task links. Unknown JSON keys are ignored. */
 export async function loadLinks(): Promise<TaskLinks> {
-  const row = await getPrisma().appModelTaskConfig.findUnique({
-    where: { id: CONFIG_ID },
-  });
-  const stored = row?.tasks;
-  const raw: Record<string, unknown> =
-    stored == null || typeof stored !== "object" || Array.isArray(stored)
-      ? {}
-      : (stored as Record<string, unknown>);
+  const raw: Record<string, unknown> = (await findTaskLinks()) ?? {};
   const links = {} as TaskLinks;
   for (const taskId of TASK_IDS) {
     const value = raw[taskId];
@@ -131,16 +121,7 @@ export async function saveLinks(
       merged[taskId] = validateTaskModelLink(value, taskId);
     }
   }
-  await getPrisma().appModelTaskConfig.upsert({
-    where: { id: CONFIG_ID },
-    create: {
-      id: CONFIG_ID,
-      tasks: merged as unknown as Prisma.InputJsonValue,
-    },
-    update: {
-      tasks: merged as unknown as Prisma.InputJsonValue,
-    },
-  });
+  await saveTaskLinks(merged as unknown as Record<string, unknown>);
   return merged;
 }
 
