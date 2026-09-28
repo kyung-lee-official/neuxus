@@ -7,11 +7,10 @@
  * (`kb_corpus_settings`), and the checkout → pages write path in `../ingest/`.
  */
 
-import { Chunkifier, ChunkifierSettings } from "../chunkifier/index.ts";
 import { Embedder, type EmbedStaleChildrenResult } from "../embedder/index.ts";
 import { ImageCaptioner } from "../image-desc/index.ts";
 import { ingestCorpusCheckout } from "../ingest/index.ts";
-import { listPageBodies, replacePageChunks } from "../pages/index.ts";
+import { Page } from "../pages/index.ts";
 import {
   type CloneProgress,
   cloneCorpusStream,
@@ -221,7 +220,7 @@ export abstract class Corpus {
     }
   }
 
-  /** Re-chunk every `kb_pages` row of one knowledge base into fresh trees. */
+  /** Force-rebuild every `kb_pages` row of one knowledge base into fresh trees. */
   static async rechunk(knowledgeBaseId: string): Promise<{
     pagesProcessed: number;
     pagesSkipped: number;
@@ -229,45 +228,9 @@ export abstract class Corpus {
     if (!Corpus.tryStart(CORPUS_OP_CHUNKIFY)) throw new CorpusLockedError();
     try {
       Corpus.emitStage(CORPUS_STG_CHUNKIFY);
-      const pages = await listPageBodies(knowledgeBaseId);
-      const chunkOptions = await ChunkifierSettings.load(knowledgeBaseId);
-
-      let pagesProcessed = 0;
-      let pagesSkipped = 0;
-
-      for (const page of pages) {
-        const chunks = Chunkifier.chunkify(page.body, chunkOptions);
-        const parentRows = chunks.parents.map((parent) => ({
-          id: `${page.id}:p:${parent.index}`,
-          pageId: page.id,
-          parentIndex: parent.index,
-          text: parent.text,
-          sourcePageHash: page.content_hash,
-        }));
-        const childRows = chunks.children.map((child) => {
-          const parentId = `${page.id}:p:${child.parentIndex}`;
-          return {
-            id: `${parentId}:c:${child.index}`,
-            parentId,
-            pageId: page.id,
-            childIndex: child.index,
-            text: child.text,
-          };
-        });
-
-        await replacePageChunks(
-          knowledgeBaseId,
-          page.id,
-          parentRows,
-          childRows,
-        );
-
-        pagesProcessed += 1;
-        if (chunks.parents.length === 0) pagesSkipped += 1;
-      }
-
+      const result = await Page.chunkifyPages(knowledgeBaseId, { force: true });
       Corpus.finish();
-      return { pagesProcessed, pagesSkipped };
+      return result;
     } catch (err) {
       Corpus.finish(err);
       throw err;
@@ -293,7 +256,7 @@ export abstract class Corpus {
     }
   }
 
-  /** Start the full sync pipeline (fetch → ingest → caption → embed → record sha). */
+  /** Start the full sync pipeline (fetch → ingest → chunkify → caption → embed → record sha). */
   static sync(knowledgeBaseId: string): void {
     if (!Corpus.tryStart(CORPUS_OP_SYNC)) throw new CorpusLockedError();
     void Corpus.runSync(knowledgeBaseId).catch(() => {
@@ -309,14 +272,10 @@ export abstract class Corpus {
       const settings: ResolvedCorpusSettings = resolveCorpusSettings(
         await CorpusSettings.load(knowledgeBaseId),
       );
-      const chunkOptions = await ChunkifierSettings.load(knowledgeBaseId);
       Corpus.emitStage(CORPUS_STG_INGEST);
-      await ingestCorpusCheckout(
-        knowledgeBaseId,
-        checkout,
-        settings.docsRoot,
-        chunkOptions,
-      );
+      await ingestCorpusCheckout(knowledgeBaseId, checkout, settings.docsRoot);
+      Corpus.emitStage(CORPUS_STG_CHUNKIFY);
+      await Page.chunkifyPages(knowledgeBaseId);
       await ImageCaptioner.captionStale({
         knowledgeBaseId,
         checkoutDir: checkout,

@@ -74,6 +74,27 @@ export async function listPageBodies(
   `;
 }
 
+/**
+ * Page id + body + content_hash for pages whose chunk tree is missing or was
+ * built from a different `content_hash` (the chunkify skip gate).
+ * @see docs/modern-knowledge-base-design/03.1-chunkify.md
+ */
+export async function listPagesNeedingChunks(
+  knowledgeBaseId: string,
+): Promise<{ id: string; body: string; content_hash: string }[]> {
+  return sql<{ id: string; body: string; content_hash: string }[]>`
+    SELECT p.id, p.body, p.content_hash
+    FROM kb_pages p
+    WHERE p.knowledge_base_id = ${knowledgeBaseId}
+      AND NOT EXISTS (
+        SELECT 1 FROM kb_parents par
+        WHERE par.knowledge_base_id = p.knowledge_base_id
+          AND par.page_id = p.id
+          AND par.source_page_hash = p.content_hash
+      )
+  `;
+}
+
 /** One `kb_pages` row including `body`, or null when missing. */
 export async function findPageDetailRow(
   knowledgeBaseId: string,
@@ -108,7 +129,7 @@ export async function findPageHashes(
   return rows[0] ?? null;
 }
 
-export type UpsertPageWithChunksInput = {
+export type UpsertPageInput = {
   knowledgeBaseId: string;
   id: string;
   title: string;
@@ -117,48 +138,43 @@ export type UpsertPageWithChunksInput = {
   sourcePath: string | null;
   contentHash: string;
   metaHash: string | null;
-  chunks: ChunkifyResult;
 };
 
-/**
- * Upsert one `kb_pages` row and replace its parent/child tree atomically.
- * The transaction is opened here; the `kb_parents`/`kb_children` statements
- * live in the `parents`/`children` dals and receive this transaction.
- */
-export async function upsertPageWithChunks(
-  input: UpsertPageWithChunksInput,
-): Promise<void> {
-  const parentRows: ParentInsert[] = input.chunks.parents.map((parent) => ({
-    id: `${input.id}:p:${parent.index}`,
-    pageId: input.id,
+/** Upsert one `kb_pages` row (no chunk-tree write). */
+export async function upsertPage(input: UpsertPageInput): Promise<void> {
+  await upsertPageRow(sql, input);
+}
+
+/** Parent/child insert rows for one page's chunk tree. */
+export function chunkTreeRows(
+  pageId: string,
+  sourcePageHash: string,
+  chunks: ChunkifyResult,
+): { parents: ParentInsert[]; children: ChildInsert[] } {
+  const parents: ParentInsert[] = chunks.parents.map((parent) => ({
+    id: `${pageId}:p:${parent.index}`,
+    pageId,
     parentIndex: parent.index,
     text: parent.text,
-    sourcePageHash: input.contentHash,
+    sourcePageHash,
   }));
 
-  const childRows: ChildInsert[] = input.chunks.children.map((child) => {
-    const parentId = `${input.id}:p:${child.parentIndex}`;
+  const children: ChildInsert[] = chunks.children.map((child) => {
+    const parentId = `${pageId}:p:${child.parentIndex}`;
     return {
       id: `${parentId}:c:${child.index}`,
       parentId,
-      pageId: input.id,
+      pageId,
       childIndex: child.index,
       text: child.text,
     };
   });
 
-  await sql.begin(async (tx) => {
-    await upsertPageRow(tx, input);
-    await replaceParents(tx, input.knowledgeBaseId, input.id, parentRows);
-    await replaceChildren(tx, input.knowledgeBaseId, input.id, childRows);
-  });
+  return { parents, children };
 }
 
 /** Upsert the `kb_pages` row inside the caller's transaction. */
-async function upsertPageRow(
-  tx: SQL,
-  input: UpsertPageWithChunksInput,
-): Promise<void> {
+async function upsertPageRow(tx: SQL, input: UpsertPageInput): Promise<void> {
   await tx`
     INSERT INTO kb_pages (
       knowledge_base_id, id, title, tags, body, source_path, content_hash,

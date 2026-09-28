@@ -1,12 +1,16 @@
 import { createHash } from "node:crypto";
 import { isoFromDate } from "../../../shared/serialize.ts";
-import type { ChunkifyResult } from "../chunkifier/index.ts";
+import { Chunkifier, ChunkifierSettings } from "../chunkifier/index.ts";
 import { findChildrenByPage } from "./dal/children.dal.ts";
 import {
+  chunkTreeRows,
   findPageDetailRow,
   findPageHashes,
+  listPageBodies,
   listPageSummaries,
-  upsertPageWithChunks,
+  listPagesNeedingChunks,
+  replacePageChunks,
+  upsertPage,
 } from "./dal/pages.dal.ts";
 import { findParentsByPage } from "./dal/parents.dal.ts";
 
@@ -66,12 +70,22 @@ export type SaveKnowledgePageInput = {
   sourcePath: string | null;
   /** sha256 of the sibling `*.meta.yaml` bytes, or null when absent. */
   metaHash: string | null;
-  chunks: ChunkifyResult;
 };
 
 export type SaveKnowledgePageResult = {
   contentHash: string;
   skipped: boolean;
+};
+
+export type ChunkifyPagesOptions = {
+  /** Rebuild every page's tree, ignoring the freshness gate. */
+  force?: boolean;
+};
+
+export type ChunkifyPagesResult = {
+  pagesProcessed: number;
+  /** Pages chunkified to an empty tree (empty body). */
+  pagesSkipped: number;
 };
 
 export abstract class Page {
@@ -155,9 +169,9 @@ export abstract class Page {
   }
 
   /**
-   * Upsert `kb_pages` and replace that page's parent/child tree, unless
-   * `content_hash` already matches (skip gate — no rewrite, no re-chunk needed).
-   * Embeddings stay null until a later embed pass.
+   * Upsert `kb_pages` unless `content_hash` and `meta_hash` already match
+   * (skip gate — no rewrite). Chunk trees are built by `chunkifyPages`, not
+   * here; embeddings stay null until the embed pass.
    * @see docs/modern-knowledge-base-design/02-ingest.md
    * @see docs/modern-knowledge-base-design/appendix-a-data-model.md
    */
@@ -179,7 +193,7 @@ export abstract class Page {
       return { contentHash, skipped: true };
     }
 
-    await upsertPageWithChunks({
+    await upsertPage({
       knowledgeBaseId: input.knowledgeBaseId,
       id: input.id,
       title: input.title,
@@ -188,9 +202,42 @@ export abstract class Page {
       sourcePath: input.sourcePath,
       contentHash,
       metaHash: input.metaHash,
-      chunks: input.chunks,
     });
 
     return { contentHash, skipped: false };
+  }
+
+  /**
+   * Rebuild the parent/child tree for pages whose stored tree is missing or
+   * stale (`kb_parents.source_page_hash` ≠ the page's `content_hash`), or for
+   * every page when `force`. Knobs come from `ChunkifierSettings`.
+   * @see docs/modern-knowledge-base-design/03.1-chunkify.md
+   */
+  static async chunkifyPages(
+    knowledgeBaseId: string,
+    options?: ChunkifyPagesOptions,
+  ): Promise<ChunkifyPagesResult> {
+    const chunkOptions = await ChunkifierSettings.load(knowledgeBaseId);
+    const pages = options?.force
+      ? await listPageBodies(knowledgeBaseId)
+      : await listPagesNeedingChunks(knowledgeBaseId);
+
+    let pagesProcessed = 0;
+    let pagesSkipped = 0;
+
+    for (const page of pages) {
+      const chunks = Chunkifier.chunkify(page.body, chunkOptions);
+      const tree = chunkTreeRows(page.id, page.content_hash, chunks);
+      await replacePageChunks(
+        knowledgeBaseId,
+        page.id,
+        tree.parents,
+        tree.children,
+      );
+      pagesProcessed += 1;
+      if (chunks.parents.length === 0) pagesSkipped += 1;
+    }
+
+    return { pagesProcessed, pagesSkipped };
   }
 }

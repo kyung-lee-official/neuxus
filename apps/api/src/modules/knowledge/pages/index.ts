@@ -1,10 +1,10 @@
 export {
   deletePagesMissingSourcePaths as deleteKnowledgePagesMissingSourcePaths,
   findPageHashes,
-  listPageBodies,
-  replacePageChunks,
 } from "./dal/pages.dal.ts";
 export {
+  type ChunkifyPagesOptions,
+  type ChunkifyPagesResult,
   type KnowledgeChildInspect,
   type KnowledgePageDetail,
   type KnowledgePageListItem,

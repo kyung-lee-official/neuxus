@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { Logger } from "../../log/index.ts";
-import { Chunkifier, type ChunkifyOptions } from "../chunkifier/index.ts";
 import { reconcilePageImagePolicies } from "../image-desc/index.ts";
 import {
   deleteKnowledgePagesMissingSourcePaths,
@@ -37,7 +36,8 @@ async function readMetaFile(
 
 /**
  * Walk the checkout docs root, persist pages, reconcile image policies, delete
- * missing source paths.
+ * missing source paths. Does not chunk — `Page.chunkifyPages` is a separate
+ * stage.
  * @see docs/modern-knowledge-base-design/01-corpus.md
  * @see docs/modern-knowledge-base-design/02-ingest.md
  */
@@ -45,7 +45,6 @@ export async function ingestCorpusCheckout(
   knowledgeBaseId: string,
   checkoutDir: string,
   docsRoot: string,
-  chunkOptions: ChunkifyOptions,
 ): Promise<void> {
   const files = await listCorpusMarkdownFiles(checkoutDir, docsRoot);
   const keepSourcePaths = files.map((file) => file.sourcePath);
@@ -56,7 +55,6 @@ export async function ingestCorpusCheckout(
     const body = ingested.body;
     const meta = await readMetaFile(file.absolutePath);
 
-    const chunks = Chunkifier.chunkify(body, chunkOptions);
     const saved = await Page.save({
       knowledgeBaseId,
       id: file.id,
@@ -65,7 +63,6 @@ export async function ingestCorpusCheckout(
       body,
       sourcePath: file.sourcePath,
       metaHash: meta.hash,
-      chunks,
     });
     if (saved.skipped) continue;
 
