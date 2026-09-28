@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { Logger } from "../../log/index.ts";
-import { Chunkifier } from "../chunkifier/index.ts";
+import { Chunkifier, type ChunkifyOptions } from "../chunkifier/index.ts";
 import { reconcilePageImagePolicies } from "../image-desc/index.ts";
 import {
   deleteKnowledgePagesMissingSourcePaths,
@@ -45,6 +45,7 @@ export async function ingestCorpusCheckout(
   knowledgeBaseId: string,
   checkoutDir: string,
   docsRoot: string,
+  chunkOptions: ChunkifyOptions,
 ): Promise<void> {
   const files = await listCorpusMarkdownFiles(checkoutDir, docsRoot);
   const keepSourcePaths = files.map((file) => file.sourcePath);
@@ -55,7 +56,7 @@ export async function ingestCorpusCheckout(
     const body = ingested.body;
     const meta = await readMetaFile(file.absolutePath);
 
-    const chunks = Chunkifier.chunkify(body);
+    const chunks = Chunkifier.chunkify(body, chunkOptions);
     const saved = await Page.save({
       knowledgeBaseId,
       id: file.id,

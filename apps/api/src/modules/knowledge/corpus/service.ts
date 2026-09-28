@@ -7,7 +7,7 @@
  * (`kb_corpus_settings`), and the checkout → pages write path in `../ingest/`.
  */
 
-import { Chunkifier } from "../chunkifier/index.ts";
+import { Chunkifier, ChunkifierSettings } from "../chunkifier/index.ts";
 import { Embedder, type EmbedStaleChildrenResult } from "../embedder/index.ts";
 import { ImageCaptioner } from "../image-desc/index.ts";
 import { ingestCorpusCheckout } from "../ingest/index.ts";
@@ -230,12 +230,13 @@ export abstract class Corpus {
     try {
       Corpus.emitStage(CORPUS_STG_CHUNKIFY);
       const pages = await listPageBodies(knowledgeBaseId);
+      const chunkOptions = await ChunkifierSettings.load(knowledgeBaseId);
 
       let pagesProcessed = 0;
       let pagesSkipped = 0;
 
       for (const page of pages) {
-        const chunks = Chunkifier.chunkify(page.body);
+        const chunks = Chunkifier.chunkify(page.body, chunkOptions);
         const parentRows = chunks.parents.map((parent) => ({
           id: `${page.id}:p:${parent.index}`,
           pageId: page.id,
@@ -308,8 +309,14 @@ export abstract class Corpus {
       const settings: ResolvedCorpusSettings = resolveCorpusSettings(
         await CorpusSettings.load(knowledgeBaseId),
       );
+      const chunkOptions = await ChunkifierSettings.load(knowledgeBaseId);
       Corpus.emitStage(CORPUS_STG_INGEST);
-      await ingestCorpusCheckout(knowledgeBaseId, checkout, settings.docsRoot);
+      await ingestCorpusCheckout(
+        knowledgeBaseId,
+        checkout,
+        settings.docsRoot,
+        chunkOptions,
+      );
       await ImageCaptioner.captionStale({
         knowledgeBaseId,
         checkoutDir: checkout,

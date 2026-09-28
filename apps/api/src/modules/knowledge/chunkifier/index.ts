@@ -4,4 +4,9 @@ export {
   resolveChunkifyOptions,
 } from "./defaults.ts";
 export { Chunkifier } from "./service.ts";
+export {
+  type AdminChunkSettings,
+  ChunkifierSettings,
+  type ChunkSettingsRow,
+} from "./settings/service.ts";
 export type { ChunkifyResult } from "./types.ts";
