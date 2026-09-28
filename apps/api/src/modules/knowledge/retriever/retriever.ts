@@ -4,7 +4,12 @@ import {
   TASK_EMBEDDING,
 } from "../../server-setting/task-model-map/service.ts";
 import { Embedder, type EmbedFn } from "../embedder/index.ts";
-import { findParentsByIds, scanChildVectors } from "./dal.ts";
+import { DESCRIBED_IMAGE_POLICIES } from "../image-desc/index.ts";
+import {
+  findParentsByIds,
+  scanChildVectors,
+  scanImageDescriptionVectors,
+} from "./dal.ts";
 import {
   type RetrieveOptions,
   resolveRetrieveOptions,
@@ -23,6 +28,15 @@ export type RetrievedParent = {
   pageId: string;
   title: string;
   text: string;
+  score: number;
+};
+
+/** One ranked image-description hit: its caption and page title. */
+export type RetrievedImage = {
+  pageId: string;
+  title: string;
+  imagePath: string;
+  description: string;
   score: number;
 };
 
@@ -93,6 +107,8 @@ export type RetrieveParentsByQuestionOptions = RetrieveOptions & {
 export type RetrieveParentsByQuestionResult = {
   currentModel: string;
   parents: RetrievedParent[];
+  /** Ranked image-description hits, independent of the parent hits. */
+  images: RetrievedImage[];
 };
 
 function numberFromSql(value: unknown): number {
@@ -106,13 +122,14 @@ function numberFromSql(value: unknown): number {
 
 export abstract class Retriever {
   /**
-   * Embed the question and return ranked unique parents for the LLM.
-   * Empty question → no parents. Does not call the synthesizer.
+   * Embed the question and return ranked unique parents plus ranked image
+   * descriptions for the LLM. Empty question → no hits. Does not call the
+   * synthesizer.
    *
    * Logs:
    *  - `retrieve skipped` (status: "empty_question") when question is blank
-   *  - `retrieve ok`       (status: "ok" | "no_hits") after the vector scan,
-   *                          with the raw top-K child hits + scores
+   *  - `retrieve ok`       (status: "ok" | "no_hits") after the vector scans,
+   *                          with the raw top-K child hits + image hits
    *  - `retrieve error`    (status: "error") on any throw; rethrown after logging
    *
    * @see docs/modern-knowledge-base-design/04-retrieval.md
@@ -138,7 +155,7 @@ export abstract class Retriever {
         childLimit: knobs.childLimit,
         latencyMs: 0,
       });
-      return { currentModel, parents: [] };
+      return { currentModel, parents: [], images: [] };
     }
 
     try {
@@ -150,13 +167,31 @@ export abstract class Retriever {
       if (!vector) {
         throw new Error("Question embed returned no vector");
       }
+      const embeddingLiteral = Embedder.pgvectorLiteral(vector);
 
-      const childRows = await scanChildVectors({
-        knowledgeBaseId: options.knowledgeBaseId,
-        currentModel,
-        embeddingLiteral: Embedder.pgvectorLiteral(vector),
-        limit: knobs.childLimit,
-      });
+      const [childRows, imageRows] = await Promise.all([
+        scanChildVectors({
+          knowledgeBaseId: options.knowledgeBaseId,
+          currentModel,
+          embeddingLiteral,
+          limit: knobs.childLimit,
+        }),
+        scanImageDescriptionVectors({
+          knowledgeBaseId: options.knowledgeBaseId,
+          currentModel,
+          embeddingLiteral,
+          limit: knobs.childLimit,
+          policies: [...DESCRIBED_IMAGE_POLICIES],
+        }),
+      ]);
+
+      const images: RetrievedImage[] = imageRows.map((row) => ({
+        pageId: row.page_id,
+        title: row.title ?? "",
+        imagePath: row.image_path,
+        description: row.description ?? "",
+        score: numberFromSql(row.score),
+      }));
 
       const topK: TopKHit[] = childRows.map((row) => ({
         childId: row.child_id,
@@ -173,11 +208,12 @@ export abstract class Retriever {
         embeddingModel: currentModel,
         childLimit: knobs.childLimit,
         topK,
+        images,
         latencyMs: Math.round(performance.now() - start),
       });
 
       if (topK.length === 0) {
-        return { currentModel, parents: [] };
+        return { currentModel, parents: [], images };
       }
 
       const hits: ChildHit[] = childRows.map((row) => ({
@@ -190,7 +226,7 @@ export abstract class Retriever {
 
       const parentIds = uniqueParentIdsByBestScore(hits);
       if (parentIds.length === 0) {
-        return { currentModel, parents: [] };
+        return { currentModel, parents: [], images };
       }
 
       const scores = scoreByParentFromHits(hits);
@@ -221,6 +257,7 @@ export abstract class Retriever {
       return {
         currentModel,
         parents: capParents(ordered, knobs.maxParents, knobs.maxCharacters),
+        images,
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

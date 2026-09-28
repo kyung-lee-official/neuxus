@@ -1,6 +1,7 @@
 export {
   type ChildHit,
   capParents,
+  type RetrievedImage,
   type RetrievedParent,
   type RetrieveParentsByQuestionOptions,
   type RetrieveParentsByQuestionResult,

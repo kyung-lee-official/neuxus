@@ -13,6 +13,15 @@ export const IMAGE_POLICIES = [
 ] as const;
 export type ImagePolicy = (typeof IMAGE_POLICIES)[number];
 
+/**
+ * Policies whose images carry a description — embedded and searchable.
+ * `ignore` rows are excluded.
+ */
+export const DESCRIBED_IMAGE_POLICIES = [
+  "manual",
+  "vision-captioning",
+] as const;
+
 export type ImageMetaEntry = {
   policy: ImagePolicy;
   /** Present only when `policy: manual`. */

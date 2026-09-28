@@ -21,6 +21,7 @@ import {
   updateImageDescription,
   writeImageDescriptionEmbedding,
 } from "./dal.ts";
+import { DESCRIBED_IMAGE_POLICIES } from "./image-meta.ts";
 
 /**
  * Business prompt for the `md-image-captioning` task. Its `sha256` is stored
@@ -167,8 +168,6 @@ export class ImageCaptioner {
  * Policies whose descriptions carry a vector. `ignore` rows are excluded.
  * @see docs/modern-knowledge-base-design/03.2-image-descriptions.md
  */
-const EMBEDDABLE_POLICIES = ["manual", "vision-captioning"];
-
 export type EmbedImageDescriptionsOptions = {
   /** Scope to one knowledge base; omit to scan all. */
   knowledgeBaseId?: string;
@@ -196,7 +195,7 @@ export class ImageDescriptionEmbedder {
 
     const rows = await findImageDescriptionsNeedingEmbedding(
       currentModel,
-      EMBEDDABLE_POLICIES,
+      [...DESCRIBED_IMAGE_POLICIES],
       { knowledgeBaseId: options?.knowledgeBaseId },
     );
 

@@ -24,6 +24,7 @@ export {
 } from "./dal.ts";
 export {
   canonicalImagePath,
+  DESCRIBED_IMAGE_POLICIES,
   IMAGE_POLICIES,
   type ImageMetaEntry,
   type ImageMetaParse,

@@ -20,6 +20,14 @@ export type ParentLookupRow = {
   title: string | null;
 };
 
+export type ImageDescriptionHitRow = {
+  page_id: string;
+  image_path: string;
+  description: string | null;
+  title: string | null;
+  score: number | string;
+};
+
 /** Top-K children by cosine distance within one knowledge base. */
 export async function scanChildVectors(args: {
   knowledgeBaseId: string;
@@ -56,5 +64,37 @@ export async function findParentsByIds(
      AND pg.id = p.page_id
     WHERE p.knowledge_base_id = ${knowledgeBaseId}
       AND p.id = ANY(${sql.array(parentIds, "text[]")})
+  `;
+}
+
+/**
+ * Top-K image descriptions by cosine distance within one knowledge base,
+ * each with its page title. `policies` names the searchable stored values.
+ * @see docs/modern-knowledge-base-design/04-retrieval.md
+ */
+export async function scanImageDescriptionVectors(args: {
+  knowledgeBaseId: string;
+  currentModel: string;
+  embeddingLiteral: string;
+  limit: number;
+  policies: string[];
+}): Promise<ImageDescriptionHitRow[]> {
+  return sql<ImageDescriptionHitRow[]>`
+    SELECT
+      d.page_id,
+      d.image_path,
+      d.description,
+      pg.title,
+      1 - (d.embedding <=> ${args.embeddingLiteral}::vector) AS score
+    FROM kb_image_descriptions d
+    JOIN kb_pages pg
+      ON pg.knowledge_base_id = d.knowledge_base_id
+     AND pg.id = d.page_id
+    WHERE d.embedding IS NOT NULL
+      AND d.embedding_model IS NOT DISTINCT FROM ${args.currentModel}
+      AND d.knowledge_base_id = ${args.knowledgeBaseId}
+      AND d.policy = ANY(${sql.array(args.policies, "text[]")})
+    ORDER BY d.embedding <=> ${args.embeddingLiteral}::vector
+    LIMIT ${args.limit}
   `;
 }
