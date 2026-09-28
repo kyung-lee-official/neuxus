@@ -1,4 +1,8 @@
-export { ingestCorpusCheckout } from "./ingest-checkout.ts";
+export {
+  ingestCorpusCheckout,
+  type ReconcileCorpusImagesResult,
+  reconcileCorpusImages,
+} from "./ingest-checkout.ts";
 export { normalizeBody, normalizeNewlines } from "./normalize.ts";
 export { Ingester, type IngestMarkdownResult } from "./service.ts";
 export {

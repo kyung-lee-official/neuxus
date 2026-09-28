@@ -9,11 +9,16 @@
 
 import { Embedder, type EmbedStaleChildrenResult } from "../embedder/index.ts";
 import {
+  type CaptionPassResult,
   type EmbedImageDescriptionsResult,
   ImageCaptioner,
   ImageDescriptionEmbedder,
 } from "../image-desc/index.ts";
-import { ingestCorpusCheckout } from "../ingest/index.ts";
+import {
+  ingestCorpusCheckout,
+  type ReconcileCorpusImagesResult,
+  reconcileCorpusImages,
+} from "../ingest/index.ts";
 import { Page } from "../pages/index.ts";
 import {
   type CloneProgress,
@@ -32,7 +37,9 @@ import { CorpusSettings } from "./settings/service.ts";
 /** Corpus operation ids — single source of truth. */
 export const CORPUS_OP_CLONE = "clone";
 export const CORPUS_OP_PULL = "pull";
+export const CORPUS_OP_RECONCILE = "reconcile";
 export const CORPUS_OP_CHUNKIFY = "chunkify";
+export const CORPUS_OP_CAPTION = "caption";
 export const CORPUS_OP_EMBED = "embed";
 export const CORPUS_OP_SYNC = "sync";
 
@@ -42,13 +49,17 @@ export const CORPUS_STG_FETCH = "fetch";
 export const CORPUS_STG_CHECKOUT = "checkout";
 export const CORPUS_STG_MERGE = "merge";
 export const CORPUS_STG_INGEST = "ingest";
+export const CORPUS_STG_RECONCILE = "reconcile";
 export const CORPUS_STG_CHUNKIFY = "chunkify";
+export const CORPUS_STG_CAPTION = "caption";
 export const CORPUS_STG_EMBED = "embed";
 
 export type CorpusOperation =
   | typeof CORPUS_OP_CLONE
   | typeof CORPUS_OP_PULL
+  | typeof CORPUS_OP_RECONCILE
   | typeof CORPUS_OP_CHUNKIFY
+  | typeof CORPUS_OP_CAPTION
   | typeof CORPUS_OP_EMBED
   | typeof CORPUS_OP_SYNC;
 
@@ -58,7 +69,9 @@ export type CorpusStage =
   | typeof CORPUS_STG_CHECKOUT
   | typeof CORPUS_STG_MERGE
   | typeof CORPUS_STG_INGEST
+  | typeof CORPUS_STG_RECONCILE
   | typeof CORPUS_STG_CHUNKIFY
+  | typeof CORPUS_STG_CAPTION
   | typeof CORPUS_STG_EMBED;
 
 export type CorpusProgress = CloneProgress;
@@ -67,6 +80,8 @@ export type CorpusEmbedResult = {
   children: EmbedStaleChildrenResult;
   descriptions: EmbedImageDescriptionsResult;
 };
+
+export type CorpusReconcileResult = ReconcileCorpusImagesResult;
 
 export type CorpusStatus = {
   running: boolean;
@@ -107,8 +122,12 @@ function initialStage(op: CorpusOperation): CorpusStage {
       return CORPUS_STG_CLONE;
     case CORPUS_OP_PULL:
       return CORPUS_STG_FETCH;
+    case CORPUS_OP_RECONCILE:
+      return CORPUS_STG_RECONCILE;
     case CORPUS_OP_CHUNKIFY:
       return CORPUS_STG_CHUNKIFY;
+    case CORPUS_OP_CAPTION:
+      return CORPUS_STG_CAPTION;
     case CORPUS_OP_EMBED:
       return CORPUS_STG_EMBED;
     case CORPUS_OP_SYNC:
@@ -246,6 +265,34 @@ export abstract class Corpus {
     }
   }
 
+  /** Re-run image-policy reconciliation for every ingested corpus page. */
+  static async reconcile(
+    knowledgeBaseId: string,
+  ): Promise<CorpusReconcileResult> {
+    if (!Corpus.tryStart(CORPUS_OP_RECONCILE)) throw new CorpusLockedError();
+    try {
+      const result = await Corpus.runReconcile(knowledgeBaseId);
+      Corpus.finish();
+      return result;
+    } catch (err) {
+      Corpus.finish(err);
+      throw err;
+    }
+  }
+
+  /** Caption every stale `vision-captioning` image of one knowledge base. */
+  static async caption(knowledgeBaseId: string): Promise<CaptionPassResult> {
+    if (!Corpus.tryStart(CORPUS_OP_CAPTION)) throw new CorpusLockedError();
+    try {
+      const result = await Corpus.runCaption(knowledgeBaseId);
+      Corpus.finish();
+      return result;
+    } catch (err) {
+      Corpus.finish(err);
+      throw err;
+    }
+  }
+
   /** Embed children and image descriptions whose vector is missing or stale. */
   static async embed(knowledgeBaseId: string): Promise<CorpusEmbedResult> {
     if (!Corpus.tryStart(CORPUS_OP_EMBED)) throw new CorpusLockedError();
@@ -275,6 +322,33 @@ export abstract class Corpus {
     });
   }
 
+  private static async runReconcile(
+    knowledgeBaseId: string,
+  ): Promise<CorpusReconcileResult> {
+    Corpus.emitStage(CORPUS_STG_RECONCILE);
+    const checkout = corpusCheckoutDir(knowledgeBaseId);
+    const settings: ResolvedCorpusSettings = resolveCorpusSettings(
+      await CorpusSettings.load(knowledgeBaseId),
+    );
+    return reconcileCorpusImages(knowledgeBaseId, checkout, settings.docsRoot);
+  }
+
+  private static async runCaption(
+    knowledgeBaseId: string,
+  ): Promise<CaptionPassResult> {
+    Corpus.emitStage(CORPUS_STG_CAPTION);
+    const checkout = corpusCheckoutDir(knowledgeBaseId);
+    const settings: ResolvedCorpusSettings = resolveCorpusSettings(
+      await CorpusSettings.load(knowledgeBaseId),
+    );
+    return ImageCaptioner.captionStale({
+      knowledgeBaseId,
+      checkoutDir: checkout,
+      docsRoot: settings.docsRoot,
+      failFast: true,
+    });
+  }
+
   private static async runSync(knowledgeBaseId: string): Promise<void> {
     try {
       const checkout = corpusCheckoutDir(knowledgeBaseId);
@@ -287,12 +361,7 @@ export abstract class Corpus {
       await ingestCorpusCheckout(knowledgeBaseId, checkout, settings.docsRoot);
       Corpus.emitStage(CORPUS_STG_CHUNKIFY);
       await Page.chunkifyPages(knowledgeBaseId);
-      await ImageCaptioner.captionStale({
-        knowledgeBaseId,
-        checkoutDir: checkout,
-        docsRoot: settings.docsRoot,
-        failFast: true,
-      });
+      await Corpus.runCaption(knowledgeBaseId);
       Corpus.emitStage(CORPUS_STG_EMBED);
       await Embedder.embedStaleChildren({ knowledgeBaseId, failFast: true });
       await ImageDescriptionEmbedder.embedStale({
