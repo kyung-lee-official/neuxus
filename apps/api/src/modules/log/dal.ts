@@ -50,3 +50,18 @@ export async function deleteAllLogs(): Promise<number> {
   const { count } = await getPrisma().appLog.deleteMany({});
   return count;
 }
+
+/** Raw `app_log` row for inspection. */
+export type LogRow = {
+  id: bigint;
+  level: string;
+  name: string | null;
+  msg: string;
+  meta: unknown;
+  createdAt: Date;
+};
+
+/** One `app_log` row by id, or null. */
+export async function findLogById(id: bigint): Promise<LogRow | null> {
+  return getPrisma().appLog.findUnique({ where: { id } });
+}
