@@ -9,7 +9,7 @@
  * Example:
  *   bun --env-file=../../.env run scripts/format-log.ts 377
  */
-import { sql } from "bun";
+import { findLogById } from "../src/modules/log/dal.ts";
 
 const logId = process.argv[2];
 if (!logId) {
@@ -19,29 +19,13 @@ if (!logId) {
   process.exit(1);
 }
 
-const rows = await sql<
-  Array<{
-    id: bigint;
-    level: string;
-    name: string | null;
-    msg: string;
-    meta: Record<string, unknown> | null;
-    created_at: Date;
-  }>
->`
-  SELECT id, level, name, msg, meta, created_at
-  FROM app_log
-  WHERE id = ${BigInt(logId)}
-  LIMIT 1
-`;
-
-if (rows.length === 0) {
+const r = await findLogById(BigInt(logId));
+if (!r) {
   console.error(`log id ${logId} not found`);
   process.exit(1);
 }
 
-const r = rows[0]!;
-const m = (r.meta ?? {}) as Record<string, unknown>;
+const m = (r.meta as Record<string, unknown> | null) ?? {};
 
 function hr(title: string) {
   console.log();
@@ -70,7 +54,7 @@ function showKeyValue(key: string, value: unknown) {
 
 console.log("=".repeat(72));
 console.log(
-  `# log ${r.id}  ·  ${r.level.toUpperCase()}  ·  ${r.name ?? "—"}  ·  ${r.created_at.toISOString()}`,
+  `# log ${r.id}  ·  ${r.level.toUpperCase()}  ·  ${r.name ?? "—"}  ·  ${r.createdAt.toISOString()}`,
 );
 console.log("=".repeat(72));
 console.log(`# msg: ${r.msg}`);

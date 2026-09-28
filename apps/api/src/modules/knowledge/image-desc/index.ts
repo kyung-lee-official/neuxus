@@ -6,18 +6,22 @@
  *   - parse.ts       : image-ref extraction + strict manual pair
  *   - resolve.ts     : body-relative path → absolute filesystem path
  *   - dal.ts         : Prisma CRUD for kb_image_descriptions
- *   - pipeline.ts    : enrichImagesWithDescriptions() orchestrator
+ *   - pipeline.ts    : ImageDescriptionEnricher orchestrator
  *
  * The vision model is selected at runtime from the `md-image-captioning`
  * task link (see `buildDefaultDescriber` in pipeline.ts).
  */
 
+export {
+  findImageDescription,
+  upsertImageDescription,
+} from "./dal.ts";
 export { dedupByPath, type ParsedImageRef, parseImageRefs } from "./parse.ts";
 export {
   defaultPersistHooks,
   type EnrichmentResult,
   type EnrichOptions,
-  enrichImagesWithDescriptions,
+  ImageDescriptionEnricher,
   ImageDescValidationError,
   type PersistHooks,
 } from "./pipeline.ts";
