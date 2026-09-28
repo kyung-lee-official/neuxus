@@ -8,7 +8,11 @@ import { answerFromContext } from "./answer.ts";
 import type { QueryModel } from "./model.ts";
 
 export abstract class Query {
-  static async ask(user: AppUser, body: QueryModel["queryBody"]) {
+  static async ask(
+    user: AppUser,
+    knowledgeBaseId: string,
+    body: QueryModel["queryBody"],
+  ) {
     const message = body.message.trim();
     if (!message) throw status(400, { error: "message is required" });
 
@@ -24,8 +28,9 @@ export abstract class Query {
       }
       const recent = await ChatMessage.listRecentBySession(sessionId);
       const personalMemories = await PersonalMemory.search(user.id, message);
-      const retrieveSettings = await RetrieverSettings.load();
+      const retrieveSettings = await RetrieverSettings.load(knowledgeBaseId);
       const { parents } = await Retriever.parentsByQuestion(message, {
+        knowledgeBaseId,
         ...retrieveSettings,
         userId: user.id,
       });
