@@ -5,7 +5,7 @@ import { CorpusGitError } from "../errors.ts";
 
 export type CorpusMarkdownFile = {
   sourcePath: string;
-  slug: string;
+  id: string;
   absolutePath: string;
 };
 
@@ -26,7 +26,7 @@ export function pathHasDotSegment(posixRel: string): boolean {
   return posixRel.split("/").some((segment) => segment.startsWith("."));
 }
 
-export function slugFromSourcePath(sourcePath: string): string {
+export function idFromSourcePath(sourcePath: string): string {
   return sourcePath.replace(/\.md$/i, "");
 }
 
@@ -67,10 +67,10 @@ export async function listCorpusMarkdownFiles(
 
   const seen = new Set<string>();
   for (const file of files) {
-    if (seen.has(file.slug)) {
-      throw new CorpusGitError(400, `Duplicate slug: ${file.slug}`);
+    if (seen.has(file.id)) {
+      throw new CorpusGitError(400, `Duplicate id: ${file.id}`);
     }
-    seen.add(file.slug);
+    seen.add(file.id);
   }
   return files;
 }
@@ -119,7 +119,7 @@ function pushMarkdown(
   const sourcePath = toPosixRelative(docsReal, fileAbs);
   if (sourcePath === "" || pathHasDotSegment(sourcePath)) return;
   if (!sourcePath.endsWith(".md")) return;
-  const slug = slugFromSourcePath(sourcePath);
-  if (slug === "") return;
-  out.push({ sourcePath, slug, absolutePath: fileAbs });
+  const id = idFromSourcePath(sourcePath);
+  if (id === "") return;
+  out.push({ sourcePath, id, absolutePath: fileAbs });
 }

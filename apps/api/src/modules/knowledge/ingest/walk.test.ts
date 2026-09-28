@@ -4,9 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   assertSafeDocsRoot,
+  idFromSourcePath,
   listCorpusMarkdownFiles,
   pathHasDotSegment,
-  slugFromSourcePath,
 } from "./walk.ts";
 
 describe("pathHasDotSegment", () => {
@@ -17,10 +17,10 @@ describe("pathHasDotSegment", () => {
   });
 });
 
-describe("slugFromSourcePath", () => {
+describe("idFromSourcePath", () => {
   test("strips the .md suffix and keeps nested POSIX paths", () => {
-    expect(slugFromSourcePath("guide/install.md")).toBe("guide/install");
-    expect(slugFromSourcePath("README.md")).toBe("README");
+    expect(idFromSourcePath("guide/install.md")).toBe("guide/install");
+    expect(idFromSourcePath("README.md")).toBe("README");
   });
 });
 
@@ -57,7 +57,7 @@ describe("listCorpusMarkdownFiles", () => {
         "README.md",
         "guide/install.md",
       ]);
-      expect(files.map((f) => f.slug)).toEqual(["README", "guide/install"]);
+      expect(files.map((f) => f.id)).toEqual(["README", "guide/install"]);
 
       await expect(listCorpusMarkdownFiles(root, "missing")).rejects.toThrow(
         /Docs root not found/,

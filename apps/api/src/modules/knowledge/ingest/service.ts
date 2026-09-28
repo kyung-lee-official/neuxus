@@ -2,7 +2,6 @@ import { normalizeBody, normalizeNewlines } from "./normalize.ts";
 
 export type IngestMarkdownResult = {
   title: string;
-  type: string | null;
   tags: string[];
   body: string;
 };
@@ -20,15 +19,14 @@ export abstract class Ingester {
     const meta = yaml == null ? emptyMeta() : parseFrontmatterYaml(yaml);
     return {
       title: meta.title,
-      type: meta.type,
       tags: meta.tags,
       body: normalizeBody(rest),
     };
   }
 }
 
-function emptyMeta(): { title: string; type: string | null; tags: string[] } {
-  return { title: "", type: null, tags: [] };
+function emptyMeta(): { title: string; tags: string[] } {
+  return { title: "", tags: [] };
 }
 
 /** Leading `---\n` … `---\n` (optional newline after closer). Otherwise no strip. */
@@ -54,7 +52,6 @@ function splitLeadingFrontmatter(text: string): {
 
 function parseFrontmatterYaml(yaml: string): {
   title: string;
-  type: string | null;
   tags: string[];
 } {
   const meta = emptyMeta();
@@ -87,11 +84,9 @@ function parseFrontmatterYaml(yaml: string): {
       i++;
       continue;
     }
-    const keyed = line.match(/^(title|type):[ \t]*(.*)$/);
+    const keyed = line.match(/^title:[ \t]*(.*)$/);
     if (keyed) {
-      const value = unquote(keyed[2]!.trim());
-      if (keyed[1] === "title") meta.title = value;
-      else meta.type = value === "" ? null : value;
+      meta.title = unquote(keyed[1]!.trim());
     }
     i++;
   }

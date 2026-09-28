@@ -4,7 +4,7 @@ export { Ingester, type IngestMarkdownResult } from "./service.ts";
 export {
   assertSafeDocsRoot,
   type CorpusMarkdownFile,
+  idFromSourcePath,
   listCorpusMarkdownFiles,
   pathHasDotSegment,
-  slugFromSourcePath,
 } from "./walk.ts";

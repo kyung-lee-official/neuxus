@@ -20,14 +20,12 @@ describe("ingestMarkdown", () => {
       "---",
       "title: North Quay Relay",
       "tags: [demo, kb]",
-      "type: note",
       "---",
       "## Setup",
     ].join("\n");
     const result = Ingester.ingestMarkdown(source);
     expect(result.title).toBe("North Quay Relay");
     expect(result.tags).toEqual(["demo", "kb"]);
-    expect(result.type).toBe("note");
     expect(result.body).toBe("## Setup\n");
     expect(result.body.startsWith("---")).toBe(false);
   });
