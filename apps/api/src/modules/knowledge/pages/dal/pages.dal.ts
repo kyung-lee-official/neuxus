@@ -89,18 +89,22 @@ export async function findPageDetailRow(
   return rows[0] ?? null;
 }
 
-/** Stored `kb_pages.content_hash`, or null when the page is missing. */
-export async function findPageContentHash(
+export type PageHashRow = {
+  content_hash: string;
+  meta_hash: string | null;
+};
+
+/** Stored `(content_hash, meta_hash)` for a page, or null when it is missing. */
+export async function findPageHashes(
   knowledgeBaseId: string,
   pageId: string,
-): Promise<string | null> {
-  const rows = await sql<{ content_hash: string | null }[]>`
-    SELECT content_hash FROM kb_pages
+): Promise<PageHashRow | null> {
+  const rows = await sql<PageHashRow[]>`
+    SELECT content_hash, meta_hash FROM kb_pages
     WHERE knowledge_base_id = ${knowledgeBaseId} AND id = ${pageId}
     LIMIT 1
   `;
-  const hash = rows[0]?.content_hash;
-  return typeof hash === "string" ? hash : null;
+  return rows[0] ?? null;
 }
 
 export type UpsertPageWithChunksInput = {

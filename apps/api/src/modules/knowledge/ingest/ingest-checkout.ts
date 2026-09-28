@@ -1,18 +1,38 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
 import { Chunkifier } from "../chunkifier/index.ts";
 import {
   deleteKnowledgePagesMissingSourcePaths,
-  findPageContentHash,
   Page,
 } from "../pages/index.ts";
 import { Ingester } from "./service.ts";
 import { listCorpusMarkdownFiles } from "./walk.ts";
 
+function sha256Hex(bytes: Buffer): string {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
+/** sha256 of the sibling `*.meta.yaml` bytes, or null when it is absent. */
+async function metaHashFor(pageAbsPath: string): Promise<string | null> {
+  const sidecar = join(
+    dirname(pageAbsPath),
+    `${basename(pageAbsPath, ".md")}.meta.yaml`,
+  );
+  try {
+    return sha256Hex(await readFile(sidecar));
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Walk the checkout docs root, persist changed pages, delete missing paths.
+ * Walk the checkout docs root, persist pages, delete missing source paths.
  * @see docs/modern-knowledge-base-design/01-corpus.md
+ * @see docs/modern-knowledge-base-design/02-ingest.md
  */
 export async function ingestCorpusCheckout(
+  knowledgeBaseId: string,
   checkoutDir: string,
   docsRoot: string,
 ): Promise<void> {
@@ -23,30 +43,23 @@ export async function ingestCorpusCheckout(
     const source = await readFile(file.absolutePath, "utf8");
     const ingested = Ingester.ingestMarkdown(source);
     const body = ingested.body;
-
-    const fields = {
-      title: ingested.title,
-      type: ingested.type,
-      tags: ingested.tags,
-      body,
-    };
-    const storedHash = await findPageContentHash(file.slug);
-    if (storedHash !== null && storedHash === Page.pageContentHash(fields)) {
-      continue;
-    }
+    const metaHash = await metaHashFor(file.absolutePath);
 
     const chunks = Chunkifier.chunkify(body);
     await Page.save({
-      id: file.slug,
-      slug: file.slug,
+      knowledgeBaseId,
+      id: file.id,
       title: ingested.title,
-      type: ingested.type,
       tags: ingested.tags,
       body,
       sourcePath: file.sourcePath,
+      metaHash,
       chunks,
     });
   }
 
-  await deleteKnowledgePagesMissingSourcePaths(keepSourcePaths);
+  await deleteKnowledgePagesMissingSourcePaths(
+    knowledgeBaseId,
+    keepSourcePaths,
+  );
 }

@@ -3,8 +3,8 @@ import { isoFromDate } from "../../../shared/serialize.ts";
 import type { ChunkifyResult } from "../chunkifier/index.ts";
 import { findChildrenByPage } from "./dal/children.dal.ts";
 import {
-  findPageContentHash,
   findPageDetailRow,
+  findPageHashes,
   listPageSummaries,
   upsertPageWithChunks,
 } from "./dal/pages.dal.ts";
@@ -170,8 +170,12 @@ export abstract class Page {
       body: input.body,
     });
 
-    const stored = await findPageContentHash(input.knowledgeBaseId, input.id);
-    if (stored === contentHash) {
+    const stored = await findPageHashes(input.knowledgeBaseId, input.id);
+    if (
+      stored &&
+      stored.content_hash === contentHash &&
+      stored.meta_hash === input.metaHash
+    ) {
       return { contentHash, skipped: true };
     }
 
