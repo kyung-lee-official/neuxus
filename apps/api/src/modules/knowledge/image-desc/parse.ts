@@ -78,6 +78,20 @@ function resolveImagePath(sourceAbsPath: string, imagePath: string): string {
   return normalize(`${dirname(sourceAbsPath)}/${imagePath}`);
 }
 
+/**
+ * Raw image reference (as written in the body) per 0-based line index, for
+ * lines that are an image. Lines without an image are absent.
+ */
+export function imageRefsByLine(body: string): Map<number, string> {
+  const out = new Map<number, string>();
+  const lines = body.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const ref = pathFromMarkdown(lines[i]!) ?? pathFromHtml(lines[i]!);
+    if (ref != null) out.set(i, ref);
+  }
+  return out;
+}
+
 /** Dedup by `(absolutePath)` so the same image file isn't processed twice. */
 export function dedupByPath(refs: ParsedImageRef[]): ParsedImageRef[] {
   const seen = new Set<string>();

@@ -2,7 +2,10 @@ import {
   resolveTaskModelLink,
   TASK_TEXT_SYNTHESIS,
 } from "../../modules/server-setting/task-model-map/service.ts";
-import type { RetrievedParent } from "../knowledge/retriever/index.ts";
+import type {
+  RetrievedImage,
+  RetrievedParent,
+} from "../knowledge/retriever/index.ts";
 import { Logger } from "../log/index.ts";
 import type { Model } from "../model-providers/core/types.ts";
 import type { AppMessage } from "../personal-data/chat-messages/service.ts";
@@ -30,12 +33,13 @@ function fitPromptToWindow(
   return `${prompt.slice(prompt.length - keep)}${marker}`;
 }
 
-/** Build a prompt from memory, chat, and KB parents, then synthesize. */
+/** Build a prompt from memory, chat, KB parents + image hits, then synthesize. */
 export async function answerFromContext(
   recentMessages: AppMessage[],
   userMessage: string,
   personalMemories: AppMemory[],
   parents: RetrievedParent[] = [],
+  images: RetrievedImage[] = [],
   /** Stamps the `app_log` synthesis rows with this user. */
   userId?: string,
 ): Promise<string> {
@@ -52,6 +56,7 @@ export async function answerFromContext(
       userMessage,
       personalMemories,
       parents,
+      images,
     ),
     model,
     maxTokens,

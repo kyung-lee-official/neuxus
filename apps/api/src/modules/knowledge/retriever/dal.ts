@@ -18,6 +18,7 @@ export type ParentLookupRow = {
   page_id: string;
   text: string | null;
   title: string | null;
+  source_path: string | null;
 };
 
 export type ImageDescriptionHitRow = {
@@ -57,7 +58,7 @@ export async function findParentsByIds(
   parentIds: string[],
 ): Promise<ParentLookupRow[]> {
   return sql<ParentLookupRow[]>`
-    SELECT p.id, p.page_id, p.text, pg.title
+    SELECT p.id, p.page_id, p.text, pg.title, pg.source_path
     FROM kb_parents p
     JOIN kb_pages pg
       ON pg.knowledge_base_id = p.knowledge_base_id

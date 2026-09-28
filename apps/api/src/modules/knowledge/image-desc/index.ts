@@ -31,6 +31,7 @@ export {
   type ImagePolicy,
   parseImageMeta,
 } from "./image-meta.ts";
+export { imageRefsByLine } from "./parse.ts";
 export {
   type ReconcileOptions,
   type ReconcileResult,

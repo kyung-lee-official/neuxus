@@ -12,12 +12,13 @@ describe("buildSynthesisPrompt", () => {
           parentId: "1",
           pageId: "p",
           title: "Setup",
+          sourcePath: "setup.md",
           text: "Run bun install.",
           score: 0.9,
         },
       ],
     );
-    expect(prompt).toContain("Knowledge base (parent context):");
+    expect(prompt).toContain("Knowledge base:");
     expect(prompt).toContain("### Setup");
     expect(prompt).toContain("Run bun install.");
     expect(prompt).toContain("How do I setup?");

@@ -29,7 +29,7 @@ export abstract class Query {
       const recent = await ChatMessage.listRecentBySession(sessionId);
       const personalMemories = await PersonalMemory.search(user.id, message);
       const retrieveSettings = await RetrieverSettings.load(knowledgeBaseId);
-      const { parents } = await Retriever.parentsByQuestion(message, {
+      const { parents, images } = await Retriever.parentsByQuestion(message, {
         knowledgeBaseId,
         ...retrieveSettings,
         userId: user.id,
@@ -39,6 +39,7 @@ export abstract class Query {
         message,
         personalMemories,
         parents,
+        images,
         user.id,
       );
       await ChatMessage.insert(sessionId, "user", message);

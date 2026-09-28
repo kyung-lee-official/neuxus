@@ -1,24 +1,29 @@
-import type { RetrievedParent } from "../knowledge/retriever/index.ts";
+import type {
+  RetrievedImage,
+  RetrievedParent,
+} from "../knowledge/retriever/index.ts";
 import type { AppMessage } from "../personal-data/chat-messages/service.ts";
 import type { AppMemory } from "../personal-data/personal-memory/service.ts";
+import { formatKnowledgeContext } from "./images.ts";
 
 const MAX_CONTEXT_CHARS = 12_000;
 
 /**
- * Build the synthesis prompt (personal memory, KB parents, chat).
+ * Build the synthesis prompt (personal memory, KB parents + image hits, chat).
  */
 export function buildSynthesisPrompt(
   recentMessages: AppMessage[],
   userMessage: string,
   personalMemories: AppMemory[] = [],
   parents: RetrievedParent[] = [],
+  images: RetrievedImage[] = [],
 ): string {
   const history = formatHistory(recentMessages);
   const personal = formatPersonalMemories(personalMemories);
-  const knowledge = formatParents(parents);
+  const knowledge = formatKnowledgeContext(parents, images);
   const parts = [
     "You are answering for a single user.",
-    "Use the knowledge-base parents, personal memory, and recent conversation below.",
+    "Use the knowledge-base context, personal memory, and recent conversation below.",
     "Personal memory is private to this user; do not invent facts that are not present.",
     "If the available context does not contain the answer, say so clearly.",
     "",
@@ -27,20 +32,13 @@ export function buildSynthesisPrompt(
     parts.push("Personal memory (private to this user only):", personal, "");
   }
   if (knowledge) {
-    parts.push("Knowledge base (parent context):", knowledge, "");
+    parts.push("Knowledge base:", knowledge, "");
   }
   if (history) {
     parts.push("Recent conversation (for context only):", history, "");
   }
   parts.push("Current question:", userMessage.trim());
   return trimToMax(parts.join("\n"), MAX_CONTEXT_CHARS);
-}
-
-function formatParents(parents: RetrievedParent[]): string {
-  if (parents.length === 0) return "";
-  return parents
-    .map((p) => (p.title ? `### ${p.title}\n${p.text}` : p.text))
-    .join("\n\n");
 }
 
 function formatHistory(messages: AppMessage[]): string {

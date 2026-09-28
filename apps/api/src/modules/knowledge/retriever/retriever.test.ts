@@ -33,8 +33,8 @@ function parent(
   return {
     parentId,
     pageId: "p",
-    slug: "s",
     title: "T",
+    sourcePath: "page.md",
     text,
     score,
   };
