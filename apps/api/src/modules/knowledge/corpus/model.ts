@@ -18,6 +18,13 @@ const corpusStageLiteral = t.Union([
   t.Literal("embed"),
 ]);
 
+const embedResponse = t.Object({
+  currentModel: t.String(),
+  considered: t.Integer({ minimum: 0 }),
+  embedded: t.Integer({ minimum: 0 }),
+  skipped: t.Integer({ minimum: 0 }),
+});
+
 /** Schemas for the corpus operation routes (clone / pull / chunkify / embed / sync / events). */
 export const CorpusModel = {
   corpusChunkifyResponse: t.Object({
@@ -27,10 +34,8 @@ export const CorpusModel = {
   }),
   corpusEmbedResponse: t.Object({
     ok: t.Literal(true),
-    currentModel: t.String(),
-    considered: t.Integer({ minimum: 0 }),
-    embedded: t.Integer({ minimum: 0 }),
-    skipped: t.Integer({ minimum: 0 }),
+    children: embedResponse,
+    descriptions: embedResponse,
   }),
   corpusSyncResponse: t.Object({
     ok: t.Literal(true),

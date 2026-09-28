@@ -1,7 +1,7 @@
 /**
- * Embedder service. Owns the `kb_children` embedding pass: find children
- * whose `embedding_model` is missing or stale, embed their text via the model
- * linked to the `embedding` task, and write the pgvector back.
+ * Embedder service. Shared embedding utilities (task-model resolution, pgvector
+ * literal, the row loop) plus the `kb_children` embedding pass. The
+ * image-description pass reuses these utilities from the image-desc module.
  */
 
 import {
@@ -13,13 +13,19 @@ import { findChildrenNeedingEmbedding, writeChildEmbedding } from "./dal.ts";
 /** Embed texts: one vector per text, in order. */
 export type EmbedFn = (texts: string[]) => Promise<number[][]>;
 
+/** The resolved embedding model + a bound `EmbedFn`. */
+export type ResolvedEmbedder = {
+  currentModel: string;
+  embed: EmbedFn;
+};
+
 export type EmbedChildRow = {
   knowledgeBaseId: string;
   id: string;
   text: string;
 };
 
-export type EmbedChildRowsResult = {
+export type EmbedRowsResult = {
   embedded: number;
   skipped: number;
 };
@@ -33,7 +39,7 @@ export type EmbedStaleChildrenOptions = {
   failFast?: boolean;
 };
 
-export type EmbedStaleChildrenResult = EmbedChildRowsResult & {
+export type EmbedStaleChildrenResult = EmbedRowsResult & {
   currentModel: string;
   considered: number;
 };
@@ -47,18 +53,32 @@ export abstract class Embedder {
     return `[${values.join(",")}]`;
   }
 
+  /** Resolve the `embedding` task link into a bound `EmbedFn`. */
+  static async resolve(override?: EmbedFn): Promise<ResolvedEmbedder> {
+    const link = await resolveTaskModelLink(TASK_EMBEDDING);
+    if (!link) {
+      throw new Error("No model is linked to the embedding task");
+    }
+    return {
+      currentModel: link.model.identifier,
+      embed:
+        override ??
+        ((texts: string[]) => link.provider.embed(link.model.modelId, texts)),
+    };
+  }
+
   /**
    * Embed each row; skip empty text or a failed provider call (leave DB unchanged).
    * @see docs/model-management/README.md
    */
-  static async embedChildRows(
-    rows: EmbedChildRow[],
+  static async embedRows<TRow extends { text: string }>(
+    rows: TRow[],
     args: {
       embedder: EmbedFn;
-      writeVector: (row: EmbedChildRow, vector: number[]) => Promise<void>;
+      writeVector: (row: TRow, vector: number[]) => Promise<void>;
       failFast?: boolean;
     },
-  ): Promise<EmbedChildRowsResult> {
+  ): Promise<EmbedRowsResult> {
     let embedded = 0;
     let skipped = 0;
 
@@ -95,22 +115,15 @@ export abstract class Embedder {
   static async embedStaleChildren(
     options?: EmbedStaleChildrenOptions,
   ): Promise<EmbedStaleChildrenResult> {
-    const link = await resolveTaskModelLink(TASK_EMBEDDING);
-    if (!link) {
-      throw new Error("No model is linked to the embedding task");
-    }
-    const currentModel = link.model.identifier;
-    const embedder =
-      options?.embedder ??
-      ((texts: string[]) => link.provider.embed(link.model.modelId, texts));
+    const { currentModel, embed } = await Embedder.resolve(options?.embedder);
 
     const children = await findChildrenNeedingEmbedding(currentModel, {
       knowledgeBaseId: options?.knowledgeBaseId,
       pageId: options?.pageId,
     });
 
-    const result = await Embedder.embedChildRows(children, {
-      embedder,
+    const result = await Embedder.embedRows(children, {
+      embedder: embed,
       failFast: options?.failFast,
       writeVector: async (row, vector) => {
         await writeChildEmbedding(

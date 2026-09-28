@@ -1,9 +1,9 @@
 /**
- * Public surface of the image-description caption pass.
+ * Public surface of the image-description passes.
  *
  * Modules:
- *   - dal.ts         : CRUD + caption queries for `kb_image_descriptions`
- *   - service.ts    : caption pass (vision model → description rows)
+ *   - service.ts    : caption + description embedding passes
+ *   - dal.ts        : CRUD + caption/embed queries for `kb_image_descriptions`
  *   - reconcile.ts   : ingest-side policy reconciliation (meta file → rows)
  *   - image-meta.ts  : `<page>.meta.yaml` parsing + canonical image paths
  *   - parse.ts       : image-ref extraction (for ingest policy reconciliation)
@@ -38,6 +38,9 @@ export {
 export {
   type CaptionPassOptions,
   type CaptionPassResult,
+  type EmbedImageDescriptionsOptions,
+  type EmbedImageDescriptionsResult,
   ImageCaptioner,
   type ImageDescriber,
+  ImageDescriptionEmbedder,
 } from "./service.ts";

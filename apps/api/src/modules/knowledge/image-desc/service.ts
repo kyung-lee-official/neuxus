@@ -1,10 +1,7 @@
 /**
- * Image-description caption pass. Runs after ingest, before embedding.
- *
- * Reads `kb_image_descriptions` rows with `policy = 'vision-captioning'`,
- * captions the stale ones with the model linked to the `md-image-captioning`
- * task, and updates the row. It never touches `kb_pages.body` — descriptions
- * live only in `kb_image_descriptions`.
+ * Image-description passes: the caption pass (`ImageCaptioner`) and the
+ * description embedding pass (`ImageDescriptionEmbedder`). Both read/write
+ * `kb_image_descriptions` only; neither touches `kb_pages.body`.
  *
  * @see docs/modern-knowledge-base-design/03.2-image-descriptions.md
  */
@@ -17,9 +14,12 @@ import {
   resolveTaskModelLink,
   TASK_MD_IMAGE_CAPTIONING,
 } from "../../server-setting/task-model-map/service.ts";
+import { Embedder, type EmbedFn } from "../embedder/index.ts";
 import {
+  findImageDescriptionsNeedingEmbedding,
   listImageDescriptionsByPolicy,
   updateImageDescription,
+  writeImageDescriptionEmbedding,
 } from "./dal.ts";
 
 /**
@@ -159,6 +159,66 @@ export class ImageCaptioner {
       captioned,
       skipped,
       failed,
+    };
+  }
+}
+
+/**
+ * Policies whose descriptions carry a vector. `ignore` rows are excluded.
+ * @see docs/modern-knowledge-base-design/03.2-image-descriptions.md
+ */
+const EMBEDDABLE_POLICIES = ["manual", "vision-captioning"];
+
+export type EmbedImageDescriptionsOptions = {
+  /** Scope to one knowledge base; omit to scan all. */
+  knowledgeBaseId?: string;
+  embedder?: EmbedFn;
+  /** Throw on the first provider failure instead of skipping the row. */
+  failFast?: boolean;
+};
+
+export type EmbedImageDescriptionsResult = {
+  currentModel: string;
+  considered: number;
+  embedded: number;
+  skipped: number;
+};
+
+export class ImageDescriptionEmbedder {
+  /**
+   * Embed `manual` / `vision-captioning` descriptions whose `embedding` is
+   * missing or whose `embedding_model` differs from the current model.
+   */
+  static async embedStale(
+    options?: EmbedImageDescriptionsOptions,
+  ): Promise<EmbedImageDescriptionsResult> {
+    const { currentModel, embed } = await Embedder.resolve(options?.embedder);
+
+    const rows = await findImageDescriptionsNeedingEmbedding(
+      currentModel,
+      EMBEDDABLE_POLICIES,
+      { knowledgeBaseId: options?.knowledgeBaseId },
+    );
+
+    const result = await Embedder.embedRows(rows, {
+      embedder: embed,
+      failFast: options?.failFast,
+      writeVector: async (row, vector) => {
+        await writeImageDescriptionEmbedding(
+          row.knowledgeBaseId,
+          row.pageId,
+          row.imagePath,
+          Embedder.pgvectorLiteral(vector),
+          currentModel,
+        );
+      },
+    });
+
+    return {
+      currentModel,
+      considered: rows.length,
+      embedded: result.embedded,
+      skipped: result.skipped,
     };
   }
 }

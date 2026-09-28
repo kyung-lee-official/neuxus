@@ -8,7 +8,11 @@
  */
 
 import { Embedder, type EmbedStaleChildrenResult } from "../embedder/index.ts";
-import { ImageCaptioner } from "../image-desc/index.ts";
+import {
+  type EmbedImageDescriptionsResult,
+  ImageCaptioner,
+  ImageDescriptionEmbedder,
+} from "../image-desc/index.ts";
 import { ingestCorpusCheckout } from "../ingest/index.ts";
 import { Page } from "../pages/index.ts";
 import {
@@ -58,6 +62,11 @@ export type CorpusStage =
   | typeof CORPUS_STG_EMBED;
 
 export type CorpusProgress = CloneProgress;
+
+export type CorpusEmbedResult = {
+  children: EmbedStaleChildrenResult;
+  descriptions: EmbedImageDescriptionsResult;
+};
 
 export type CorpusStatus = {
   running: boolean;
@@ -237,19 +246,21 @@ export abstract class Corpus {
     }
   }
 
-  /** Embed children whose `embedding_model` is missing or stale. */
-  static async embed(
-    knowledgeBaseId: string,
-  ): Promise<EmbedStaleChildrenResult> {
+  /** Embed children and image descriptions whose vector is missing or stale. */
+  static async embed(knowledgeBaseId: string): Promise<CorpusEmbedResult> {
     if (!Corpus.tryStart(CORPUS_OP_EMBED)) throw new CorpusLockedError();
     try {
       Corpus.emitStage(CORPUS_STG_EMBED);
-      const result = await Embedder.embedStaleChildren({
+      const children = await Embedder.embedStaleChildren({
+        knowledgeBaseId,
+        failFast: true,
+      });
+      const descriptions = await ImageDescriptionEmbedder.embedStale({
         knowledgeBaseId,
         failFast: true,
       });
       Corpus.finish();
-      return result;
+      return { children, descriptions };
     } catch (err) {
       Corpus.finish(err);
       throw err;
@@ -284,6 +295,10 @@ export abstract class Corpus {
       });
       Corpus.emitStage(CORPUS_STG_EMBED);
       await Embedder.embedStaleChildren({ knowledgeBaseId, failFast: true });
+      await ImageDescriptionEmbedder.embedStale({
+        knowledgeBaseId,
+        failFast: true,
+      });
       await CorpusSettings.saveLastSyncedSha(knowledgeBaseId, sha);
       Corpus.finish();
     } catch (err) {

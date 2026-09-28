@@ -185,6 +185,69 @@ export async function deleteImageDescriptionsNotIn(
   return count;
 }
 
+export type ImageDescriptionToEmbed = {
+  knowledgeBaseId: string;
+  pageId: string;
+  imagePath: string;
+  /** The description text to embed. */
+  text: string;
+};
+
+/**
+ * Description rows needing a vector: `policy` in `policies` (the caller names
+ * them), a `description` present, and `embedding_model` missing or differing
+ * from `currentModel`. Scope to one knowledge base optionally.
+ * @see docs/modern-knowledge-base-design/03.2-image-descriptions.md
+ */
+export async function findImageDescriptionsNeedingEmbedding(
+  currentModel: string,
+  policies: string[],
+  scope: { knowledgeBaseId?: string } = {},
+): Promise<ImageDescriptionToEmbed[]> {
+  const rows = await getPrisma().knowledgeImageDescription.findMany({
+    where: {
+      ...(scope.knowledgeBaseId
+        ? { knowledgeBaseId: scope.knowledgeBaseId }
+        : {}),
+      policy: { in: policies },
+      description: { not: null },
+      OR: [{ embeddingModel: null }, { embeddingModel: { not: currentModel } }],
+    },
+    select: {
+      knowledgeBaseId: true,
+      pageId: true,
+      imagePath: true,
+      description: true,
+    },
+  });
+  return rows.map((row) => ({
+    knowledgeBaseId: row.knowledgeBaseId,
+    pageId: row.pageId,
+    imagePath: row.imagePath,
+    text: row.description ?? "",
+  }));
+}
+
+/** Write one image description's pgvector + model stamp. */
+export async function writeImageDescriptionEmbedding(
+  knowledgeBaseId: string,
+  pageId: string,
+  imagePath: string,
+  embeddingLiteral: string,
+  model: string,
+): Promise<void> {
+  await sql`
+    UPDATE kb_image_descriptions
+    SET
+      embedding = ${embeddingLiteral}::vector,
+      embedding_model = ${model},
+      embedded_at = NOW()
+    WHERE knowledge_base_id = ${knowledgeBaseId}
+      AND page_id = ${pageId}
+      AND image_path = ${imagePath}
+  `;
+}
+
 export type ImageDescriptionUpdate = {
   imageContentHash: string;
   description: string;
