@@ -13,15 +13,15 @@ function pageIdFromWildcard(raw: string): string | null {
 }
 
 export abstract class Knowledge {
-  static async listPages() {
-    const pages = await Page.list();
+  static async listPages(knowledgeBaseId: string) {
+    const pages = await Page.list(knowledgeBaseId);
     return { pages };
   }
 
-  static async getPage(rawId: string) {
+  static async getPage(knowledgeBaseId: string, rawId: string) {
     const id = pageIdFromWildcard(rawId);
     if (!id) throw status(400, { error: "Invalid page id" });
-    const page = await Page.findById(id);
+    const page = await Page.findById(knowledgeBaseId, id);
     if (!page) throw status(404, { error: "Page not found" });
     return page;
   }
