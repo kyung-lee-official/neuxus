@@ -4,17 +4,17 @@
  * linked to the `embedding` task, and write the pgvector back.
  */
 
-import { sql } from "bun";
-import { getPrisma } from "../../../shared/db.ts";
 import {
   resolveTaskModelLink,
   TASK_EMBEDDING,
 } from "../../server-setting/task-model-map/service.ts";
+import { findChildrenNeedingEmbedding, writeChildEmbedding } from "./dal.ts";
 
 /** Embed texts: one vector per text, in order. */
 export type EmbedFn = (texts: string[]) => Promise<number[][]>;
 
 export type EmbedChildRow = {
+  knowledgeBaseId: string;
   id: string;
   text: string;
 };
@@ -25,6 +25,8 @@ export type EmbedChildRowsResult = {
 };
 
 export type EmbedStaleChildrenOptions = {
+  /** Scope to one knowledge base (optionally to one page within it). */
+  knowledgeBaseId?: string;
   pageId?: string;
   embedder?: EmbedFn;
   /** Throw on the first provider failure instead of skipping the child. */
@@ -53,7 +55,7 @@ export abstract class Embedder {
     rows: EmbedChildRow[],
     args: {
       embedder: EmbedFn;
-      writeVector: (id: string, vector: number[]) => Promise<void>;
+      writeVector: (row: EmbedChildRow, vector: number[]) => Promise<void>;
       failFast?: boolean;
     },
   ): Promise<EmbedChildRowsResult> {
@@ -75,7 +77,7 @@ export abstract class Embedder {
           skipped += 1;
           continue;
         }
-        await args.writeVector(row.id, vector);
+        await args.writeVector(row, vector);
         embedded += 1;
       } catch (err) {
         if (args.failFast) throw err;
@@ -88,7 +90,7 @@ export abstract class Embedder {
 
   /**
    * Embed children with null or stale `embedding_model`.
-   * Scope with `pageId` after a page replace; omit to scan all pages.
+   * Scope with `knowledgeBaseId` / `pageId`; omit to scan all knowledge bases.
    */
   static async embedStaleChildren(
     options?: EmbedStaleChildrenOptions,
@@ -102,38 +104,21 @@ export abstract class Embedder {
       options?.embedder ??
       ((texts: string[]) => link.provider.embed(link.model.modelId, texts));
 
-    const rows = await getPrisma().knowledgeChild.findMany({
-      where: {
-        ...(options?.pageId ? { pageId: options.pageId } : {}),
-        // `embedding IS NULL` ⇒ `embeddingModel IS NULL` (always set together);
-        // otherwise pick up stale rows whose model differs.
-        OR: [
-          { embeddingModel: null },
-          { embeddingModel: { not: currentModel } },
-        ],
-      },
-      select: { id: true, text: true },
+    const children = await findChildrenNeedingEmbedding(currentModel, {
+      knowledgeBaseId: options?.knowledgeBaseId,
+      pageId: options?.pageId,
     });
-
-    const children: EmbedChildRow[] = rows.map((row) => ({
-      id: row.id,
-      text: row.text ?? "",
-    }));
 
     const result = await Embedder.embedChildRows(children, {
       embedder,
       failFast: options?.failFast,
-      writeVector: async (id, vector) => {
-        const literal = Embedder.pgvectorLiteral(vector);
-        // Vector write stays raw — `kb_children.embedding` is pgvector.
-        await sql`
-          UPDATE kb_children
-          SET
-            embedding = ${literal}::vector,
-            embedding_model = ${currentModel},
-            embedded_at = NOW()
-          WHERE id = ${id}
-        `;
+      writeVector: async (row, vector) => {
+        await writeChildEmbedding(
+          row.knowledgeBaseId,
+          row.id,
+          Embedder.pgvectorLiteral(vector),
+          currentModel,
+        );
       },
     });
 
