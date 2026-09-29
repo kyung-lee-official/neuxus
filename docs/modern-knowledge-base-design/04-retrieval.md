@@ -2,23 +2,36 @@
 
 Question (string) in, ranked rows out.
 
-Each search query binds one knowledge base (`$kb`); the caller chooses which knowledge base(s) to search.
+A search query targets a **set** of one or more knowledge bases; the caller chooses the set ([Multiple knowledge bases](#multiple-knowledge-bases)).
 
 Embed the question, similarity-search `kb_children.embedding`, expand to parents for the LLM.
 
 ## Flow
 
 ```text
-1. Embed the question (same model as children)
-2. Similarity-search children
-3. Resolve parents (+ page title)
-4. Dedupe parents; keep best child score per parent
-5. Cap by max parents / max characters
-6. Similarity-search image descriptions, independent of step 2 ([Image-description search](#image-description-search))
+1. Embed the question once (same model as children)
+2. Similarity-search children in each knowledge base in the set
+3. Resolve parents per knowledge base (+ page title)
+4. Dedupe by `(knowledgeBaseId, parentId)`; keep best child score per parent
+5. Cap the merged set by max parents / max characters
+6. Similarity-search image descriptions in each knowledge base, independent of step 2 ([Image-description search](#image-description-search))
 7. LLM gets parent texts (+ title) and image-description hits — not child windows alone ([05-synthesis.md](./05-synthesis.md))
 ```
 
 Cap knobs (`child_limit`, `max_parents`, `max_characters`) come from the knowledge base's [`kb_retrieve_settings`](./appendix-a-data-model.md#retrieval-knobs-table); app defaults when null.
+
+## Multiple knowledge bases
+
+A request carries the knowledge-base ids it wants to query. The backend persists no grouping between them: a "domain" is an application-level concept, and a client that needs to discover valid ids reads the [`kb_knowledge_bases`](./appendix-a-data-model.md) registry.
+
+The service validates the set — non-empty, every id exists — then queries exactly it. No caller-access restriction is applied for now; if one is added, it belongs in the service or controller layer and leaves the architecture unchanged.
+
+Every knowledge base shares the one embedding model ([appendix A](./appendix-a-data-model.md)), so scores are comparable across them: the child hits merge and re-rank by score. Page and parent ids are unique only within one knowledge base, so merge and expand on `(knowledgeBaseId, parentId)` and `(knowledgeBaseId, pageId)`, then cap the merged ranking once, globally ([Flow](#flow)). Image hits merge the same way; a writable knowledge base is text-only ([appendix A](./appendix-a-data-model.md)), so it contributes no images.
+
+### Open decisions
+
+- **Knobs across a set.** Whether `child_limit` is per knowledge base with a global `max_parents` / `max_characters`, or one source governs the query.
+- **Cross-knowledge-base labels.** How parents and images are labelled when two knowledge bases carry the same page title.
 
 ## Question embed
 
