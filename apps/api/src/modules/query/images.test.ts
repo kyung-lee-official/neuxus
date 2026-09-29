@@ -31,7 +31,7 @@ function image(overrides: Partial<RetrievedImage> = {}): RetrievedImage {
 describe("formatKnowledgeContext", () => {
   test("replaces an inline image ref with its description", () => {
     const text = formatKnowledgeContext([parent()], [image()]);
-    expect(text).toContain("### North Quay Relay");
+    expect(text).toContain("**North Quay Relay**");
     expect(text).toContain(
       "A relay switch between two quays, with a 12V line labeled A.",
     );

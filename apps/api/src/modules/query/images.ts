@@ -64,7 +64,7 @@ export function formatKnowledgeContext(
         imageByPath.set(image.imagePath, image);
     }
     const text = substituteParentImages(parent, imageByPath, used);
-    sections.push(parent.title ? `### ${parent.title}\n${text}` : text);
+    sections.push(parent.title ? `**${parent.title}**\n${text}` : text);
   }
 
   for (const image of images) {
