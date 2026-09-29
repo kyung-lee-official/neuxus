@@ -24,7 +24,7 @@ Cap knobs (`child_limit`, `max_parents`, `max_characters`) come from the knowled
 
 A request carries the knowledge-base ids it wants to query. The backend persists no grouping between them: a "domain" is an application-level concept, and a client that needs to discover valid ids reads the [`kb_knowledge_bases`](./appendix-a-data-model.md) registry.
 
-The service validates the set — non-empty, every id exists — then queries exactly it. No caller-access restriction is applied for now; if one is added, it belongs in the service or controller layer and leaves the architecture unchanged.
+The service validates the set — non-empty, every id exists — then queries exactly it. No caller-access restriction is applied for now; a future one belongs in the service or controller layer.
 
 Every knowledge base shares the one embedding model ([appendix A](./appendix-a-data-model.md)), so scores are comparable across them: the child hits merge and re-rank by score. Page and parent ids are unique only within one knowledge base, so merge and expand on `(knowledgeBaseId, parentId)` and `(knowledgeBaseId, pageId)`, then cap the merged ranking once, globally ([Flow](#flow)). Image hits merge the same way; a writable knowledge base is text-only ([appendix A](./appendix-a-data-model.md)), so it contributes no images.
 
