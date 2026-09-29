@@ -1,15 +1,13 @@
 /**
  * Ingest-side image policy reconciliation: record each image the body
- * references as a `kb_image_descriptions` row — `policy` +
- * `image_content_hash`, plus the manual description when the sibling
- * `*.meta.yaml` says so. Rows for images the page no longer references are
- * deleted. Policy only — never calls a model.
+ * references as a `kb_image_descriptions` row — `policy`, plus the manual
+ * description when the sibling `*.meta.yaml` says so. Rows for images the page
+ * no longer references are deleted. Policy only — never calls a model and never
+ * reads image bytes (`image_content_hash` is owned by the caption pass).
  *
  * @see docs/modern-knowledge-base-design/02-ingest.md
  */
 
-import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
 import {
   deleteImageDescriptionsNotIn,
   resetImageDerivedFields,
@@ -21,10 +19,6 @@ import {
   parseImageMeta,
 } from "./image-meta.ts";
 import { dedupByPath, parseImageRefs } from "./parse.ts";
-
-function sha256Hex(bytes: Buffer): string {
-  return createHash("sha256").update(bytes).digest("hex");
-}
 
 export type ReconcileOptions = {
   knowledgeBaseId: string;
@@ -46,8 +40,8 @@ export type ReconcileResult = {
 
 /**
  * Reconcile one page's image rows. Throws when the meta file is malformed (a
- * `manual` entry without a description is an error for the page); missing
- * images and unreferenced meta entries are reported as warnings.
+ * `manual` entry without a description is an error for the page); out-of-contract
+ * references and unreferenced meta entries are reported as warnings.
  */
 export async function reconcilePageImagePolicies(
   options: ReconcileOptions,
@@ -76,20 +70,12 @@ export async function reconcilePageImagePolicies(
     }
     const entry = entries.get(imagePath);
     const policy = entry?.policy ?? "vision-captioning";
-    let imageContentHash: string;
-    try {
-      imageContentHash = sha256Hex(await readFile(ref.absolutePath));
-    } catch {
-      warnings.push(`image not found: ${ref.imagePath}`);
-      continue;
-    }
     await upsertImagePolicy(
       options.knowledgeBaseId,
       options.pageId,
       imagePath,
       {
         policy,
-        imageContentHash,
         ...(policy === "manual"
           ? { description: entry?.description ?? "" }
           : policy === "ignore"

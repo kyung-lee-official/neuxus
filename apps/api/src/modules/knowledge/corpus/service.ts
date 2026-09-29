@@ -314,7 +314,7 @@ export abstract class Corpus {
     }
   }
 
-  /** Start the full sync pipeline (fetch → ingest → chunkify → caption → embed → record sha). */
+  /** Start the full sync pipeline (fetch → ingest → reconcile → chunkify → caption → embed → record sha). */
   static sync(knowledgeBaseId: string): void {
     if (!Corpus.tryStart(CORPUS_OP_SYNC)) throw new CorpusLockedError();
     void Corpus.runSync(knowledgeBaseId).catch(() => {
@@ -324,13 +324,16 @@ export abstract class Corpus {
 
   private static async runReconcile(
     knowledgeBaseId: string,
+    pageIds?: string[],
   ): Promise<CorpusReconcileResult> {
     Corpus.emitStage(CORPUS_STG_RECONCILE);
     const checkout = corpusCheckoutDir(knowledgeBaseId);
     const settings: ResolvedCorpusSettings = resolveCorpusSettings(
       await CorpusSettings.load(knowledgeBaseId),
     );
-    return reconcileCorpusImages(knowledgeBaseId, checkout, settings.docsRoot);
+    return reconcileCorpusImages(knowledgeBaseId, checkout, settings.docsRoot, {
+      pageIds,
+    });
   }
 
   private static async runCaption(
@@ -358,7 +361,12 @@ export abstract class Corpus {
         await CorpusSettings.load(knowledgeBaseId),
       );
       Corpus.emitStage(CORPUS_STG_INGEST);
-      await ingestCorpusCheckout(knowledgeBaseId, checkout, settings.docsRoot);
+      const { changedPageIds } = await ingestCorpusCheckout(
+        knowledgeBaseId,
+        checkout,
+        settings.docsRoot,
+      );
+      await Corpus.runReconcile(knowledgeBaseId, changedPageIds);
       Corpus.emitStage(CORPUS_STG_CHUNKIFY);
       await Page.chunkifyPages(knowledgeBaseId);
       await Corpus.runCaption(knowledgeBaseId);

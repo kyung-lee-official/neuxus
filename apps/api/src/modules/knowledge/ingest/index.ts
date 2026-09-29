@@ -1,5 +1,7 @@
 export {
+  type IngestCorpusCheckoutResult,
   ingestCorpusCheckout,
+  type ReconcileCorpusImagesOptions,
   type ReconcileCorpusImagesResult,
   reconcileCorpusImages,
 } from "./ingest-checkout.ts";

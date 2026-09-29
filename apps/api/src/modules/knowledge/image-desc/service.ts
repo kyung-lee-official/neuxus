@@ -25,7 +25,7 @@ import { DESCRIBED_IMAGE_POLICIES } from "./image-meta.ts";
 
 /**
  * Business prompt for the `md-image-captioning` task. Its `sha256` is stored
- * as `caption_prompt_hash`; editing this text re-captions stored rows.
+ * as `hardcoded_caption_prompt_hash`; editing this text re-captions stored rows.
  */
 const CAPTION_PROMPT =
   "Describe this image in one concise paragraph. Focus on the technical content: what is shown, the meaning of any labels or values, and any diagram relationships. Do not start with phrases like 'This image shows' — start directly with the subject. Do not repeat information that is already described in nearby text. Output only the description, no preamble.";
@@ -118,7 +118,7 @@ export class ImageCaptioner {
         const fresh =
           imageContentHash === candidate.imageContentHash &&
           candidate.captionModel === currentModel &&
-          candidate.captionPromptHash === currentPromptHash &&
+          candidate.hardcodedCaptionPromptHash === currentPromptHash &&
           candidate.descriptionHash != null;
         if (fresh) {
           skipped += 1;
@@ -143,7 +143,7 @@ export class ImageCaptioner {
             imageContentHash,
             description,
             captionModel: currentModel,
-            captionPromptHash: currentPromptHash,
+            hardcodedCaptionPromptHash: currentPromptHash,
             descriptionHash: sha256Hex(Buffer.from(description, "utf8")),
           },
         );

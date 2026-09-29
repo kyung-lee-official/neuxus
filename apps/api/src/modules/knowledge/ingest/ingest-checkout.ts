@@ -64,10 +64,18 @@ async function reconcileFileImages(args: {
   return { upserted: reconciled.upserted, deleted: reconciled.deleted };
 }
 
+export type IngestCorpusCheckoutResult = {
+  /**
+   * Page ids upserted this run (content or meta changed). The caller feeds
+   * these to the image-policy reconciliation stage.
+   */
+  changedPageIds: string[];
+};
+
 /**
- * Walk the checkout docs root, persist pages, reconcile image policies, delete
- * missing source paths. Does not chunk — `Page.chunkifyPages` is a separate
- * stage.
+ * Walk the checkout docs root, persist pages, delete missing source paths.
+ * Does not chunk or reconcile — `Page.chunkifyPages` and the reconciliation
+ * stage are separate.
  * @see docs/modern-knowledge-base-design/01-corpus.md
  * @see docs/modern-knowledge-base-design/02-ingest.md
  */
@@ -75,14 +83,14 @@ export async function ingestCorpusCheckout(
   knowledgeBaseId: string,
   checkoutDir: string,
   docsRoot: string,
-): Promise<void> {
+): Promise<IngestCorpusCheckoutResult> {
   const files = await listCorpusMarkdownFiles(checkoutDir, docsRoot);
   const keepSourcePaths = files.map((file) => file.sourcePath);
+  const changedPageIds: string[] = [];
 
   for (const file of files) {
     const source = await readFile(file.absolutePath, "utf8");
     const ingested = Ingester.ingestMarkdown(source);
-    const body = ingested.body;
     const meta = await readMetaFile(file.absolutePath);
 
     const saved = await Page.save({
@@ -90,37 +98,19 @@ export async function ingestCorpusCheckout(
       id: file.id,
       title: ingested.title,
       tags: ingested.tags,
-      body,
+      body: ingested.body,
       sourcePath: file.sourcePath,
       metaHash: meta.hash,
     });
     if (saved.skipped) continue;
-
-    try {
-      await reconcileFileImages({
-        knowledgeBaseId,
-        id: file.id,
-        sourcePath: file.sourcePath,
-        absolutePath: file.absolutePath,
-        body,
-        metaYaml: meta.text,
-      });
-    } catch (error) {
-      ingestLog.error(
-        `image policy reconciliation failed for ${file.sourcePath}`,
-        {
-          knowledgeBaseId,
-          pageId: file.id,
-          error: error instanceof Error ? error.message : String(error),
-        },
-      );
-    }
+    changedPageIds.push(file.id);
   }
 
   await deleteKnowledgePagesMissingSourcePaths(
     knowledgeBaseId,
     keepSourcePaths,
   );
+  return { changedPageIds };
 }
 
 export type ReconcileCorpusImagesResult = {
@@ -129,23 +119,34 @@ export type ReconcileCorpusImagesResult = {
   imagesDeleted: number;
 };
 
+export type ReconcileCorpusImagesOptions = {
+  /**
+   * Restrict to these page ids (e.g. the ingest changed set). Omit to reconcile
+   * every already-ingested corpus page.
+   */
+  pageIds?: string[];
+};
+
 /**
- * Standalone image-policy reconciliation: re-run it for every already-ingested
- * corpus page, without a full ingest. Pages absent from `kb_pages` are skipped.
- * Forced — it does not apply the page-hash skip gate.
+ * Image-policy reconciliation stage: for each target page, record what to do
+ * with each image it references in `kb_image_descriptions`. Pages absent from
+ * `kb_pages` are skipped. Never calls a model.
  * @see docs/modern-knowledge-base-design/02-ingest.md
  */
 export async function reconcileCorpusImages(
   knowledgeBaseId: string,
   checkoutDir: string,
   docsRoot: string,
+  options?: ReconcileCorpusImagesOptions,
 ): Promise<ReconcileCorpusImagesResult> {
   const files = await listCorpusMarkdownFiles(checkoutDir, docsRoot);
+  const only = options?.pageIds ? new Set(options.pageIds) : null;
   let pagesProcessed = 0;
   let imagesUpserted = 0;
   let imagesDeleted = 0;
 
   for (const file of files) {
+    if (only && !only.has(file.id)) continue;
     const stored = await findPageHashes(knowledgeBaseId, file.id);
     if (!stored) continue;
 
