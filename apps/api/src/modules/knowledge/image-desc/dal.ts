@@ -10,13 +10,13 @@ export type ImageDescriptionRow = {
   knowledgeBaseId: string;
   pageId: string;
   imagePath: string;
-  /** sha256 hex of the image bytes. */
-  imageContentHash: string;
+  /** sha256 of the image bytes the caption was built from; null until captioned. */
+  imageContentHash: string | null;
   /** `ignore` | `manual` | `vision-captioning`. */
   policy: string;
   description: string | null;
   captionModel: string | null;
-  captionPromptHash: string | null;
+  hardcodedCaptionPromptHash: string | null;
   descriptionHash: string | null;
   embeddingModel: string | null;
   embeddedAt: Date | null;
@@ -83,7 +83,7 @@ export async function upsertImageDescription(
     policy: row.policy,
     description: row.description,
     captionModel: row.captionModel,
-    captionPromptHash: row.captionPromptHash,
+    hardcodedCaptionPromptHash: row.hardcodedCaptionPromptHash,
     descriptionHash: row.descriptionHash,
   };
   await getPrisma().knowledgeImageDescription.upsert({
@@ -107,7 +107,6 @@ export async function upsertImageDescription(
 export type ImagePolicyInput = {
   /** Stored value; this layer attaches no meaning to it. */
   policy: string;
-  imageContentHash: string;
   /**
    * `description` to write: a string, or `null` to clear it. Omit to leave the
    * stored value untouched (the embed/caption passes own those fields).
@@ -116,10 +115,10 @@ export type ImagePolicyInput = {
 };
 
 /**
- * Upsert one row's `policy` + `image_content_hash` (+ `description` when the
- * caller supplies it) by composite key. Storage only — which fields a policy
- * implies is the caller's concern. The pgvector `embedding` is not written
- * here.
+ * Upsert one row's `policy` (+ `description` when the caller supplies it) by
+ * composite key. Storage only — which fields a policy implies is the caller's
+ * concern. `image_content_hash` is owned by the caption pass and is not written
+ * here; the pgvector `embedding` is not written here either.
  */
 export async function upsertImagePolicy(
   knowledgeBaseId: string,
@@ -127,7 +126,7 @@ export async function upsertImagePolicy(
   imagePath: string,
   input: ImagePolicyInput,
 ): Promise<void> {
-  const { policy, imageContentHash, description } = input;
+  const { policy, description } = input;
   await getPrisma().knowledgeImageDescription.upsert({
     where: {
       knowledgeBaseId_pageId_imagePath: { knowledgeBaseId, pageId, imagePath },
@@ -137,23 +136,21 @@ export async function upsertImagePolicy(
       pageId,
       imagePath,
       policy,
-      imageContentHash,
       description: description ?? null,
       captionModel: null,
-      captionPromptHash: null,
+      hardcodedCaptionPromptHash: null,
       descriptionHash: null,
     },
     update: {
       policy,
-      imageContentHash,
       ...(description !== undefined ? { description } : {}),
     },
   });
 }
 
 /**
- * Null the derived caption fields and the pgvector `embedding` for one row so
- * they re-derive. Storage only — the caller decides when.
+ * Null the caption fields, the image hash, and the pgvector `embedding` for one
+ * row so they re-derive. Storage only — the caller decides when.
  */
 export async function resetImageDerivedFields(
   knowledgeBaseId: string,
@@ -163,8 +160,9 @@ export async function resetImageDerivedFields(
   await sql`
     UPDATE kb_image_descriptions
     SET
+      image_content_hash = NULL,
       caption_model = NULL,
-      caption_prompt_hash = NULL,
+      hardcoded_caption_prompt_hash = NULL,
       description_hash = NULL,
       embedding = NULL
     WHERE knowledge_base_id = ${knowledgeBaseId}
@@ -252,7 +250,7 @@ export type ImageDescriptionUpdate = {
   imageContentHash: string;
   description: string;
   captionModel: string;
-  captionPromptHash: string;
+  hardcodedCaptionPromptHash: string;
   descriptionHash: string;
 };
 
@@ -269,7 +267,7 @@ export async function updateImageDescription(
       image_content_hash = ${fields.imageContentHash},
       description = ${fields.description},
       caption_model = ${fields.captionModel},
-      caption_prompt_hash = ${fields.captionPromptHash},
+      hardcoded_caption_prompt_hash = ${fields.hardcodedCaptionPromptHash},
       description_hash = ${fields.descriptionHash},
       embedding = NULL
     WHERE knowledge_base_id = ${knowledgeBaseId}
