@@ -1,6 +1,6 @@
-# Ingest (files → pages + image policy)
+# Ingest (files to pages)
 
-Ingest discovers the corpus files and turns each into a `kb_pages` row plus that page's image policy. Which files exist (docs root, include/exclude, how a path maps to `source_path` / `id`) is the [corpus layout contract](./01-corpus.md).
+Ingest discovers the corpus files and turns each into a `kb_pages` row. Which files exist (docs root, include/exclude, how a path maps to `source_path` / `id`) is the [corpus layout contract](./01-corpus.md).
 
 `title` / `tags` come from frontmatter. **`body`** is the remaining markdown; `chunkify` never strips frontmatter. `body` keeps only the image syntax (`![alt](path)`); the caption is stored in `kb_image_descriptions`, not in the body ([03.2-image-descriptions.md](./03.2-image-descriptions.md)).
 
@@ -20,7 +20,7 @@ Ingest processes one **read-only** knowledge base per run (`kb_knowledge_bases.w
 
 ## Flow
 
-One `.md` file per iteration. The skip gate is the **page** (`content_hash` + `meta_hash`); there is no per-section hash. Ingest does no provider work and does not chunk or embed.
+One `.md` file per iteration. The skip gate is the **page**: `content_hash` + `meta_hash`; there is no per-section hash. Ingest calls no provider and does not chunk or embed.
 
 ```mermaid
 ---
@@ -35,7 +35,7 @@ flowchart TD
   Lookup --> Match{both match?}
   Match -- yes --> Skip([skip page])
   Match -- no --> Upsert["UPSERT kb_pages<br/>(by knowledge_base_id, id)"]
-  Upsert --> Reconcile["Reconcile kb_image_descriptions<br/>(policy per image)"]
+  Upsert --> Reconcile["UPSERT / DELETE image rows<br/>(policy, manual description)"]
   Reconcile --> Next[Next file]
   Skip --> Next
   Next --> Walker
@@ -43,14 +43,13 @@ flowchart TD
 
 ## Image policy reconciliation
 
-Runs once per page whose hashes differ. For each image the body references, ingest records what to do with it in `kb_image_descriptions`:
+Ingest reconciles image policy while it processes each changed page, and records what to do with each image the body references in `kb_image_descriptions`:
 
 - **Identity:** `(knowledge_base_id, page_id, image_path)`.
 - **Policy:** from the sibling `*.meta.yaml` — `ignore`, `manual`, or `vision-captioning`; images not listed default to `vision-captioning`.
-- **`image_content_hash`:** sha256 of the image bytes, so a changed image is detectable.
 - **`manual` description:** taken from the sidecar when the policy is `manual`.
 
-Rows for images the page no longer references are deleted. This step is **policy only** — it never calls a model. The sidecar format, the caption pass, and the description vectors are [03.2-image-descriptions.md](./03.2-image-descriptions.md).
+Rows for images the page no longer references are deleted. When a row leaves `vision-captioning` for `manual` / `ignore`, its caption fields (`image_content_hash`, `caption_model`, `hardcoded_caption_prompt_hash`, `description_hash`) and `embedding` are cleared, because `description` is now owned by the sidecar. This step is **policy only** — it never calls a model and never reads image bytes. The sidecar format, the caption pass, and the description vectors are [03.2-image-descriptions.md](./03.2-image-descriptions.md).
 
 ## Frontmatter
 
@@ -62,7 +61,7 @@ Recognized keys: `title`, `tags` (inline `[a, b]` or a YAML list). Trim string v
 
 Canonical `kb_pages.body`:
 
-- `\r\n` / `\r` → `\n` (do this before detecting `---\n` so CRLF files still match)
+- `\r\n` / `\r` become `\n` (do this before detecting `---\n` so CRLF files still match)
 - strip trailing spaces on each line
 - ensure a single final `\n`
 
@@ -70,9 +69,9 @@ The same map is **idempotent**; `chunkify` may re-apply it.
 
 Hashes and parent/child slices use this string — not original file bytes.
 
-## Incremental updates (page and meta hashes)
+## Incremental updates (hash gate)
 
-Two `kb_pages` hashes decide whether ingest reprocesses a page:
+Two hashes decide whether ingest reprocesses a page:
 
 | Hash           | Covers                                              |
 | -------------- | --------------------------------------------------- |
@@ -88,6 +87,8 @@ sha256(JSON.stringify({ title, tags: [...tags].sort(), body }));
 | Situation                | Action                                                                                                |
 | ------------------------ | ----------------------------------------------------------------------------------------------------- |
 | Both match               | Skip the page                                                                                         |
-| Either differs           | Upsert `kb_pages` by `(knowledge_base_id, id)`, then reconcile `kb_image_descriptions`                |
+| Either differs           | Upsert `kb_pages` by `(knowledge_base_id, id)`, then reconcile the page's image rows                  |
 | `content_hash` differs   | The page's chunk tree is stale — chunkify rebuilds it ([chunk freshness](./README.md#freshness-keys)) |
 | `meta_hash` differs only | Body and chunk tree stay; only the image rows are reconciled                                          |
+
+Image bytes are not part of this gate: a changed image does not touch `kb_pages` or the image policy. The caption pass detects it by comparing the current bytes to the row's `image_content_hash` ([03.2-image-descriptions.md](./03.2-image-descriptions.md#caption-pass)).

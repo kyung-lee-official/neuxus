@@ -20,7 +20,7 @@ Knowledge base ──* Page ──* Image description (embedding)
 - Every content table carries `knowledge_base_id`; primary and foreign keys are scoped to it (`(knowledge_base_id, id)`), and retrieval filters by it. `kb_children` also denormalizes `page_id` for its scans.
 - A **read-only** knowledge base (`kb_knowledge_bases.writable = false`) is written only by the **ingest** stage.
 - A **writable** knowledge base (`kb_knowledge_bases.writable = true`) is updated directly, never by the ingest stage, and is **text-only** (no `kb_image_descriptions`).
-- On page change: delete that page's parents/children, insert the new tree ([incremental updates](./02-ingest.md#incremental-updates-page-and-meta-hashes)).
+- On page change: delete that page's parents/children, insert the new tree ([incremental updates](./02-ingest.md#incremental-updates-hash-gate)).
 - Each parent records `source_page_hash`, the `kb_pages.content_hash` the tree was built from; chunkify rebuilds a page's tree when it differs from the current `content_hash` ([chunk freshness](./README.md#freshness-keys)).
 
 Keep `kb_*` namespaced apart from application tables (same database is fine).
@@ -84,18 +84,18 @@ CREATE TABLE kb_children (
 );
 
 CREATE TABLE kb_image_descriptions (
-  knowledge_base_id      TEXT NOT NULL,
-  page_id                TEXT NOT NULL,
-  image_path             TEXT NOT NULL,
-  image_content_hash     TEXT NOT NULL,  -- sha256 of the image bytes
-  policy                 TEXT NOT NULL,  -- ignore | manual | vision-captioning
-  description            TEXT,           -- null for ignore / before caption
-  caption_model          TEXT,           -- null for manual
-  caption_prompt_hash    TEXT,           -- sha256 of the hardcoded caption prompt
-  description_hash       TEXT,           -- sha256 of description
-  embedding              vector(768),    -- adjust N to the shared embedding model
-  embedding_model        TEXT,
-  embedded_at            TIMESTAMPTZ,
+  knowledge_base_id             TEXT NOT NULL,
+  page_id                       TEXT NOT NULL,
+  image_path                    TEXT NOT NULL,
+  image_content_hash     TEXT,           -- sha256 of the image bytes the caption was built from; caption pass; null before captioning and for ignore / manual
+  policy                        TEXT NOT NULL,  -- ignore | manual | vision-captioning
+  description                   TEXT,           -- null for ignore / before caption
+  caption_model                 TEXT,           -- null for manual
+  hardcoded_caption_prompt_hash TEXT,           -- sha256 of the hardcoded caption prompt
+  description_hash              TEXT,           -- sha256 of description
+  embedding                     vector(768),    -- adjust N to the shared embedding model
+  embedding_model               TEXT,
+  embedded_at                   TIMESTAMPTZ,
   PRIMARY KEY (knowledge_base_id, page_id, image_path),
   FOREIGN KEY (knowledge_base_id, page_id)
     REFERENCES kb_pages (knowledge_base_id, id) ON DELETE CASCADE

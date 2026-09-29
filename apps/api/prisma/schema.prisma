@@ -146,7 +146,7 @@ model KnowledgePage {
     metaHash        String?  @map("meta_hash")
     updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-    knowledgeBase     KnowledgeBase              @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+    knowledgeBase     KnowledgeBase               @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
     parents           KnowledgeParent[]
     children          KnowledgeChild[]
     imageDescriptions KnowledgeImageDescription[]
@@ -164,8 +164,8 @@ model KnowledgeParent {
     /// `kb_pages.content_hash` this tree was built from.
     sourcePageHash  String @map("source_page_hash")
 
-    page          KnowledgePage   @relation(fields: [knowledgeBaseId, pageId], references: [knowledgeBaseId, id], onDelete: Cascade)
-    children      KnowledgeChild[]
+    page     KnowledgePage    @relation(fields: [knowledgeBaseId, pageId], references: [knowledgeBaseId, id], onDelete: Cascade)
+    children KnowledgeChild[]
 
     @@id([knowledgeBaseId, id])
     @@unique([knowledgeBaseId, pageId, parentIndex])
@@ -175,18 +175,18 @@ model KnowledgeParent {
 /// `embedding` is pgvector; set dimensions (e.g. vector(768)) in the migration.
 /// No HNSW index by default.
 model KnowledgeChild {
-    knowledgeBaseId String                      @map("knowledge_base_id")
+    knowledgeBaseId String                 @map("knowledge_base_id")
     id              String
-    parentId        String                      @map("parent_id")
-    pageId          String                      @map("page_id")
-    childIndex      Int                         @map("child_index")
+    parentId        String                 @map("parent_id")
+    pageId          String                 @map("page_id")
+    childIndex      Int                    @map("child_index")
     text            String
     embedding       Unsupported("vector")?
-    embeddingModel  String?                     @map("embedding_model")
-    embeddedAt      DateTime?                   @map("embedded_at") @db.Timestamptz(6)
+    embeddingModel  String?                @map("embedding_model")
+    embeddedAt      DateTime?              @map("embedded_at") @db.Timestamptz(6)
 
-    parent        KnowledgeParent @relation(fields: [knowledgeBaseId, parentId], references: [knowledgeBaseId, id], onDelete: Cascade)
-    page          KnowledgePage   @relation(fields: [knowledgeBaseId, pageId], references: [knowledgeBaseId, id], onDelete: Cascade)
+    parent KnowledgeParent @relation(fields: [knowledgeBaseId, parentId], references: [knowledgeBaseId, id], onDelete: Cascade)
+    page   KnowledgePage   @relation(fields: [knowledgeBaseId, pageId], references: [knowledgeBaseId, id], onDelete: Cascade)
 
     @@id([knowledgeBaseId, id])
     @@unique([knowledgeBaseId, parentId, childIndex])
@@ -196,23 +196,23 @@ model KnowledgeChild {
 /// Per-image description cache (`kb_image_descriptions`), one row per
 /// `(knowledge_base_id, page_id, image_path)`. Read-only knowledge bases only.
 model KnowledgeImageDescription {
-    knowledgeBaseId   String    @map("knowledge_base_id")
-    pageId            String    @map("page_id")
+    knowledgeBaseId            String                 @map("knowledge_base_id")
+    pageId                     String                 @map("page_id")
     /// Path of the image as written inside the markdown body.
-    imagePath         String    @map("image_path")
-    /// sha256 hex of the image bytes. Compared to a fresh hash to decide skip vs re-describe.
-    imageContentHash  String    @map("image_content_hash")
+    imagePath                  String                 @map("image_path")
+    /// sha256 of the image bytes the caption was built from; caption pass; `null` before captioning and for `ignore` / `manual`.
+    imageContentHash           String?                @map("image_content_hash")
     /// `ignore` | `manual` | `vision-captioning`.
-    policy            String
-    description       String?
-    captionModel      String?   @map("caption_model")
-    captionPromptHash String?   @map("caption_prompt_hash")
-    descriptionHash   String?   @map("description_hash")
-    embedding         Unsupported("vector")?
-    embeddingModel    String?   @map("embedding_model")
-    embeddedAt        DateTime? @map("embedded_at") @db.Timestamptz(6)
+    policy                     String
+    description                String?
+    captionModel               String?                @map("caption_model")
+    hardcodedCaptionPromptHash String?                @map("hardcoded_caption_prompt_hash")
+    descriptionHash            String?                @map("description_hash")
+    embedding                  Unsupported("vector")?
+    embeddingModel             String?                @map("embedding_model")
+    embeddedAt                 DateTime?              @map("embedded_at") @db.Timestamptz(6)
 
-    page          KnowledgePage @relation(fields: [knowledgeBaseId, pageId], references: [knowledgeBaseId, id], onDelete: Cascade)
+    page KnowledgePage @relation(fields: [knowledgeBaseId, pageId], references: [knowledgeBaseId, id], onDelete: Cascade)
 
     @@id([knowledgeBaseId, pageId, imagePath])
     @@map("kb_image_descriptions")
@@ -280,13 +280,13 @@ model AppLogSettings {
 
     /// Sinks: any combination of `console` and `postgres`. Empty array
     /// (`@default([])`) means "use app defaults".
-    sinks           String[] @default([])
+    sinks          String[] @default([])
     /// Bounded queue capacity for the postgres sink. `null` falls back.
-    queueSize       Int?     @map("queue_size")
+    queueSize      Int?     @map("queue_size")
     /// Drain budget (ms) for the worker on shutdown / `flushLogs()`.
-    drainTimeoutMs  Int?     @map("drain_timeout_ms")
+    drainTimeoutMs Int?     @map("drain_timeout_ms")
     /// Pretty-print logixlysia's stdout via pino-pretty. `null` falls back.
-    pretty          Boolean?
+    pretty         Boolean?
 
     @@map("app_log_settings")
 }
