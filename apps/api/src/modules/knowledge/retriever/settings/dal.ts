@@ -1,11 +1,13 @@
 /**
- * Retriever-settings DAL. Owns the `kb_retrieve_settings` table (one row per
- * knowledge base, keyed by `knowledge_base_id`).
+ * Retriever-settings DAL. Owns the `kb_retrieve_settings` table (a single
+ * global row, id `default`).
  *
  * Internal to the settings sub-module: only `service.ts` imports it.
  */
 
 import { getPrisma } from "../../../../shared/db.ts";
+
+const SETTINGS_ID = "default";
 
 /** Raw `kb_retrieve_settings` row, columns verbatim. */
 export type RetrieveSettingsRecord = {
@@ -14,12 +16,10 @@ export type RetrieveSettingsRecord = {
   maxCharacters: number | null;
 };
 
-/** Load the retrieval settings for one knowledge base, or null when unset. */
-export async function findRetrieveSettings(
-  knowledgeBaseId: string,
-): Promise<RetrieveSettingsRecord | null> {
+/** Load the global retrieval settings, or null when unset. */
+export async function findRetrieveSettings(): Promise<RetrieveSettingsRecord | null> {
   const row = await getPrisma().knowledgeRetrieveSettings.findUnique({
-    where: { knowledgeBaseId },
+    where: { id: SETTINGS_ID },
   });
   if (!row) return null;
   return {
@@ -29,18 +29,15 @@ export async function findRetrieveSettings(
   };
 }
 
-/** Upsert the retrieval settings for one knowledge base. */
-export async function upsertRetrieveSettings(
-  knowledgeBaseId: string,
-  fields: {
-    childLimit: number | null;
-    maxParents: number | null;
-    maxCharacters: number | null;
-  },
-): Promise<void> {
+/** Upsert the global retrieval settings. */
+export async function upsertRetrieveSettings(fields: {
+  childLimit: number | null;
+  maxParents: number | null;
+  maxCharacters: number | null;
+}): Promise<void> {
   await getPrisma().knowledgeRetrieveSettings.upsert({
-    where: { knowledgeBaseId },
-    create: { knowledgeBaseId, ...fields },
+    where: { id: SETTINGS_ID },
+    create: { id: SETTINGS_ID, ...fields },
     update: { ...fields },
   });
 }

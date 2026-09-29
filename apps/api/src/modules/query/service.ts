@@ -28,7 +28,7 @@ export abstract class Query {
       }
       const recent = await ChatMessage.listRecentBySession(sessionId);
       const personalMemories = await PersonalMemory.search(user.id, message);
-      const retrieveSettings = await RetrieverSettings.load(knowledgeBaseId);
+      const retrieveSettings = await RetrieverSettings.load();
       const { parents, images } = await Retriever.parentsByQuestion(message, {
         knowledgeBaseId,
         ...retrieveSettings,

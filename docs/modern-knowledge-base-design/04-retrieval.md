@@ -18,7 +18,7 @@ Embed the question, similarity-search `kb_children.embedding`, expand to parents
 7. LLM gets parent texts (+ title) and image-description hits — not child windows alone ([05-synthesis.md](./05-synthesis.md))
 ```
 
-Cap knobs (`child_limit`, `max_parents`, `max_characters`) come from the knowledge base's [`kb_retrieve_settings`](./appendix-a-data-model.md#retrieval-knobs-table); app defaults when null.
+Cap knobs (`child_limit`, `max_parents`, `max_characters`) are **global** ([`kb_retrieve_settings`](./appendix-a-data-model.md#retrieval-knobs-table), one row `id = "default"`) — they apply to a query's merged result, not one knowledge base. App defaults when null.
 
 ## Multiple knowledge bases
 
@@ -26,11 +26,10 @@ A request carries the knowledge-base ids it wants to query. The backend persists
 
 The service validates the set — non-empty, every id exists — then queries exactly it. No caller-access restriction is applied for now; a future one belongs in the service or controller layer.
 
-Every knowledge base shares the one embedding model ([appendix A](./appendix-a-data-model.md)), so scores are comparable across them: the child hits merge and re-rank by score. Page and parent ids are unique only within one knowledge base, so merge and expand on `(knowledgeBaseId, parentId)` and `(knowledgeBaseId, pageId)`, then cap the merged ranking once, globally ([Flow](#flow)). Image hits merge the same way; a writable knowledge base is text-only ([appendix A](./appendix-a-data-model.md)), so it contributes no images.
+Every knowledge base shares the one embedding model ([appendix A](./appendix-a-data-model.md)), so scores are comparable across them: the child hits merge and re-rank by score, keeping the global top `child_limit` before parent dedupe. Page and parent ids are unique only within one knowledge base, so merge and expand on `(knowledgeBaseId, parentId)` and `(knowledgeBaseId, pageId)`, then cap once with `max_parents` / `max_characters` ([Flow](#flow)). Image hits merge the same way; a writable knowledge base is text-only ([appendix A](./appendix-a-data-model.md)), so it contributes no images.
 
 ### Open decisions
 
-- **Knobs across a set.** Whether `child_limit` is per knowledge base with a global `max_parents` / `max_characters`, or one source governs the query.
 - **Cross-knowledge-base labels.** How parents and images are labelled when two knowledge bases carry the same page title.
 
 ## Question embed

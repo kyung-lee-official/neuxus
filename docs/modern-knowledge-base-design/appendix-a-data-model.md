@@ -148,14 +148,14 @@ CREATE TABLE kb_chunk_settings (
 
 ## Retrieval knobs table
 
-Per knowledge base. Nullable columns; **defaults live in application code**, not SQL `DEFAULT`.
+Global (one row, `id = "default"`) — retrieval knobs are query-level, not per knowledge base. Nullable columns; **defaults live in application code**, not SQL `DEFAULT`.
 
 ```sql
 CREATE TABLE kb_retrieve_settings (
-  knowledge_base_id TEXT PRIMARY KEY REFERENCES kb_knowledge_bases (id) ON DELETE CASCADE,
-  child_limit       INT,
-  max_parents       INT,
-  max_characters    INT
+  id             TEXT PRIMARY KEY DEFAULT 'default',
+  child_limit    INT,
+  max_parents    INT,
+  max_characters INT
 );
 ```
 
