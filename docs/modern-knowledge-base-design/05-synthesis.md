@@ -14,20 +14,30 @@ The model declares its context window and max output tokens. If the window is un
 
 The prompt is already assembled by the caller. It includes:
 
-- Knowledge **parent** texts (+ page title) from [04-retrieval.md](./04-retrieval.md)
+- Knowledge **parent** texts (each with a source line) from [04-retrieval.md](./04-retrieval.md)
 - Image-description hits from the second search in [04-retrieval.md](./04-retrieval.md#image-description-search)
 - Personal memory and recent chat when the Ask path has them
 
-Knowledge context comes from the caller's chosen knowledge base(s) ([04-retrieval.md](./04-retrieval.md#multiple-knowledge-bases)); parents from all of them are pooled into one context. Each parent is written under its page title as a bold label (`**North Quay Relay**`), not a markdown heading, so the body's own heading levels stay intact. Memory and chat are separate. Empty parent list is allowed (memory/chat-only). If the prompt context does not contain the answer, the model should say so.
+Knowledge context comes from the caller's chosen knowledge base(s) ([04-retrieval.md](./04-retrieval.md#multiple-knowledge-bases)); parents from all of them are pooled into one context. Each parent is written under a source line listing its knowledge base, page, and title; the parent text keeps its own headings ([Image handling](#image-handling)). Memory and chat are separate. Empty parent list is allowed (memory/chat-only). If the prompt context does not contain the answer, the model should say so.
 
 ## Image handling
 
-A parent's text carries images only as markdown references (`![alt](path)`), so each image's stored description reaches the prompt one of two ways:
+An image-description hit from the second search ([04-retrieval.md](./04-retrieval.md#image-description-search)) is a row with a knowledge base, page id, page title, image path, description, and score.
 
-1. **Included with its parent** — replace the `![…](…)` inline, in the prompt only.
-2. **Matched on its own** — append the description, labelled with its page title.
+Each hit is appended to the knowledge context as exactly one sentence; the description is never substituted into a parent's text, so a parent keeps its markdown image references (`![alt](path)`) untouched. The row turns into:
 
-Example page, title **North Quay Relay**:
+```text
+An image from knowledge base "${knowledgeBaseId}", page "${pageId}" (title "${title}") shows: ${description}
+```
+
+A parent is written under the same source shape:
+
+```text
+From knowledge base "${knowledgeBaseId}", page "${pageId}" (title "${title}"):
+${parent text}
+```
+
+Example page, title **North Quay Relay** (knowledge base `docs`, page `guide/relay`):
 
 ```markdown
 ## Wiring
@@ -37,15 +47,28 @@ Example page, title **North Quay Relay**:
 The relay sits between the two quays.
 ```
 
-Description: `A relay switch between two quays, with a 12V line labeled A.`
+Retrieval returns this parent and this image hit:
 
-- A question matching the prose pulls in the parent; its image line becomes:
+```text
+parent:    { knowledgeBaseId: "docs", pageId: "guide/relay", title: "North Quay Relay",
+             text: "## Wiring\n\n![North quay](assets/wiring.png)\n\nThe relay sits between the two quays.", score: 0.90 }
+image hit: { knowledgeBaseId: "docs", pageId: "guide/relay", title: "North Quay Relay",
+             imagePath: "assets/wiring.png",
+             description: "A relay switch between two quays, with a 12V line labeled A.", score: 0.82 }
+```
 
-  `A relay switch between two quays, with a 12V line labeled A. The relay sits between the two quays.`
+Knowledge context sent to the model (last state before the synthesis call):
 
-- A question matching only the description appends:
+```text
+From knowledge base "docs", page "guide/relay" (title "North Quay Relay"):
+## Wiring
 
-  `North Quay Relay — A relay switch between two quays, with a 12V line labeled A.`
+![North quay](assets/wiring.png)
+
+The relay sits between the two quays.
+
+An image from knowledge base "docs", page "guide/relay" (title "North Quay Relay") shows: A relay switch between two quays, with a 12V line labeled A.
+```
 
 ## Output
 

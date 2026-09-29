@@ -28,10 +28,6 @@ The service validates the set — non-empty, every id exists — then queries ex
 
 Every knowledge base shares the one embedding model ([appendix A](./appendix-a-data-model.md)), so scores are comparable across them: the child hits merge and re-rank by score, keeping the global top `child_limit` before parent dedupe. Page and parent ids are unique only within one knowledge base, so merge and expand on `(knowledgeBaseId, parentId)` and `(knowledgeBaseId, pageId)`, then cap once with `max_parents` / `max_characters` ([Flow](#flow)). Image hits merge the same way; a writable knowledge base is text-only ([appendix A](./appendix-a-data-model.md)), so it contributes no images.
 
-### Open decisions
-
-- **Cross-knowledge-base labels.** How parents and images are labelled when two knowledge bases carry the same page title.
-
 ## Question embed
 
 Embed the question with the current **embedding** model — the same model the children were embedded with — so the question and children share one vector space.
@@ -60,7 +56,7 @@ LIMIT $2;
 ## Expand to parents
 
 ```sql
-SELECT p.id, p.text, pg.title
+SELECT p.knowledge_base_id, p.id, p.text, pg.title
 FROM kb_parents p
 JOIN kb_pages pg
   ON pg.knowledge_base_id = p.knowledge_base_id
@@ -75,11 +71,16 @@ The same embedded question drives a **second vector search**, over `kb_image_des
 
 ```sql
 SELECT
+  d.knowledge_base_id,
   d.page_id,
   d.image_path,
   d.description,
+  pg.title,
   1 - (d.embedding <=> $1::vector) AS score
 FROM kb_image_descriptions d
+JOIN kb_pages pg
+  ON pg.knowledge_base_id = d.knowledge_base_id
+ AND pg.id = d.page_id
 WHERE d.embedding IS NOT NULL
   AND d.embedding_model IS NOT DISTINCT FROM $current_model
   AND d.knowledge_base_id = $kb
@@ -88,7 +89,7 @@ ORDER BY d.embedding <=> $1::vector
 LIMIT $2;
 ```
 
-Its hits are capped and merged into the synthesis context ([05-synthesis.md](./05-synthesis.md#image-handling)); an image hit carries only its description and page title.
+Its hits are capped and merged into the synthesis context ([05-synthesis.md](./05-synthesis.md#image-handling)); an image hit carries its knowledge base, page id, title, and description.
 
 ## Stale vectors
 

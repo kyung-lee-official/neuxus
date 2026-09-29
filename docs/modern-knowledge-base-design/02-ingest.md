@@ -47,9 +47,9 @@ Ingest reconciles image policy while it processes each changed page, and records
 
 - **Identity:** `(knowledge_base_id, page_id, image_path)`.
 - **Policy:** from the sibling `*.meta.yaml` — `ignore`, `manual`, or `vision-captioning`; images not listed default to `vision-captioning`.
-- **`manual` description:** taken from the sidecar when the policy is `manual`.
+- **`manual` description:** taken from the `*.meta.yaml` when the policy is `manual`.
 
-Rows for images the page no longer references are deleted. When a row leaves `vision-captioning` for `manual` / `ignore`, its caption fields (`image_content_hash`, `caption_model`, `hardcoded_caption_prompt_hash`, `description_hash`) and `embedding` are cleared, because `description` is now owned by the sidecar. This step is **policy only** — it never calls a model and never reads image bytes. The sidecar format, the caption pass, and the description vectors are [03.2-image-descriptions.md](./03.2-image-descriptions.md).
+Rows for images the page no longer references are deleted. When a row leaves `vision-captioning` for `manual` / `ignore`, its caption fields (`image_content_hash`, `caption_model`, `hardcoded_caption_prompt_hash`, `description_hash`) and `embedding` are cleared, because `description` is now owned by the `*.meta.yaml`. This step is **policy only** — it never calls a model and never reads image bytes. The `*.meta.yaml` format, the caption pass, and the description vectors are [03.2-image-descriptions.md](./03.2-image-descriptions.md).
 
 ## Frontmatter
 
