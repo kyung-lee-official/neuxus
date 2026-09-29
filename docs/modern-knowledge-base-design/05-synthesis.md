@@ -1,4 +1,4 @@
-# Synthesis (prompt → answer)
+# Synthesis (prompt to answer)
 
 This doc is the **synthesis contract**: resolve the model, call the provider, return text.
 

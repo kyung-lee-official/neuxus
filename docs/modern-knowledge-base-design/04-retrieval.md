@@ -1,6 +1,6 @@
-# Retrieval (question → ranked parents + image descriptions)
+# Retrieval (question to ranked parents + image descriptions)
 
-Question (string) in → ranked rows out.
+Question (string) in, ranked rows out.
 
 Each search query binds one knowledge base (`$kb`); the caller chooses which knowledge base(s) to search.
 

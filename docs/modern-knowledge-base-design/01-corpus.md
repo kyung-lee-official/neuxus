@@ -37,8 +37,8 @@ kb.git/                       # docs root = repo root (default)
 
 | Rule            | Behavior                                                         |
 | --------------- | ---------------------------------------------------------------- |
-| Docs root       | empty → walk the repo root (default)                             |
-| Docs root       | non-empty relative path → walk that subdirectory                 |
+| Docs root       | empty: walk the repo root (default)                              |
+| Docs root       | non-empty relative path: walk that subdirectory                  |
 | Missing path    | fail the walk (only when an explicit non-empty docs root is set) |
 | Path separators | POSIX `/` in stored `source_path`, even on Windows               |
 
@@ -58,17 +58,17 @@ Walk **recursively** under the docs root.
 
 ## Hierarchy
 
-Folders organize the corpus repo and set each page's `source_path` and `id`. `kb_pages` is **flat** — one file → one row, at any folder depth. Folder depth is **not** the chunk parent/child tree.
+Folders organize the corpus repo and set each page's `source_path` and `id`. `kb_pages` is **flat** — one file, one row, at any folder depth. Folder depth is **not** the chunk parent/child tree.
 
 ```text
 # docs_root = "" (default)
-<parent>/<page>.md             → id <parent>/<page>
-<parent>/<subdir>/<page>.md    → id <parent>/<subdir>/<page>
-README.md                      → id README
+<parent>/<page>.md             maps to id <parent>/<page>
+<parent>/<subdir>/<page>.md    maps to id <parent>/<subdir>/<page>
+README.md                      maps to id README
 
 # docs_root = "<docs-root>"
-<docs-root>/<parent>/<page>.md          → id <parent>/<page>
-<docs-root>/<parent>/<subdir>/<page>.md → id <parent>/<subdir>/<page>
+<docs-root>/<parent>/<page>.md          maps to id <parent>/<page>
+<docs-root>/<parent>/<subdir>/<page>.md maps to id <parent>/<subdir>/<page>
 ```
 
 The two hierarchies, compared:
