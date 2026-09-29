@@ -47,26 +47,22 @@ Example page, title **North Quay Relay** (knowledge base `docs`, page `guide/rel
 The relay sits between the two quays.
 ```
 
-Retrieval returns this parent and this image hit:
+Retrieval returns this image hit:
 
-```text
-parent:    { knowledgeBaseId: "docs", pageId: "guide/relay", title: "North Quay Relay",
-             text: "## Wiring\n\n![North quay](assets/wiring.png)\n\nThe relay sits between the two quays.", score: 0.90 }
-image hit: { knowledgeBaseId: "docs", pageId: "guide/relay", title: "North Quay Relay",
-             imagePath: "assets/wiring.png",
-             description: "A relay switch between two quays, with a 12V line labeled A.", score: 0.82 }
+```json
+{
+  "knowledgeBaseId": "docs",
+  "pageId": "guide/relay",
+  "title": "North Quay Relay",
+  "imagePath": "assets/wiring.png",
+  "description": "A relay switch between two quays, with a 12V line labeled A.",
+  "score": 0.82
+}
 ```
 
-Knowledge context sent to the model (last state before the synthesis call):
+It is appended to the knowledge context as this sentence (the last state before the synthesis call):
 
 ```text
-From knowledge base "docs", page "guide/relay" (title "North Quay Relay"):
-## Wiring
-
-![North quay](assets/wiring.png)
-
-The relay sits between the two quays.
-
 An image from knowledge base "docs", page "guide/relay" (title "North Quay Relay") shows: A relay switch between two quays, with a 12V line labeled A.
 ```
 
