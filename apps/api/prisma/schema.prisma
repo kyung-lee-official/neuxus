@@ -78,7 +78,6 @@ model KnowledgeBase {
     pages            KnowledgePage[]
     corpusSettings   KnowledgeCorpusSettings?
     chunkSettings    KnowledgeChunkSettings?
-    retrieveSettings KnowledgeRetrieveSettings?
 
     @@map("kb_knowledge_bases")
 }
@@ -116,19 +115,18 @@ model KnowledgeChunkSettings {
     @@map("kb_chunk_settings")
 }
 
-/// Retrieval knobs (`kb_retrieve_settings`), one row per knowledge base.
-/// Nullable columns — app defaults live in code (`RETRIEVE_DEFAULTS`).
+/// Retrieval knobs (`kb_retrieve_settings`), a single global row (`id = "default"`).
+/// Knobs are query-level, not per knowledge base. Nullable columns — app
+/// defaults live in code (`RETRIEVE_DEFAULTS`).
 model KnowledgeRetrieveSettings {
-    knowledgeBaseId String @id @map("knowledge_base_id")
+    id String @id @default("default")
 
-    /// Top-K child hits from the vector distance scan.
+    /// Top-K child hits from the vector distance scan (per knowledge base).
     childLimit    Int? @map("child_limit")
     /// Max unique parent ids returned after dedup.
     maxParents    Int? @map("max_parents")
     /// Cap on total parent-text characters.
     maxCharacters Int? @map("max_characters")
-
-    knowledgeBase KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
 
     @@map("kb_retrieve_settings")
 }
