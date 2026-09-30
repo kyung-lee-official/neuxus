@@ -39,11 +39,11 @@ flowchart LR
 
 ## Freshness keys
 
-| Unit                       | Skip when                                                                                                                             |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Ingest (page)              | `kb_pages.content_hash` and `kb_pages.meta_hash` both match                                                                           |
-| Chunkify (page)            | the page's chunk tree carries `source_page_hash` = `kb_pages.content_hash`                                                            |
-| Image descriptions (image) | the image's current bytes hash, `caption_model`, and `hardcoded_caption_prompt_hash` match the stored row, and a `description` exists |
-| Any vector                 | `embedding_model` = the current embedding model `identifier` (`{providerId}::{modelId}`)                                              |
+| Unit                       | Skip when                                                                                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Ingest (page)              | `kb_pages.content_hash` and `kb_pages.meta_hash` both match                                                                                      |
+| Chunkify (page)            | the page's chunk tree carries `source_page_hash` = `kb_pages.content_hash`                                                                       |
+| Image descriptions (image) | the image's current bytes hash, `caption_model`, and `hardcoded_caption_prompt_hash` match the stored row, and a `description` exists            |
+| Any vector                 | `embedding_model` = the current embedding model `identifier` (`{providerId}::{modelId}`); image-description vectors also require a `description` |
 
 The embedding, captioning, and synthesis models are application wiring: [`app_model_task_config`](./appendix-a-data-model.md#model-config-tables) task links, with provider connections in `app_model_provider_config`. No `kb_*` settings table holds a model id.
