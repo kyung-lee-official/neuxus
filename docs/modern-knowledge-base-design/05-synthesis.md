@@ -15,14 +15,14 @@ The model declares its context window and max output tokens. If the window is un
 The prompt is already assembled by the caller. It includes:
 
 - Knowledge **parent** texts (each with a source line) from [04-retrieval.md](./04-retrieval.md)
-- Image-description hits from the second search in [04-retrieval.md](./04-retrieval.md#image-description-search)
+- Image-description hits from the [image-description search](./04-retrieval.md#image-description-search)
 - Personal memory and recent chat when the Ask path has them
 
 Knowledge context comes from the caller's chosen knowledge base(s) ([04-retrieval.md](./04-retrieval.md#multiple-knowledge-bases)); parents from all of them are pooled into one context. Each parent is written under a source line listing its knowledge base, page, and title; the parent text keeps its own headings ([Image handling](#image-handling)). Memory and chat are separate. Empty parent list is allowed (memory/chat-only). If the prompt context does not contain the answer, the model should say so.
 
 ## Image handling
 
-An image-description hit from the second search ([04-retrieval.md](./04-retrieval.md#image-description-search)) is a row with a knowledge base, page id, page title, image path, description, and score.
+An [image-description hit](./04-retrieval.md#image-description-search) is a row with a knowledge base, page id, page title, image path, description, and score.
 
 Each hit is appended to the knowledge context as exactly one sentence; the description is never substituted into a parent's text, so a parent keeps its markdown image references (`![alt](path)`) untouched. The row turns into:
 
