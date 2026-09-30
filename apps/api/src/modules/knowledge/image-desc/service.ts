@@ -119,7 +119,7 @@ export class ImageCaptioner {
           imageContentHash === candidate.imageContentHash &&
           candidate.captionModel === currentModel &&
           candidate.hardcodedCaptionPromptHash === currentPromptHash &&
-          candidate.descriptionHash != null;
+          candidate.description != null;
         if (fresh) {
           skipped += 1;
           continue;
@@ -144,7 +144,6 @@ export class ImageCaptioner {
             description,
             captionModel: currentModel,
             hardcodedCaptionPromptHash: currentPromptHash,
-            descriptionHash: sha256Hex(Buffer.from(description, "utf8")),
           },
         );
         captioned += 1;

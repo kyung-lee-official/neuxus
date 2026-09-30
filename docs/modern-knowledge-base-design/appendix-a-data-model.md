@@ -92,7 +92,6 @@ CREATE TABLE kb_image_descriptions (
   description                   TEXT,           -- null for ignore / before caption
   caption_model                 TEXT,           -- null for manual
   hardcoded_caption_prompt_hash TEXT,           -- sha256 of the hardcoded caption prompt
-  description_hash              TEXT,           -- sha256 of description
   embedding                     vector(768),    -- adjust N to the shared embedding model
   embedding_model               TEXT,
   embedded_at                   TIMESTAMPTZ,

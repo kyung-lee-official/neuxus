@@ -17,7 +17,6 @@ export type ImageDescriptionRow = {
   description: string | null;
   captionModel: string | null;
   hardcodedCaptionPromptHash: string | null;
-  descriptionHash: string | null;
   embeddingModel: string | null;
   embeddedAt: Date | null;
 };
@@ -84,7 +83,6 @@ export async function upsertImageDescription(
     description: row.description,
     captionModel: row.captionModel,
     hardcodedCaptionPromptHash: row.hardcodedCaptionPromptHash,
-    descriptionHash: row.descriptionHash,
   };
   await getPrisma().knowledgeImageDescription.upsert({
     where: {
@@ -139,7 +137,6 @@ export async function upsertImagePolicy(
       description: description ?? null,
       captionModel: null,
       hardcodedCaptionPromptHash: null,
-      descriptionHash: null,
     },
     update: {
       policy,
@@ -163,7 +160,6 @@ export async function resetImageDerivedFields(
       image_content_hash = NULL,
       caption_model = NULL,
       hardcoded_caption_prompt_hash = NULL,
-      description_hash = NULL,
       embedding = NULL
     WHERE knowledge_base_id = ${knowledgeBaseId}
       AND page_id = ${pageId}
@@ -251,7 +247,6 @@ export type ImageDescriptionUpdate = {
   description: string;
   captionModel: string;
   hardcodedCaptionPromptHash: string;
-  descriptionHash: string;
 };
 
 /** Write new description fields and clear the pgvector `embedding` to re-embed. */
@@ -268,7 +263,6 @@ export async function updateImageDescription(
       description = ${fields.description},
       caption_model = ${fields.captionModel},
       hardcoded_caption_prompt_hash = ${fields.hardcodedCaptionPromptHash},
-      description_hash = ${fields.descriptionHash},
       embedding = NULL
     WHERE knowledge_base_id = ${knowledgeBaseId}
       AND page_id = ${pageId}
