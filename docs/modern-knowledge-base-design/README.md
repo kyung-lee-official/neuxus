@@ -32,7 +32,7 @@ flowchart LR
 | [01-corpus.md](./01-corpus.md)                             | Corpus layout: docs root, include/exclude, how a path maps to `source_path` / `id`                                                       |
 | [02-ingest.md](./02-ingest.md)                             | Discover files; markdown file becomes a `kb_pages` row (frontmatter, hash skip); reconcile per-image policy into `kb_image_descriptions` |
 | [03.1-chunkify.md](./03.1-chunkify.md)                     | Derive parents / children from `kb_pages.body`                                                                                           |
-| [03.2-image-descriptions.md](./03.2-image-descriptions.md) | Build image captions + description vectors from `*.meta.yaml`                                                                            |
+| [03.2-image-descriptions.md](./03.2-image-descriptions.md) | Image captions + description vectors (policy from `*.meta.yaml`)                                                                            |
 | [04-retrieval.md](./04-retrieval.md)                       | Question in, ranked parents out (+ ranked image descriptions)                                                                            |
 | [05-synthesis.md](./05-synthesis.md)                       | Prompt in, answer out (image descriptions folded into the prompt)                                                                        |
 | [appendix-a-data-model.md](./appendix-a-data-model.md)     | Tables                                                                                                                                   |
