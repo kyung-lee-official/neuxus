@@ -8,7 +8,7 @@
 
 Vectors are produced and consumed through a shared embed utility, not a flow step.
 
-The stages are independent: each can run on its own, and its hash gate decides whether it does any work. Wiring them together (an application-level job, a "sync") is optional and application layer.
+The stages are independent: each can run on its own, and its freshness key decides whether it does any work. Wiring them together (an application-level job, a "sync") is optional and application layer.
 
 Content lives in **knowledge bases**: each is either **read-only** (pages ingested from a corpus and written only by the ingest stage) or **writable** (pages updated directly, not by ingest). Every write targets one knowledge base; a search query targets a set of one or more, specified by the request. The backend persists no grouping.
 
@@ -32,7 +32,7 @@ flowchart LR
 | [01-corpus.md](./01-corpus.md)                             | Corpus layout: docs root, include/exclude, how a path maps to `source_path` / `id`                                                       |
 | [02-ingest.md](./02-ingest.md)                             | Discover files; markdown file becomes a `kb_pages` row (frontmatter, hash skip); reconcile per-image policy into `kb_image_descriptions` |
 | [03.1-chunkify.md](./03.1-chunkify.md)                     | Derive parents / children from `kb_pages.body`                                                                                           |
-| [03.2-image-descriptions.md](./03.2-image-descriptions.md) | Image captions + description vectors (policy from `*.meta.yaml`)                                                                            |
+| [03.2-image-descriptions.md](./03.2-image-descriptions.md) | Image captions + description vectors (policy from `*.meta.yaml`)                                                                         |
 | [04-retrieval.md](./04-retrieval.md)                       | Question in, ranked parents out (+ ranked image descriptions)                                                                            |
 | [05-synthesis.md](./05-synthesis.md)                       | Prompt in, answer out (image descriptions folded into the prompt)                                                                        |
 | [appendix-a-data-model.md](./appendix-a-data-model.md)     | Tables                                                                                                                                   |
