@@ -22,22 +22,23 @@ Knowledge context comes from the caller's chosen knowledge base(s) ([04-retrieva
 
 ## Image handling
 
-An [image-description hit](./04-retrieval.md#image-description-search) is a row with a knowledge base, page id, page title, image path, description, and score.
+Retrieval returns parents and [image-description hits](./04-retrieval.md#result) as separate lists. Each hit is folded into the prompt by one rule, applied in order:
 
-Each hit is appended to the knowledge context as exactly one sentence; the description is never substituted into a parent's text, so a parent keeps its markdown image references (`![alt](path)`) untouched. The row turns into:
+1. **Attached** — a retrieved parent from the same knowledge base and page has an image reference that resolves to the hit's `imagePath` ([canonical image path](./03.2-image-descriptions.md#canonical-image-path)): replace that parent's image reference `![alt](path)` with the description, in the prompt only. The stored `body` keeps the image reference `![alt](path)`.
+2. **Standalone** — otherwise: append the description as its own sentence, labelled with its source.
 
-```text
-An image from knowledge base "${knowledgeBaseId}", page "${pageId}" (title "${title}") shows: ${description}
-```
-
-A parent is written under the same source shape:
+A parent is written under a source line; the standalone sentence uses the same shape:
 
 ```text
 From knowledge base "${knowledgeBaseId}", page "${pageId}" (title "${title}"):
 ${parent text}
 ```
 
-Example page, title **North Quay Relay** (knowledge base `docs`, page `guide/relay`):
+```text
+An image from knowledge base "${knowledgeBaseId}", page "${pageId}" (title "${title}") shows: ${description}
+```
+
+Example page, title **North Quay Relay** (knowledge base `docs`, page `guide/relay`), and its image hit:
 
 ```markdown
 ## Wiring
@@ -47,20 +48,29 @@ Example page, title **North Quay Relay** (knowledge base `docs`, page `guide/rel
 The relay sits between the two quays.
 ```
 
-Retrieval returns this image hit:
-
 ```json
 {
   "knowledgeBaseId": "docs",
   "pageId": "guide/relay",
   "title": "North Quay Relay",
-  "imagePath": "assets/wiring.png",
+  "imagePath": "guide/assets/wiring.png",
   "description": "A relay switch between two quays, with a 12V line labeled A.",
   "score": 0.82
 }
 ```
 
-It is appended to the knowledge context as this sentence (the last state before the synthesis call):
+**Attached** — the page's parent was retrieved; the image reference `![North quay](assets/wiring.png)` is replaced in the prompt only:
+
+```text
+From knowledge base "docs", page "guide/relay" (title "North Quay Relay"):
+## Wiring
+
+A relay switch between two quays, with a 12V line labeled A.
+
+The relay sits between the two quays.
+```
+
+**Standalone** — the page's parent was not retrieved; the description is appended:
 
 ```text
 An image from knowledge base "docs", page "guide/relay" (title "North Quay Relay") shows: A relay switch between two quays, with a 12V line labeled A.
