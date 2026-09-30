@@ -203,11 +203,15 @@ model KnowledgeImageDescription {
     /// `ignore` | `manual` | `vision-captioning`.
     policy                     String
     description                String?
+    /// sha256 of `description`; written with the description.
+    descriptionHash            String?                @map("description_hash")
     captionModel               String?                @map("caption_model")
     hardcodedCaptionPromptHash String?                @map("hardcoded_caption_prompt_hash")
     embedding                  Unsupported("vector")?
     embeddingModel             String?                @map("embedding_model")
     embeddedAt                 DateTime?              @map("embedded_at") @db.Timestamptz(6)
+    /// sha256 of the `description` this `embedding` was computed from; embed pass.
+    embeddedDescriptionHash    String?                @map("embedded_description_hash")
 
     page KnowledgePage @relation(fields: [knowledgeBaseId, pageId], references: [knowledgeBaseId, id], onDelete: Cascade)
 
