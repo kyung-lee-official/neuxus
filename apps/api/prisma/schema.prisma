@@ -205,7 +205,6 @@ model KnowledgeImageDescription {
     description                String?
     captionModel               String?                @map("caption_model")
     hardcodedCaptionPromptHash String?                @map("hardcoded_caption_prompt_hash")
-    descriptionHash            String?                @map("description_hash")
     embedding                  Unsupported("vector")?
     embeddingModel             String?                @map("embedding_model")
     embeddedAt                 DateTime?              @map("embedded_at") @db.Timestamptz(6)
