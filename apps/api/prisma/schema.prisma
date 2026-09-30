@@ -138,7 +138,6 @@ model KnowledgePage {
     title           String
     tags            String[] @default([])
     body            String
-    sourcePath      String?  @map("source_path")
     contentHash     String   @map("content_hash")
     metaHash        String?  @map("meta_hash")
     updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
