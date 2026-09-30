@@ -87,7 +87,18 @@ ORDER BY d.embedding <=> $1::vector
 LIMIT $2;
 ```
 
-Its hits are capped and merged into the synthesis context ([05-synthesis.md](./05-synthesis.md#image-handling)); an image hit carries its knowledge base, page id, title, and description.
+Its hits are capped and merged into the synthesis context ([05-synthesis.md](./05-synthesis.md#image-handling)); the row shape is defined under [Result](#result).
+
+## Result
+
+Retrieval returns two independent lists:
+
+| List                   | Row                                                                     |
+| ---------------------- | ----------------------------------------------------------------------- |
+| Parents                | `{ knowledgeBaseId, parentId, pageId, title, sourcePath, text, score }` |
+| Image-description hits | `{ knowledgeBaseId, pageId, title, imagePath, description, score }`     |
+
+`05-synthesis.md` folds both into the prompt ([05-synthesis.md](./05-synthesis.md#image-handling)).
 
 ## Stale vectors
 
