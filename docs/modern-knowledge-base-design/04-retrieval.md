@@ -8,15 +8,13 @@ Embed the question, similarity-search `kb_children.embedding`, expand to parents
 
 ## Flow
 
-```text
 1. Embed the question once (same model as children)
 2. Similarity-search children in each knowledge base in the set
 3. Resolve parents per knowledge base (+ page title)
 4. Dedupe by `(knowledgeBaseId, parentId)`; keep best child score per parent
 5. Cap the merged set by max parents / max characters
-6. Similarity-search image descriptions in each knowledge base, independent of step 2 ([Image-description search](#image-description-search))
+6. Similarity-search [image descriptions](#image-description-search) in each knowledge base, independent of step 2
 7. LLM gets parent texts (+ title) and image-description hits — not child windows alone ([05-synthesis.md](./05-synthesis.md))
-```
 
 Cap knobs (`child_limit`, `max_parents`, `max_characters`) are **global** ([`kb_retrieve_settings`](./appendix-a-data-model.md#retrieval-knobs-table), one row `id = "default"`) — they apply to a query's merged result, not one knowledge base. App defaults when null.
 
