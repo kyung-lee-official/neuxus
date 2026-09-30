@@ -89,7 +89,6 @@ model KnowledgeCorpusSettings {
 
     repoUrl       String? @map("repo_url")
     branch        String?
-    docsRoot      String? @map("docs_root")
     lastSyncedSha String? @map("last_synced_sha")
 
     knowledgeBase KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
