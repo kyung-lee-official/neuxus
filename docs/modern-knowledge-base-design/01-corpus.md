@@ -2,7 +2,7 @@
 
 **Does**
 
-- Keep a local checkout of the chosen branch (clone / pull / fetch)
+- Keep a local checkout of the chosen branch (clone / pull / fetch) from the per-knowledge-base git remote, recording the commit held (`last_synced_sha`)
 - Define the corpus source layout: file include/exclude and the `id` identity (a file's repo-root-relative path minus `.md`, e.g. `guide/install.md` gives `id` `guide/install`)
 
 Folder depth is an **authoring** choice: how authors organize the repo. It is not the chunk parent/child tree ([03.1-chunkify.md](./03.1-chunkify.md)).
