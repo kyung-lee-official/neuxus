@@ -18,13 +18,15 @@ theme: neo-dark
 ---
 flowchart LR
   corpus["01 corpus (source)"] --> ingest[02 ingest]
-  ingest --> chunkify[03.1 chunkify]
   ingest --> imagedesc[03.2 image descriptions]
+  ingest --> chunkify[03.1 chunkify]
   direct[direct write] --> chunkify
   retrieval[04 retrieval] --> synthesis[05 synthesis]
-  chunkify -. uses .-> embed[embed utility]
+  retrieval -. uses .-> embed[embed utility]
+  chunkify -. uses .-> embed
   imagedesc -. uses .-> embed
-  retrieval -. uses .-> embed
+  chunkify -. read by .-> retrieval
+  imagedesc -. read by .-> retrieval
 ```
 
 | Doc                                                        | Contract                                                                                                                                 |
@@ -39,11 +41,11 @@ flowchart LR
 
 ## Freshness keys
 
-| Unit                       | Skip when                                                                                                                                                                                              |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Ingest (page)              | `kb_pages.content_hash` and `kb_pages.meta_hash` both match                                                                                                                                            |
-| Chunkify (page)            | the page's chunk tree carries `source_page_hash` = `kb_pages.content_hash`                                                                                                                             |
-| Image descriptions (image) | the image's current bytes hash, `caption_model`, and `hardcoded_caption_prompt_hash` match the stored row, and a `description` exists                                                                  |
-| Any vector                 | `embedding_model` = the current embedding model `identifier` (`{providerId}::{modelId}`); image-description vectors also require a `description` with `description_hash` = `embedded_description_hash` |
+| Unit                 | Skip when                                                                                                                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Ingest (page)        | `kb_pages.content_hash` and `kb_pages.meta_hash` both match                                                                                                                                            |
+| Chunkify (page)      | the page's chunk tree carries `source_page_hash` = `kb_pages.content_hash`                                                                                                                             |
+| Caption pass (image) | for `vision-captioning` rows: the image's current bytes hash, `caption_model`, and `hardcoded_caption_prompt_hash` match the stored row, and a `description` exists                                    |
+| Any vector           | `embedding_model` = the current embedding model `identifier` (`{providerId}::{modelId}`); image-description vectors also require a `description` with `description_hash` = `embedded_description_hash` |
 
 The embedding, captioning, and synthesis models are application wiring: [`app_model_task_config`](./appendix-a-data-model.md#model-config-tables) task links, with provider connections in `app_model_provider_config`. No `kb_*` settings table holds a model id.
