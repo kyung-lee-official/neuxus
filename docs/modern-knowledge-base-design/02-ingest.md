@@ -1,19 +1,33 @@
 # Ingest (files to pages)
 
-Ingest discovers the corpus files and turns each into a `kb_pages` row. Which files exist (docs root, include/exclude, how a path maps to `source_path` / `id`) is the [corpus layout contract](./01-corpus.md).
+Ingest walks the checkout, reads each included `*.md`, and turns it into a `kb_pages` row. Where the files live and how a path becomes a page's `id` is the [corpus layout contract](./01-corpus.md).
 
-`title` / `tags` come from frontmatter. **`body`** is the remaining markdown; `chunkify` never strips frontmatter. `body` keeps only the image syntax (`![alt](path)`); the caption is stored in `kb_image_descriptions`, not in the body ([03.2-image-descriptions.md](./03.2-image-descriptions.md)).
+`title` / `tags` come from frontmatter. **`body`** is the remaining markdown. `body` keeps only the image syntax (`![alt](path)`); the caption is stored in `kb_image_descriptions`, not in the body ([03.2-image-descriptions.md](./03.2-image-descriptions.md)).
+
+**Does**
+
+- Discover files; parse each `.md` (frontmatter into `title` / `tags`, body normalized); read the sibling `*.meta.yaml`.
+- Compute `content_hash` + `meta_hash`, gate, and upsert `kb_pages`.
+- Record each referenced image's policy — and, for `manual`, its description — in `kb_image_descriptions`; delete rows for images the page no longer references.
+- Delete `kb_pages` rows whose file disappeared.
+
+**Reads** — the checkout files and their `*.meta.yaml`; the stored `kb_pages.content_hash` / `meta_hash`.
+
+**Owns** — `kb_pages` (`title`, `tags`, `body`, `content_hash`, `meta_hash`, `updated_at`); `kb_image_descriptions.policy`, `.description` (manual), `.description_hash` (manual). A policy change away from `vision-captioning` also clears that row's caption inputs (`image_content_hash`, `caption_model`, `hardcoded_caption_prompt_hash`).
+
+**Freshness** — skip the page when `content_hash` and `meta_hash` both match.
+
+**Never touches** — the chunk tree (`chunkify`); `embedding` / `embedding_model` / `embedded_at` / `embedded_description_hash` (`embed`). Calls no model and reads no image bytes.
 
 ## Files
 
-Ingest owns discovery: it runs the walker over the docs root and gets the included `*.md` files, one per page. The walk rules are the [corpus layout contract](./01-corpus.md).
+Ingest owns discovery: it runs the walker over the checkout and gets the included `*.md` files, one per page. The walk rules are the [corpus layout contract](./01-corpus.md).
 
-After processing the files, ingest deletes any `kb_pages` row **of that knowledge base** whose `source_path` is set but not among the files the walker returned (the file was deleted upstream):
+After processing the files, ingest deletes any `kb_pages` row **of that knowledge base** whose `id` is not among the files the walker returned (the file was deleted upstream):
 
 ```text
 DELETE FROM kb_pages WHERE knowledge_base_id = <kb>
-  AND source_path IS NOT NULL
-  AND NOT (source_path = ANY(<walker source_paths>));
+  AND NOT (id = ANY(<walker ids>));
 ```
 
 Ingest processes one **read-only** knowledge base per run (`kb_knowledge_bases.writable = false`); writable knowledge bases are updated directly, never ingested.
@@ -43,13 +57,13 @@ flowchart TD
 
 ## Image policy reconciliation
 
-Ingest reconciles image policy while it processes each changed page, and records what to do with each image the body references in `kb_image_descriptions`:
+Reconciliation records each referenced image's policy in `kb_image_descriptions` so the stored rows match the body plus `*.meta.yaml`; ingest does this while it processes each changed page:
 
 - **Identity:** `(knowledge_base_id, page_id, image_path)`.
 - **Policy:** from the sibling `*.meta.yaml` — `ignore`, `manual`, or `vision-captioning`; images not listed default to `vision-captioning`.
 - **`manual` description:** taken from the `*.meta.yaml` when the policy is `manual`.
 
-Rows for images the page no longer references are deleted. When a row leaves `vision-captioning` for `manual` / `ignore`, its caption fields (`image_content_hash`, `caption_model`, `hardcoded_caption_prompt_hash`) and `embedding` are cleared, because `description` is now owned by the `*.meta.yaml`. This step is **policy only** — it never calls a model and never reads image bytes. The `*.meta.yaml` format, the caption pass, and the description vectors are [03.2-image-descriptions.md](./03.2-image-descriptions.md).
+Rows for images the page no longer references are deleted. When a row leaves `vision-captioning` for `manual` / `ignore`, its caption fields (`image_content_hash`, `caption_model`, `hardcoded_caption_prompt_hash`) are cleared. A `manual` row's `description` and `description_hash` come from the `*.meta.yaml`; `ignore` clears both. `embedding` is owned by the embed pass, which re-embeds on its own when `description_hash` differs from `embedded_description_hash` ([03.2-image-descriptions.md](./03.2-image-descriptions.md#description-embedding)). This step is **policy only** — it never calls a model and never reads image bytes. The `*.meta.yaml` format, the caption pass, and the description vectors are [03.2-image-descriptions.md](./03.2-image-descriptions.md).
 
 ## Frontmatter
 
