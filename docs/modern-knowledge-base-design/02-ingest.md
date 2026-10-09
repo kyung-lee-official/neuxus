@@ -4,7 +4,7 @@
 
 - Walk the checkout (see the [corpus layout contract](./01-corpus.md)); parse each `.md` (frontmatter into `title` / `tags`, body normalized); read the sibling `*.meta.yaml`.
 - Compute `content_hash` + `meta_hash`, gate, and upsert `kb_pages`.
-- Record each referenced image's policy — and, for `manual`, its description — in `kb_image_descriptions`; delete rows for images the page no longer references.
+- Record each referenced image's policy in `kb_image_descriptions`; delete rows for images the page no longer references.
 - Delete `kb_pages` rows whose file disappeared.
 
 **Reads** — the checkout files and their `*.meta.yaml`; the stored `kb_pages.content_hash` / `meta_hash`.
