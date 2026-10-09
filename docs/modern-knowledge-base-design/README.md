@@ -41,11 +41,16 @@ flowchart LR
 
 ## Freshness keys
 
-| Unit                 | Skip when                                                                                                                                                                                              |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Ingest (page)        | `kb_pages.content_hash` and `kb_pages.meta_hash` both match                                                                                                                                            |
-| Chunkify (page)      | the page's chunk tree carries `source_page_hash` = `kb_pages.content_hash`                                                                                                                             |
-| Caption pass (image) | for `vision-captioning` rows: the image's current bytes hash, `caption_model`, and `hardcoded_caption_prompt_hash` match the stored row, and a `description` exists                                    |
-| Any vector           | `embedding_model` = the current embedding model `identifier` (`{providerId}::{modelId}`); image-description vectors also require a `description` with `description_hash` = `embedded_description_hash` |
+Each stage derives a key from its inputs and compares it to the stored value; only a mismatch does work.
+
+| Key (computed from)                                                                     | Computed At           | Compared At  | On mismatch                           |
+| --------------------------------------------------------------------------------------- | --------------------- | ------------ | ------------------------------------- |
+| `content_hash` (title + tags + body)                                                    | Ingest                | Ingest       | re-ingest the page                    |
+| `meta_hash` (sibling `*.meta.yaml` bytes)                                               | Ingest                | Ingest       | record each referenced image's policy (and `manual` description) in `kb_image_descriptions`; delete rows for unreferenced images    |
+| `source_page_hash` (the `content_hash` the tree was built from)                         | Chunkify              | Chunkify     | rebuild the parent/child tree         |
+| `image_content_hash` (image bytes) · `caption_model` · `hardcoded_caption_prompt_hash`  | Caption pass          | Caption pass | re-caption (also if no `description`) |
+| `embedding_model` (the vector's model)                                                  | Embed                 | Embed        | re-embed                              |
+| `description_hash` (the current description)                                            | Caption pass / Ingest | Embed        | re-embed the image-description vector |
+| `embedded_description_hash` (the description the vector was built from)                 | Embed                 | Embed        | re-embed the image-description vector |
 
 The embedding, captioning, and synthesis models are application wiring: [`app_model_task_config`](./appendix-a-data-model.md#model-config-tables) task links, with provider connections in `app_model_provider_config`. No `kb_*` settings table holds a model id.
