@@ -4,7 +4,7 @@
 
 - Walk the checkout (see the [corpus layout contract](./01-corpus.md)); parse each `.md` (frontmatter into `title` / `tags`, body normalized); read the sibling `*.meta.yaml`.
 - Compute `content_hash` + `meta_hash`, gate, and upsert `kb_pages`.
-- Record each referenced image's policy in `kb_image_descriptions`; delete rows for images the page no longer references.
+- Validate the body's image references against the sibling `*.meta.yaml` (fail-fast on any discrepancy), then record each image's policy in `kb_image_descriptions`; delete rows for images the page no longer references.
 - Delete `kb_pages` rows whose file disappeared.
 
 **Reads** — the checkout files and their `*.meta.yaml`; the stored `kb_pages.content_hash` / `meta_hash`.
@@ -53,13 +53,14 @@ flowchart TD
 
 ## Image policy reconciliation
 
-Reconciliation records each referenced image's policy in `kb_image_descriptions` so the stored rows match the body plus `*.meta.yaml`; ingest does this while it processes each changed page:
+Ingest validates each page against its sibling `*.meta.yaml` and records the policy for every image the body references in `kb_image_descriptions`:
 
+- **Validation:** the body's image references and the `*.meta.yaml` keys are the **same set** of canonical `image_path`s. A missing entry (a body image not listed) or an extra entry (listed but not referenced) is a discrepancy: ingest **fails fast and throws** — it neither defaults nor repairs.
 - **Identity:** `(knowledge_base_id, page_id, image_path)`.
-- **Policy:** from the sibling `*.meta.yaml` — `ignore`, `manual`, or `vision-captioning`; images not listed default to `vision-captioning`.
+- **Policy:** from the sibling `*.meta.yaml` — `ignore`, `manual`, or `vision-captioning`.
 - **`manual` description:** taken from the `*.meta.yaml` when the policy is `manual`.
 
-Rows for images the page no longer references are deleted. When a row leaves `vision-captioning` for `manual` / `ignore`, its caption fields (`image_content_hash`, `caption_model`, `hardcoded_caption_prompt_hash`) are cleared. A `manual` row's `description` and `description_hash` come from the `*.meta.yaml`; `ignore` clears both. `embedding` is owned by the embed pass, which re-embeds on its own when `description_hash` differs from `embed_input_hash` ([03.2-image-descriptions.md](./03.2-image-descriptions.md#description-embedding)). This step is **policy only** — it never calls a model and never reads image bytes. The `*.meta.yaml` format, the caption pass, and the description vectors are [03.2-image-descriptions.md](./03.2-image-descriptions.md).
+Rows for images the page no longer references are deleted. When a row leaves `vision-captioning` for `manual` / `ignore`, its caption fields (`image_content_hash`, `caption_model`, `hardcoded_caption_prompt_hash`) are cleared. A `manual` row's `description` and `description_hash` come from the `*.meta.yaml`; `ignore` clears both. `embedding` is owned by the embed pass, which re-embeds on its own when `description_hash` differs from `embed_input_hash` ([03.2-image-descriptions.md](./03.2-image-descriptions.md#description-embedding)). This step is **policy only** — it never calls a model and never reads image bytes. The `*.meta.yaml` format and rules are [03.2-image-descriptions.md](./03.2-image-descriptions.md).
 
 ## Frontmatter
 
@@ -94,11 +95,11 @@ Skip the page only when **both** match the stored values. The content encoding i
 sha256(JSON.stringify({ title, tags: [...tags].sort(), body }));
 ```
 
-| Situation                | Action                                                                                                |
-| ------------------------ | ----------------------------------------------------------------------------------------------------- |
-| Both match               | Skip the page                                                                                         |
-| Either differs           | Upsert `kb_pages` by `(knowledge_base_id, id)`, then reconcile the page's image rows                  |
-| `content_hash` differs   | The page's chunk tree is stale — chunkify rebuilds it ([chunk freshness](./README.md#freshness-keys)) |
-| `meta_hash` differs only | Body and chunk tree stay; only the image rows are reconciled                                          |
+| Situation                | Action                                                                                                                                                                                                       |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Both match               | Skip the page                                                                                                                                                                                                |
+| Either differs           | Upsert `kb_pages` by `(knowledge_base_id, id)`, then reconcile the page's image rows                                                                                                                         |
+| `content_hash` differs   | The chunk tree's `source_page_hash` no longer equals `content_hash`, so the tree is stale; chunkify's gate compares those two and decides whether to rebuild ([chunk freshness](./README.md#freshness-keys)) |
+| `meta_hash` differs only | Body and chunk tree stay; only the image rows are reconciled                                                                                                                                                 |
 
 Image bytes are not part of this gate: a changed image does not touch `kb_pages` or the image policy. The caption pass detects it by comparing the current bytes to the row's `image_content_hash` ([03.2-image-descriptions.md](./03.2-image-descriptions.md#caption-pass)).
