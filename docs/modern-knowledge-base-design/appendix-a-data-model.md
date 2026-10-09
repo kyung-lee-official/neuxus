@@ -45,7 +45,6 @@ CREATE TABLE kb_pages (
   title             TEXT NOT NULL,
   tags              TEXT[] NOT NULL DEFAULT '{}',
   body              TEXT NOT NULL,  -- markdown; ingest-normalized
-  source_path       TEXT,           -- read-only KBs only; null otherwise
   content_hash      TEXT NOT NULL,
   meta_hash         TEXT,           -- sha256 of the sibling *.meta.yaml bytes; null when absent
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -87,14 +86,16 @@ CREATE TABLE kb_image_descriptions (
   knowledge_base_id             TEXT NOT NULL,
   page_id                       TEXT NOT NULL,
   image_path                    TEXT NOT NULL,
-  image_content_hash     TEXT,           -- sha256 of the image bytes the caption was built from; caption pass; null before captioning and for ignore / manual
+  image_content_hash            TEXT,           -- sha256 of the image bytes the caption was built from; caption pass; null before captioning and for ignore / manual
   policy                        TEXT NOT NULL,  -- ignore | manual | vision-captioning
   description                   TEXT,           -- null for ignore / before caption
+  description_hash              TEXT,           -- sha256 of description; written with the description
   caption_model                 TEXT,           -- null for manual
   hardcoded_caption_prompt_hash TEXT,           -- sha256 of the hardcoded caption prompt
   embedding                     vector(768),    -- adjust N to the shared embedding model
   embedding_model               TEXT,
   embedded_at                   TIMESTAMPTZ,
+  embed_input_hash              TEXT,           -- sha256 of the description this embedding was computed from; embed pass
   PRIMARY KEY (knowledge_base_id, page_id, image_path),
   FOREIGN KEY (knowledge_base_id, page_id)
     REFERENCES kb_pages (knowledge_base_id, id) ON DELETE CASCADE
@@ -114,16 +115,15 @@ CREATE TABLE kb_image_descriptions (
 
 Per knowledge base: git remote **and** which commit line to follow ([01-corpus.md](./01-corpus.md#settings-in-the-database)). Not env. Nullable columns; **defaults live in application code**, not SQL `DEFAULT`. Missing row means **no remote** (`repo_url` null): do not clone; layout rules still apply to an explicit local checkout.
 
-`repo_url` / `branch` / `docs_root` are how we fetch and where we walk. `last_synced_sha` is last successful sync (not vector identity). Changing the remote does not stale embeddings by itself; ingesting a different commit does. Do not log future credential columns.
+`repo_url` / `branch` are how we fetch. `last_synced_sha` is last successful sync (not vector identity). Changing the remote does not stale embeddings by itself; reading a different commit does. Do not log future credential columns.
 
-App defaults (when null / no row): `repo_url` = none, `branch` = `main`, `docs_root` = `docs`, `last_synced_sha` = none.
+App defaults (when null / no row): `repo_url` = none, `branch` = `main`, `last_synced_sha` = none.
 
 ```sql
 CREATE TABLE kb_corpus_settings (
   knowledge_base_id TEXT PRIMARY KEY REFERENCES kb_knowledge_bases (id) ON DELETE CASCADE,
   repo_url          TEXT,
   branch            TEXT,
-  docs_root         TEXT,
   last_synced_sha   TEXT
 );
 ```

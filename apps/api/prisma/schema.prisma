@@ -209,7 +209,7 @@ model KnowledgeImageDescription {
     embeddingModel             String?                @map("embedding_model")
     embeddedAt                 DateTime?              @map("embedded_at") @db.Timestamptz(6)
     /// sha256 of the `description` this `embedding` was computed from; embed pass.
-    embeddedDescriptionHash    String?                @map("embedded_description_hash")
+    embedInputHash             String?                @map("embed_input_hash")
 
     page KnowledgePage @relation(fields: [knowledgeBaseId, pageId], references: [knowledgeBaseId, id], onDelete: Cascade)
 

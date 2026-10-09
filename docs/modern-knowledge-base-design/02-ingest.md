@@ -13,7 +13,7 @@
 
 **Freshness** — skip the page when `content_hash` and `meta_hash` both match.
 
-**Never touches** — the chunk tree (`chunkify`); `embedding` / `embedding_model` / `embedded_at` / `embedded_description_hash` (`embed`). Calls no model and reads no image bytes.
+**Never touches** — the chunk tree (`chunkify`); `embedding` / `embedding_model` / `embedded_at` / `embed_input_hash` (`embed`). Calls no model and reads no image bytes.
 
 ## Files
 
@@ -59,7 +59,7 @@ Reconciliation records each referenced image's policy in `kb_image_descriptions`
 - **Policy:** from the sibling `*.meta.yaml` — `ignore`, `manual`, or `vision-captioning`; images not listed default to `vision-captioning`.
 - **`manual` description:** taken from the `*.meta.yaml` when the policy is `manual`.
 
-Rows for images the page no longer references are deleted. When a row leaves `vision-captioning` for `manual` / `ignore`, its caption fields (`image_content_hash`, `caption_model`, `hardcoded_caption_prompt_hash`) are cleared. A `manual` row's `description` and `description_hash` come from the `*.meta.yaml`; `ignore` clears both. `embedding` is owned by the embed pass, which re-embeds on its own when `description_hash` differs from `embedded_description_hash` ([03.2-image-descriptions.md](./03.2-image-descriptions.md#description-embedding)). This step is **policy only** — it never calls a model and never reads image bytes. The `*.meta.yaml` format, the caption pass, and the description vectors are [03.2-image-descriptions.md](./03.2-image-descriptions.md).
+Rows for images the page no longer references are deleted. When a row leaves `vision-captioning` for `manual` / `ignore`, its caption fields (`image_content_hash`, `caption_model`, `hardcoded_caption_prompt_hash`) are cleared. A `manual` row's `description` and `description_hash` come from the `*.meta.yaml`; `ignore` clears both. `embedding` is owned by the embed pass, which re-embeds on its own when `description_hash` differs from `embed_input_hash` ([03.2-image-descriptions.md](./03.2-image-descriptions.md#description-embedding)). This step is **policy only** — it never calls a model and never reads image bytes. The `*.meta.yaml` format, the caption pass, and the description vectors are [03.2-image-descriptions.md](./03.2-image-descriptions.md).
 
 ## Frontmatter
 
