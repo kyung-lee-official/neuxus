@@ -1,36 +1,22 @@
-# Corpus layout
+# Corpus source
 
 **Does**
 
 - Keep a local checkout of the chosen branch (clone / pull / fetch) from the per-knowledge-base git remote, recording the commit held (`last_synced_sha`)
 - Define the corpus source layout: file include/exclude and the `id` identity (a file's repo-root-relative path minus `.md`, e.g. `guide/install.md` gives `id` `guide/install`)
 
-Folder depth is an **authoring** choice: how authors organize the repo. It is not the chunk parent/child tree ([03.1-chunkify.md](./03.1-chunkify.md)).
+## Source
 
-## Source of truth
+The markdown corpus lives in its **own git repository**, separate from the app; authors write and review it there and the app only reads it — you change markdown in git, not the app. A corpus backs a **read-only** knowledge base ([appendix A](./appendix-a-data-model.md)); a local directory that matches this layout is also valid.
 
-The markdown corpus lives in its **own git repository**, separate from the app. Authors write and review it there. The app only reads the chosen branch; it never edits the corpus — you change markdown in git, not the app. A corpus backs a **read-only** knowledge base ([appendix A](./appendix-a-data-model.md)).
-
-A local directory that matches this layout is valid.
-
-## Settings in the database
-
-Where a knowledge base reads its corpus from — the git repository URL and the branch — is stored in Postgres (`kb_corpus_settings`), not in environment variables. The row also records the last commit read. `DATABASE_URL` stays an environment variable so the app can reach the database.
-
-One row per knowledge base, keyed by `knowledge_base_id`; **nullable columns**, **app defaults in code** when missing.
-
-`repo_url` has **no** useful app default. Null / missing means no repository is configured.
-
-Changing `repo_url` / `branch` selects a different source; the layout rules below are unchanged.
-
-## Checkout
+Where a knowledge base reads from — the git remote and branch — is stored per knowledge base in `kb_corpus_settings`, not environment variables (nullable columns, app defaults in code; a null `repo_url` means no repository). `DATABASE_URL` stays an environment variable so the app can reach the database.
 
 The corpus is materialized into a local checkout before anything reads it:
 
 - **clone** — when the checkout is missing, from `repo_url` + `branch`.
 - **pull** — when it exists, fetch and fast-forward to the branch tip.
 
-`last_synced_sha` records the commit the checkout holds after a successful sync. No `repo_url` means no clone.
+`last_synced_sha` records the commit the checkout holds after a successful sync. Changing `repo_url` / `branch` selects a different source; the layout rules below are unchanged.
 
 ## Repo layout
 
@@ -78,10 +64,4 @@ Two files must not map to the same path (case-sensitive as git stores them). Pre
 
 ## Identity
 
-A page's identity is its `id`.
-
-| Field | How it is set                                                                                        |
-| ----- | ---------------------------------------------------------------------------------------------------- |
-| `id`  | The file's repo-root-relative POSIX path without the `.md` suffix (`<parent>/<page>`); unique per KB |
-
-A rename or move changes the `id`, so it is a new identity, not an edit of the old one.
+A page's identity is its `id`: the file's repo-root-relative POSIX path without the `.md` suffix (e.g. `guide/install.md` gives `id` `guide/install`), unique within the knowledge base. A rename or move changes the `id` — a new identity, not an edit of the old one.
