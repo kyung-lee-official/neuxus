@@ -1,12 +1,8 @@
 # Ingest (files to pages)
 
-Ingest walks the checkout, reads each included `*.md`, and turns it into a `kb_pages` row. Where the files live and how a path becomes a page's `id` is the [corpus layout contract](./01-corpus.md).
-
-`title` / `tags` come from frontmatter. **`body`** is the remaining markdown. `body` keeps only the image syntax (`![alt](path)`); the caption is stored in `kb_image_descriptions`, not in the body ([03.2-image-descriptions.md](./03.2-image-descriptions.md)).
-
 **Does**
 
-- Discover files; parse each `.md` (frontmatter into `title` / `tags`, body normalized); read the sibling `*.meta.yaml`.
+- Walk the checkout (see the [corpus layout contract](./01-corpus.md)); parse each `.md` (frontmatter into `title` / `tags`, body normalized); read the sibling `*.meta.yaml`.
 - Compute `content_hash` + `meta_hash`, gate, and upsert `kb_pages`.
 - Record each referenced image's policy — and, for `manual`, its description — in `kb_image_descriptions`; delete rows for images the page no longer references.
 - Delete `kb_pages` rows whose file disappeared.
@@ -21,7 +17,7 @@ Ingest walks the checkout, reads each included `*.md`, and turns it into a `kb_p
 
 ## Files
 
-Ingest owns discovery: it runs the walker over the checkout and gets the included `*.md` files, one per page. The walk rules are the [corpus layout contract](./01-corpus.md).
+Ingest walks the checkout and gets the included `*.md` files, one per page. The walk rules are the [corpus layout contract](./01-corpus.md).
 
 After processing the files, ingest deletes any `kb_pages` row **of that knowledge base** whose `id` is not among the files the walker returned (the file was deleted upstream):
 
