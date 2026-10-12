@@ -20,7 +20,7 @@ Knowledge base ──* Page ──* Image description (embedding)
 - Every content table carries `knowledge_base_id`; primary and foreign keys are scoped to it (`(knowledge_base_id, id)`), and every DAL query filters by a single `knowledge_base_id`. `kb_children` also denormalizes `page_id` for its scans. The service layer decides which knowledge bases to read and merges a set ([04-retrieval.md](./04-retrieval.md#multiple-knowledge-bases)).
 - A **read-only** knowledge base (`kb_knowledge_bases.writable = false`) is written only by the **ingest** stage.
 - A **writable** knowledge base (`kb_knowledge_bases.writable = true`) is updated directly, never by the ingest stage, and is **text-only** (no `kb_image_descriptions`).
-- On page change: delete that page's parents/children, insert the new tree ([incremental updates](./02-ingest.md#incremental-updates-hash-gate)).
+- On page change: delete that page's parents/children, insert the new tree ([incremental updates](./02-ingest.md#incremental-updates)).
 - Each parent records `source_page_hash`, the `kb_pages.content_hash` the tree was built from; chunkify rebuilds a page's tree when it differs from the current `content_hash` ([chunk freshness](./README.md#freshness-keys)).
 
 Keep `kb_*` namespaced apart from application tables (same database is fine).
@@ -92,6 +92,7 @@ CREATE TABLE kb_image_descriptions (
   description_hash              TEXT,           -- sha256 of description; written with the description
   caption_model                 TEXT,           -- null for manual
   hardcoded_caption_prompt_hash TEXT,           -- sha256 of the hardcoded caption prompt
+  captioned_description_hash    TEXT,           -- the description_hash the caption pass wrote
   embedding                     vector(768),    -- adjust N to the shared embedding model
   embedding_model               TEXT,
   embedded_at                   TIMESTAMPTZ,
@@ -113,7 +114,7 @@ CREATE TABLE kb_image_descriptions (
 
 ## Corpus settings table
 
-Per knowledge base: git remote **and** which commit line to follow ([01-corpus.md](./01-corpus.md#settings-in-the-database)). Not env. Nullable columns; **defaults live in application code**, not SQL `DEFAULT`. Missing row means **no remote** (`repo_url` null): do not clone; layout rules still apply to an explicit local checkout.
+Per knowledge base: git remote **and** which commit line to follow ([01-corpus.md](./01-corpus.md#source)). Not env. Nullable columns; **defaults live in application code**, not SQL `DEFAULT`. Missing row means **no remote** (`repo_url` null): do not clone; layout rules still apply to an explicit local checkout.
 
 `repo_url` / `branch` are how we fetch. `last_synced_sha` is last successful sync (not vector identity). Changing the remote does not stale embeddings by itself; reading a different commit does. Do not log future credential columns.
 
