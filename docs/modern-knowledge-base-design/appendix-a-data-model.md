@@ -96,7 +96,7 @@ CREATE TABLE kb_image_descriptions (
   embedding                     vector(768),    -- adjust N to the shared embedding model
   embedding_model               TEXT,
   embedded_at                   TIMESTAMPTZ,
-  embed_input_hash              TEXT,           -- sha256 of the description this embedding was computed from; embed pass
+  embed_input_hash              TEXT,           -- sha256 of the description this embedding was computed from; caption pass
   PRIMARY KEY (knowledge_base_id, page_id, image_path),
   FOREIGN KEY (knowledge_base_id, page_id)
     REFERENCES kb_pages (knowledge_base_id, id) ON DELETE CASCADE
