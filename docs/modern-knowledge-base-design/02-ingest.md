@@ -30,7 +30,7 @@ Ingest processes one **read-only** knowledge base per run (`kb_knowledge_bases.w
 
 ## Flow
 
-One `.md` file per iteration. The freshness keys are the **page**: `content_hash` + `meta_hash`; there is no per-section hash. Ingest calls no provider and does not chunk or embed.
+One `.md` file per iteration. The freshness keys are **per page** (`content_hash` + `meta_hash`); there is no per-section hash. Ingest calls no provider and does not chunk or embed.
 
 ```mermaid
 ---
