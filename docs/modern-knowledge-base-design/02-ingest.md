@@ -44,8 +44,10 @@ flowchart TD
   Hash --> Lookup["read stored hashes from kb_pages"]
   Lookup --> Match{both match?}
   Match -- yes --> Skip([skip page])
-  Match -- no --> Upsert["UPSERT kb_pages<br/>(by knowledge_base_id, id)"]
+  Match -- no --> Changed{content_hash differs?}
+  Changed -- yes --> Upsert["UPSERT kb_pages<br/>(by knowledge_base_id, id)"]
   Upsert --> Validate{"body images match<br/>*.meta.yaml keys?"}
+  Changed -- no --> Validate
   Validate -- no --> Fail([fail fast: throw])
   Validate -- yes --> Reconcile["UPSERT / DELETE image rows<br/>(policy, manual description)"]
   Reconcile --> Next[Next file]
@@ -97,11 +99,11 @@ Skip the page only when **both** match the stored values. The content encoding i
 sha256(JSON.stringify({ title, tags: [...tags].sort(), body }));
 ```
 
-| Situation                | Action                                                                                                                                                                                                  |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Both match               | Skip the page                                                                                                                                                                                           |
-| Either differs           | Upsert `kb_pages` by `(knowledge_base_id, id)`, then reconcile the page's image rows                                                                                                                    |
-| `content_hash` differs   | The chunk tree's `source_page_hash` no longer equals `content_hash`, so the tree is stale; chunkify's gate compares those two and decides whether to rebuild ([chunk freshness](./README.md#staleness)) |
-| `meta_hash` differs only | Body and chunk tree stay; only the image rows are reconciled                                                                                                                                            |
+| Situation                | Action                                                                                                                                                                                                                                                  |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Both match               | Skip the page                                                                                                                                                                                                                                           |
+| Either differs           | Validate the body's images against `*.meta.yaml` (fail fast if they are not the same set), write each image's `policy` and `manual` description, delete rows for images the body no longer references                                                                                                                         |
+| `content_hash` differs   | Upsert `kb_pages` by `(knowledge_base_id, id)`; the chunk tree's `source_page_hash` no longer equals `content_hash`, so the tree is stale; chunkify's gate compares those two and decides whether to rebuild ([chunk freshness](./README.md#staleness)) |
+| `meta_hash` differs only | Body and chunk tree stay; only the page's image rows change                                                                                                                                            |
 
 Image bytes are not part of this gate: a changed image does not touch `kb_pages` or the image policy. The caption pass detects it by comparing the current bytes to the row's `image_content_hash` ([03.2-image-descriptions.md](./03.2-image-descriptions.md#caption-pass)).
