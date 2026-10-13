@@ -2,18 +2,18 @@
 
 **Does**
 
-- Walk the checkout (see the [corpus layout contract](./01-corpus.md)); parse each `.md` (frontmatter into `title` / `tags`, body normalized); read the sibling `*.meta.yaml`.
+- Walk the checkout (see the [corpus layout contract](./01-corpus.md)); parse each `.md` (frontmatter into `title` / `tags`, body normalized); read the sibling `*.meta.yaml` (required when the body references images).
 - Compute `content_hash` + `meta_hash`, gate, and upsert `kb_pages`.
 - Validate the body's image references against the sibling `*.meta.yaml` (fail-fast on any discrepancy), then record each image's policy in `kb_image_descriptions`; delete rows for images the page no longer references.
 - Delete `kb_pages` rows whose file disappeared.
 
-**Reads** — the checkout files and their `*.meta.yaml`; the stored `kb_pages.content_hash` / `meta_hash`.
+**Reads** — the checkout files and their `*.meta.yaml`; the stored `kb_pages.content_hash` / `meta_hash`; the stored `kb_image_descriptions` rows for the page.
 
-**Owns** — `kb_pages` (`title`, `tags`, `body`, `content_hash`, `meta_hash`, `updated_at`); `kb_image_descriptions.policy`, `.description` (manual), `.description_hash` (manual). A policy change away from `vision-captioning` also clears that row's caption inputs (`image_content_hash`, `caption_model`, `hardcoded_caption_prompt_hash`).
+**Owns** — `kb_pages` (`title`, `tags`, `body`, `content_hash`, `meta_hash`, `updated_at`); `kb_image_descriptions.policy`, `.description` (manual), `.description_hash` (manual).
 
 **Freshness** — skip the page when `content_hash` and `meta_hash` both match.
 
-**Never touches** — the chunk tree (`chunkify`); `embedding` / `embedding_model` / `embedded_at` / `embed_input_hash` (`embed`). Calls no model and reads no image bytes.
+**Never touches** — the chunk tree (`chunkify`); the caption pass's fields (`image_content_hash`, `caption_model`, `hardcoded_caption_prompt_hash`, `captioned_description_hash`); the caption pass's embedding fields (`embedding`, `embedding_model`, `embedded_at`, `embed_input_hash`). Calls no model and reads no image bytes.
 
 ## Files
 
@@ -30,7 +30,7 @@ Ingest processes one **read-only** knowledge base per run (`kb_knowledge_bases.w
 
 ## Flow
 
-One `.md` file per iteration. The skip gate is the **page**: `content_hash` + `meta_hash`; there is no per-section hash. Ingest calls no provider and does not chunk or embed.
+One `.md` file per iteration. The freshness key is the **page**: `content_hash` + `meta_hash`; there is no per-section hash. Ingest calls no provider and does not chunk or embed.
 
 ```mermaid
 ---
@@ -45,7 +45,9 @@ flowchart TD
   Lookup --> Match{both match?}
   Match -- yes --> Skip([skip page])
   Match -- no --> Upsert["UPSERT kb_pages<br/>(by knowledge_base_id, id)"]
-  Upsert --> Reconcile["UPSERT / DELETE image rows<br/>(policy, manual description)"]
+  Upsert --> Validate{"body images match<br/>*.meta.yaml keys?"}
+  Validate -- no --> Fail([fail fast: throw])
+  Validate -- yes --> Reconcile["UPSERT / DELETE image rows<br/>(policy, manual description)"]
   Reconcile --> Next[Next file]
   Skip --> Next
   Next --> Walker
@@ -60,7 +62,7 @@ Ingest validates each page against its sibling `*.meta.yaml` and records the pol
 - **Policy:** from the sibling `*.meta.yaml` — `ignore`, `manual`, or `vision-captioning`.
 - **`manual` description:** taken from the `*.meta.yaml` when the policy is `manual`.
 
-Rows for images the page no longer references are deleted. When a row leaves `vision-captioning` for `manual` / `ignore`, its caption fields (`image_content_hash`, `caption_model`, `hardcoded_caption_prompt_hash`) are cleared. A `manual` row's `description` and `description_hash` come from the `*.meta.yaml`; `ignore` clears both. `embedding` is owned by the embed pass, which re-embeds on its own when `description_hash` differs from `embed_input_hash` ([03.2-image-descriptions.md](./03.2-image-descriptions.md#description-embedding)). This step is **policy only** — it never calls a model and never reads image bytes. The `*.meta.yaml` format and rules are [03.2-image-descriptions.md](./03.2-image-descriptions.md).
+Rows for images the page no longer references are deleted. A `manual` row's `description` and `description_hash` come from the `*.meta.yaml`; `ignore` clears both. The caption fields (`image_content_hash`, `caption_model`, `hardcoded_caption_prompt_hash`) and `captioned_description_hash` belong to the caption pass; when a row returns to `vision-captioning`, the caption pass re-captions on its own because `description_hash` no longer equals `captioned_description_hash` ([03.2-image-descriptions.md](./03.2-image-descriptions.md#caption-pass)). `embedding` is written by the caption pass (via the shared embed utility) when `description_hash` differs from `embed_input_hash` ([03.2-image-descriptions.md](./03.2-image-descriptions.md#description-embedding)). This step is **policy only** — it never calls a model and never reads image bytes. The `*.meta.yaml` format and rules are [03.2-image-descriptions.md](./03.2-image-descriptions.md).
 
 ## Frontmatter
 
@@ -80,7 +82,7 @@ The same map is **idempotent**; `chunkify` may re-apply it.
 
 Hashes and parent/child slices use this string — not original file bytes.
 
-## Incremental updates (hash gate)
+## Incremental updates
 
 Two hashes decide whether ingest reprocesses a page:
 
