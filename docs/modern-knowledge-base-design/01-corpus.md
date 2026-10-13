@@ -2,8 +2,10 @@
 
 **Does**
 
-- Keep a local checkout of the chosen branch (clone / pull / fetch) from the per-knowledge-base git remote, recording the commit held (`last_synced_sha`)
+- Keep a local checkout of the chosen branch (clone / pull) from the per-knowledge-base git remote, recording the commit held (`last_synced_sha`)
 - Define the corpus source layout: file include/exclude and the `id` identity (a file's repo-root-relative path minus `.md`, e.g. `guide/install.md` gives `id` `guide/install`)
+
+**Never touches** — the page, image, chunk, and vector tables (`kb_pages`, `kb_image_descriptions`, `kb_parents`, `kb_children`); it writes only the checkout and `kb_corpus_settings.last_synced_sha`.
 
 ## Source
 
@@ -23,10 +25,11 @@ The corpus is materialized into a local checkout before anything reads it:
 The whole checkout is the corpus; every included `*.md` becomes a page:
 
 ```text
-kb.git/
+corpus/
   README.md                   # included (id `README`)
   <parent>/
     <page>.md                 # included (id `<parent>/<page>`)
+    <page>.meta.yaml          # sidecar read with the page (not a page)
     <subdir>/
       <page>.md               # included (id `<parent>/<subdir>/<page>`)
   CHANGELOG.md                # included
@@ -49,6 +52,8 @@ Walk **recursively** from the checkout root.
 | Nested directories, any depth          | Non-`.md` files (not pages)                    |
 
 `README.md` at the root **is** included (`id` `README`). Empty files are included too.
+
+A page may have a sibling sidecar `<page>.meta.yaml` in the same directory. The walker reads it alongside the page, but it is **not** a page (no `id`); its format is the image contract ([03.2-image-descriptions.md](./03.2-image-descriptions.md)).
 
 ## Hierarchy
 
