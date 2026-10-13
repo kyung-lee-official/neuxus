@@ -54,6 +54,6 @@ flowchart LR
 
 A changed embedding model does not trigger a run by itself; the owning stage re-embeds on its next run.
 
-The embedding, captioning, and synthesis models are application wiring: [`app_model_task_config`](./appendix-a-data-model.md#model-config-tables) task links, with provider connections in `app_model_provider_config`. No `kb_*` settings table holds a model id.
+Model choice is application wiring: [`app_model_task_config`](./appendix-a-data-model.md#model-config-tables) links each app task (embedding, captioning, synthesis) to a model, with provider connections in `app_model_provider_config`. No `kb_*` settings table holds a model id.
 
 Independently of the gate, ingest also **validates** on every reprocessed page that the body's image references and the `*.meta.yaml` keys are the same set; a discrepancy fails fast ([02-ingest.md](./02-ingest.md#image-policy-reconciliation)).
