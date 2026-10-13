@@ -11,7 +11,7 @@
 
 **Owns** — `kb_pages` (`title`, `tags`, `body`, `content_hash`, `meta_hash`, `updated_at`); `kb_image_descriptions.policy`, `.description` (manual), `.description_hash` (manual).
 
-**Freshness** — skip the page when `content_hash` and `meta_hash` both match.
+**Staleness** — skip the page when `content_hash` and `meta_hash` both match.
 
 **Never touches** — the chunk tree (`chunkify`); the caption pass's fields (`image_content_hash`, `caption_model`, `hardcoded_caption_prompt_hash`, `captioned_description_hash`); the caption pass's embedding fields (`embedding`, `embedding_model`, `embedded_at`, `embed_input_hash`). Calls no model and reads no image bytes.
 
@@ -30,7 +30,7 @@ Ingest processes one **read-only** knowledge base per run (`kb_knowledge_bases.w
 
 ## Flow
 
-One `.md` file per iteration. The freshness key is the **page**: `content_hash` + `meta_hash`; there is no per-section hash. Ingest calls no provider and does not chunk or embed.
+One `.md` file per iteration. The freshness keys are the **page**: `content_hash` + `meta_hash`; there is no per-section hash. Ingest calls no provider and does not chunk or embed.
 
 ```mermaid
 ---
@@ -49,13 +49,13 @@ flowchart TD
   Upsert --> Validate{"body images match<br/>*.meta.yaml keys?"}
   Changed -- no --> Validate
   Validate -- no --> Fail([fail fast: throw])
-  Validate -- yes --> Reconcile["UPSERT / DELETE image rows<br/>(policy, manual description)"]
-  Reconcile --> Next[Next file]
+  Validate -- yes --> WriteRows["write image rows<br/>(policy, manual description, delete unreferenced)"]
+  WriteRows --> Next[Next file]
   Skip --> Next
   Next --> Walker
 ```
 
-## Image policy reconciliation
+## Image rows
 
 Ingest validates each page against its sibling `*.meta.yaml` and records the policy for every image the body references in `kb_image_descriptions`:
 
@@ -102,8 +102,8 @@ sha256(JSON.stringify({ title, tags: [...tags].sort(), body }));
 | Situation                | Action                                                                                                                                                                                                                                                  |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Both match               | Skip the page                                                                                                                                                                                                                                           |
-| Either differs           | Validate the body's images against `*.meta.yaml` (fail fast if they are not the same set), write each image's `policy` and `manual` description, delete rows for images the body no longer references                                                                                                                         |
-| `content_hash` differs   | Upsert `kb_pages` by `(knowledge_base_id, id)`; the chunk tree's `source_page_hash` no longer equals `content_hash`, so the tree is stale; chunkify's gate compares those two and decides whether to rebuild ([chunk freshness](./README.md#staleness)) |
-| `meta_hash` differs only | Body and chunk tree stay; only the page's image rows change                                                                                                                                            |
+| Either differs           | Validate the body's images against `*.meta.yaml` (fail fast if they are not the same set), write each image's `policy` and `manual` description, delete rows for images the body no longer references                                                   |
+| `content_hash` differs   | Upsert `kb_pages` by `(knowledge_base_id, id)`; the chunk tree's `source_page_hash` no longer equals `content_hash`, so the tree is stale; chunkify's gate compares those two and decides whether to rebuild ([chunk staleness](./README.md#staleness)) |
+| `meta_hash` differs only | Body and chunk tree stay; only the page's image rows change                                                                                                                                                                                             |
 
 Image bytes are not part of this gate: a changed image does not touch `kb_pages` or the image policy. The caption pass detects it by comparing the current bytes to the row's `image_content_hash` ([03.2-image-descriptions.md](./03.2-image-descriptions.md#caption-pass)).
