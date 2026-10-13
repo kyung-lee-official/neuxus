@@ -97,11 +97,11 @@ Skip the page only when **both** match the stored values. The content encoding i
 sha256(JSON.stringify({ title, tags: [...tags].sort(), body }));
 ```
 
-| Situation                | Action                                                                                                                                                                                                       |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Both match               | Skip the page                                                                                                                                                                                                |
-| Either differs           | Upsert `kb_pages` by `(knowledge_base_id, id)`, then reconcile the page's image rows                                                                                                                         |
-| `content_hash` differs   | The chunk tree's `source_page_hash` no longer equals `content_hash`, so the tree is stale; chunkify's gate compares those two and decides whether to rebuild ([chunk freshness](./README.md#freshness-keys)) |
-| `meta_hash` differs only | Body and chunk tree stay; only the image rows are reconciled                                                                                                                                                 |
+| Situation                | Action                                                                                                                                                                                                  |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Both match               | Skip the page                                                                                                                                                                                           |
+| Either differs           | Upsert `kb_pages` by `(knowledge_base_id, id)`, then reconcile the page's image rows                                                                                                                    |
+| `content_hash` differs   | The chunk tree's `source_page_hash` no longer equals `content_hash`, so the tree is stale; chunkify's gate compares those two and decides whether to rebuild ([chunk freshness](./README.md#staleness)) |
+| `meta_hash` differs only | Body and chunk tree stay; only the image rows are reconciled                                                                                                                                            |
 
 Image bytes are not part of this gate: a changed image does not touch `kb_pages` or the image policy. The caption pass detects it by comparing the current bytes to the row's `image_content_hash` ([03.2-image-descriptions.md](./03.2-image-descriptions.md#caption-pass)).
