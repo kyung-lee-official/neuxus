@@ -8,7 +8,7 @@
 
 Vectors are produced and consumed through a shared embed utility, not a flow step. Embedding is not a stage: a stage that produces embeddable content calls the utility as part of its own write.
 
-The stages are independent: each can run on its own, and its freshness keys decide whether it does any work. Wiring them together (an application-level job, a "sync") is optional and application layer.
+The stages are independent: each can run on its own, and its staleness gate decides whether it does any work. Wiring them together (an application-level job, a "sync") is optional and application layer.
 
 Content lives in **knowledge bases**: each is either **read-only** (pages ingested from a corpus and written only by the ingest stage) or **writable** (pages updated directly, not by ingest). Every write targets one knowledge base; a search query targets a set of one or more, specified by the request. The backend persists no grouping.
 
@@ -32,7 +32,7 @@ flowchart LR
 | Doc                                                        | Contract                                                                                                                                                                                 |
 | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [01-corpus.md](./01-corpus.md)                             | Corpus source: what content is in scope for ingest                                                                                                                                       |
-| [02-ingest.md](./02-ingest.md)                             | Walk the checkout; markdown file becomes a `kb_pages` row (frontmatter, freshness keys); validate images against `*.meta.yaml` and record each image's policy in `kb_image_descriptions` |
+| [02-ingest.md](./02-ingest.md)                             | Walk the checkout; markdown file becomes a `kb_pages` row (frontmatter, staleness gate); validate images against `*.meta.yaml` and record each image's policy in `kb_image_descriptions` |
 | [03.1-chunkify.md](./03.1-chunkify.md)                     | Derive parents / children from `kb_pages.body`                                                                                                                                           |
 | [03.2-image-descriptions.md](./03.2-image-descriptions.md) | Image captions + description vectors (policy from `*.meta.yaml`)                                                                                                                         |
 | [04-retrieval.md](./04-retrieval.md)                       | Question in, ranked parents out (+ ranked image descriptions)                                                                                                                            |
