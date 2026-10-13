@@ -21,7 +21,7 @@ Knowledge base ──* Page ──* Image description (embedding)
 - A **read-only** knowledge base (`kb_knowledge_bases.writable = false`) is written only by the **ingest** stage.
 - A **writable** knowledge base (`kb_knowledge_bases.writable = true`) is updated directly, never by the ingest stage, and is **text-only** (no `kb_image_descriptions`).
 - On page change: delete that page's parents/children, insert the new tree ([incremental updates](./02-ingest.md#incremental-updates)).
-- Each parent records `source_page_hash`, the `kb_pages.content_hash` the tree was built from; chunkify rebuilds a page's tree when it differs from the current `content_hash` ([chunk freshness](./README.md#freshness-keys)).
+- Each parent records `source_page_hash`, the `kb_pages.content_hash` the tree was built from; chunkify rebuilds a page's tree when it differs from the current `content_hash` ([chunk staleness](./README.md#staleness)).
 
 Keep `kb_*` namespaced apart from application tables (same database is fine).
 
