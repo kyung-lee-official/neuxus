@@ -5,7 +5,7 @@
 - Keep a local checkout of the chosen branch (clone / pull) from the per-knowledge-base git remote, recording the commit held (`last_synced_sha`)
 - Define the corpus source layout: file include/exclude and the `id` identity (a file's repo-root-relative path minus `.md`, e.g. `guide/install.md` gives `id` `guide/install`)
 
-**Never touches** — the page, image, chunk, and vector tables (`kb_pages`, `kb_image_descriptions`, `kb_parents`, `kb_children`); it writes only the checkout and `kb_corpus_settings.last_synced_sha`.
+**Never touches** — the page, image, parent, and child tables (`kb_pages`, `kb_image_descriptions`, `kb_parents`, `kb_children`); it writes only the checkout and `kb_corpus_settings.last_synced_sha`.
 
 ## Source
 
