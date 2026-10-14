@@ -4,34 +4,22 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { CorpusGitError } from "../errors.ts";
 
 export type CorpusMarkdownFile = {
-  sourcePath: string;
+  path: string;
   id: string;
   absolutePath: string;
 };
-
-const DOCS_ROOT_PATTERN = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/;
-
-export function assertSafeDocsRoot(docsRoot: string): void {
-  if (docsRoot === "") return;
-  const unsafe =
-    !DOCS_ROOT_PATTERN.test(docsRoot) ||
-    docsRoot.split("/").some((s) => s.startsWith("."));
-  if (unsafe) {
-    throw new CorpusGitError(400, "docs root is not a safe relative path");
-  }
-}
 
 /** True when any POSIX path segment starts with `.`. */
 export function pathHasDotSegment(posixRel: string): boolean {
   return posixRel.split("/").some((segment) => segment.startsWith("."));
 }
 
-export function idFromSourcePath(sourcePath: string): string {
-  return sourcePath.replace(/\.md$/i, "");
+export function idFromPath(path: string): string {
+  return path.replace(/\.md$/i, "");
 }
 
-function toPosixRelative(docsAbs: string, fileAbs: string): string {
-  return relative(docsAbs, fileAbs).split(sep).join("/");
+function toPosixRelative(rootAbs: string, fileAbs: string): string {
+  return relative(rootAbs, fileAbs).split(sep).join("/");
 }
 
 function isInsideRoot(rootAbs: string, candidateAbs: string): boolean {
@@ -40,30 +28,29 @@ function isInsideRoot(rootAbs: string, candidateAbs: string): boolean {
 }
 
 /**
- * Recursively list `*.md` under the docs root. Skips dot-segments and
- * symlinks that resolve outside the docs root.
+ * Recursively list `*.md` under the checkout root. Skips dot-segments and
+ * symlinks that resolve outside the checkout.
  * @see docs/modern-knowledge-base-design/01-corpus.md
  */
 export async function listCorpusMarkdownFiles(
   checkoutDir: string,
-  docsRoot: string,
 ): Promise<CorpusMarkdownFile[]> {
-  assertSafeDocsRoot(docsRoot);
-  const docsAbs = resolve(checkoutDir, docsRoot);
-  if (!existsSync(docsAbs)) {
-    throw new CorpusGitError(400, `Docs root not found: ${docsRoot}`);
+  const rootAbs = resolve(checkoutDir);
+  if (!existsSync(rootAbs)) {
+    throw new CorpusGitError(400, `Checkout not found: ${checkoutDir}`);
   }
-  const docsStat = await stat(docsAbs);
-  if (!docsStat.isDirectory()) {
-    throw new CorpusGitError(400, `Docs root is not a directory: ${docsRoot}`);
+  const rootStat = await stat(rootAbs);
+  if (!rootStat.isDirectory()) {
+    throw new CorpusGitError(
+      400,
+      `Checkout is not a directory: ${checkoutDir}`,
+    );
   }
 
-  const docsReal = await realpath(docsAbs);
+  const rootReal = await realpath(rootAbs);
   const files: CorpusMarkdownFile[] = [];
-  await walkDir(docsReal, docsReal, files);
-  files.sort((a, b) =>
-    a.sourcePath < b.sourcePath ? -1 : a.sourcePath > b.sourcePath ? 1 : 0,
-  );
+  await walkDir(rootReal, rootReal, files);
+  files.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
 
   const seen = new Set<string>();
   for (const file of files) {
@@ -76,7 +63,7 @@ export async function listCorpusMarkdownFiles(
 }
 
 async function walkDir(
-  docsReal: string,
+  rootReal: string,
   dirAbs: string,
   out: CorpusMarkdownFile[],
 ): Promise<void> {
@@ -92,34 +79,34 @@ async function walkDir(
       } catch {
         continue;
       }
-      if (!isInsideRoot(docsReal, target)) continue;
+      if (!isInsideRoot(rootReal, target)) continue;
       const targetStat = await stat(target);
       if (targetStat.isDirectory()) {
-        await walkDir(docsReal, target, out);
+        await walkDir(rootReal, target, out);
       } else if (targetStat.isFile() && entry.name.endsWith(".md")) {
-        pushMarkdown(docsReal, target, out);
+        pushMarkdown(rootReal, target, out);
       }
       continue;
     }
     if (info.isDirectory()) {
-      await walkDir(docsReal, abs, out);
+      await walkDir(rootReal, abs, out);
       continue;
     }
     if (info.isFile() && entry.name.endsWith(".md")) {
-      pushMarkdown(docsReal, abs, out);
+      pushMarkdown(rootReal, abs, out);
     }
   }
 }
 
 function pushMarkdown(
-  docsReal: string,
+  rootReal: string,
   fileAbs: string,
   out: CorpusMarkdownFile[],
 ): void {
-  const sourcePath = toPosixRelative(docsReal, fileAbs);
-  if (sourcePath === "" || pathHasDotSegment(sourcePath)) return;
-  if (!sourcePath.endsWith(".md")) return;
-  const id = idFromSourcePath(sourcePath);
+  const path = toPosixRelative(rootReal, fileAbs);
+  if (path === "" || pathHasDotSegment(path)) return;
+  if (!path.endsWith(".md")) return;
+  const id = idFromPath(path);
   if (id === "") return;
-  out.push({ sourcePath, id, absolutePath: fileAbs });
+  out.push({ path, id, absolutePath: fileAbs });
 }
