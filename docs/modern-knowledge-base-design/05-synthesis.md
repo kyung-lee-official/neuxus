@@ -1,5 +1,15 @@
 # Synthesis (prompt to answer)
 
+**Does** — resolve the synthesis model, call the provider's `textChat`, and return the assistant text.
+
+**Reads** — the caller-assembled prompt; the model's context window and max output.
+
+**Owns** — nothing (returns text).
+
+**Staleness** — none.
+
+**Never touches** — writes nothing; the prompt is assembled by the caller.
+
 This doc is the **synthesis contract**: resolve the model, call the provider, return text.
 
 ## Provider
