@@ -4,7 +4,7 @@ import { basename, dirname, join } from "node:path";
 import { Logger } from "../../log/index.ts";
 import { reconcilePageImagePolicies } from "../image-desc/index.ts";
 import {
-  deleteKnowledgePagesMissingSourcePaths,
+  deleteKnowledgePagesMissingIds,
   findPageHashes,
   Page,
 } from "../pages/index.ts";
@@ -42,7 +42,7 @@ async function readMetaFile(
 async function reconcileFileImages(args: {
   knowledgeBaseId: string;
   id: string;
-  sourcePath: string;
+  pagePath: string;
   absolutePath: string;
   body: string;
   metaYaml: string | null;
@@ -50,17 +50,11 @@ async function reconcileFileImages(args: {
   const reconciled = await reconcilePageImagePolicies({
     knowledgeBaseId: args.knowledgeBaseId,
     pageId: args.id,
-    sourcePath: args.sourcePath,
+    pagePath: args.pagePath,
     sourceAbsPath: args.absolutePath,
     body: args.body,
     metaYaml: args.metaYaml,
   });
-  for (const warning of reconciled.warnings) {
-    ingestLog.warn(warning, {
-      knowledgeBaseId: args.knowledgeBaseId,
-      pageId: args.id,
-    });
-  }
   return { upserted: reconciled.upserted, deleted: reconciled.deleted };
 }
 
@@ -73,7 +67,7 @@ export type IngestCorpusCheckoutResult = {
 };
 
 /**
- * Walk the checkout docs root, persist pages, delete missing source paths.
+ * Walk the checkout, persist pages, delete missing pages.
  * Does not chunk or reconcile — `Page.chunkifyPages` and the reconciliation
  * stage are separate.
  * @see docs/modern-knowledge-base-design/01-corpus.md
@@ -82,10 +76,9 @@ export type IngestCorpusCheckoutResult = {
 export async function ingestCorpusCheckout(
   knowledgeBaseId: string,
   checkoutDir: string,
-  docsRoot: string,
 ): Promise<IngestCorpusCheckoutResult> {
-  const files = await listCorpusMarkdownFiles(checkoutDir, docsRoot);
-  const keepSourcePaths = files.map((file) => file.sourcePath);
+  const files = await listCorpusMarkdownFiles(checkoutDir);
+  const keepIds = files.map((file) => file.id);
   const changedPageIds: string[] = [];
 
   for (const file of files) {
@@ -99,17 +92,13 @@ export async function ingestCorpusCheckout(
       title: ingested.title,
       tags: ingested.tags,
       body: ingested.body,
-      sourcePath: file.sourcePath,
       metaHash: meta.hash,
     });
     if (saved.skipped) continue;
     changedPageIds.push(file.id);
   }
 
-  await deleteKnowledgePagesMissingSourcePaths(
-    knowledgeBaseId,
-    keepSourcePaths,
-  );
+  await deleteKnowledgePagesMissingIds(knowledgeBaseId, keepIds);
   return { changedPageIds };
 }
 
@@ -136,10 +125,9 @@ export type ReconcileCorpusImagesOptions = {
 export async function reconcileCorpusImages(
   knowledgeBaseId: string,
   checkoutDir: string,
-  docsRoot: string,
   options?: ReconcileCorpusImagesOptions,
 ): Promise<ReconcileCorpusImagesResult> {
-  const files = await listCorpusMarkdownFiles(checkoutDir, docsRoot);
+  const files = await listCorpusMarkdownFiles(checkoutDir);
   const only = options?.pageIds ? new Set(options.pageIds) : null;
   let pagesProcessed = 0;
   let imagesUpserted = 0;
@@ -158,7 +146,7 @@ export async function reconcileCorpusImages(
       const result = await reconcileFileImages({
         knowledgeBaseId,
         id: file.id,
-        sourcePath: file.sourcePath,
+        pagePath: file.path,
         absolutePath: file.absolutePath,
         body,
         metaYaml: meta.text,
@@ -167,14 +155,11 @@ export async function reconcileCorpusImages(
       imagesDeleted += result.deleted;
       pagesProcessed += 1;
     } catch (error) {
-      ingestLog.error(
-        `image policy reconciliation failed for ${file.sourcePath}`,
-        {
-          knowledgeBaseId,
-          pageId: file.id,
-          error: error instanceof Error ? error.message : String(error),
-        },
-      );
+      ingestLog.error(`image policy reconciliation failed for ${file.path}`, {
+        knowledgeBaseId,
+        pageId: file.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
