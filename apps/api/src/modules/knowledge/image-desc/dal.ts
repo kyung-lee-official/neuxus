@@ -146,28 +146,6 @@ export async function upsertImagePolicy(
   });
 }
 
-/**
- * Clear the caption inputs (image hash, model, prompt hash) for one row so a
- * later caption pass re-derives. Storage only — the caller decides when. The
- * `embedding` is owned by the caption pass and is left alone.
- */
-export async function resetImageDerivedFields(
-  knowledgeBaseId: string,
-  pageId: string,
-  imagePath: string,
-): Promise<void> {
-  await sql`
-    UPDATE kb_image_descriptions
-    SET
-      image_content_hash = NULL,
-      caption_model = NULL,
-      hardcoded_caption_prompt_hash = NULL
-    WHERE knowledge_base_id = ${knowledgeBaseId}
-      AND page_id = ${pageId}
-      AND image_path = ${imagePath}
-  `;
-}
-
 /** Delete rows for one page whose `image_path` is not in `imagePaths`. */
 export async function deleteImageDescriptionsNotIn(
   knowledgeBaseId: string,
