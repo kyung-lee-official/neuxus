@@ -7,10 +7,8 @@
  * (`kb_corpus_settings`), and the checkout → pages write path in `../ingest/`.
  */
 
-import { Embedder, type EmbedStaleChildrenResult } from "../embedder/index.ts";
 import {
   type CaptionPassResult,
-  type EmbedImageDescriptionsResult,
   ImageCaptioner,
   ImageDescriptionEmbedder,
 } from "../image-desc/index.ts";
@@ -31,7 +29,6 @@ export const CORPUS_OP_CLONE = "clone";
 export const CORPUS_OP_PULL = "pull";
 export const CORPUS_OP_CHUNKIFY = "chunkify";
 export const CORPUS_OP_CAPTION = "caption";
-export const CORPUS_OP_EMBED = "embed";
 export const CORPUS_OP_SYNC = "sync";
 
 /** Corpus stage ids — single source of truth. */
@@ -42,14 +39,12 @@ export const CORPUS_STG_MERGE = "merge";
 export const CORPUS_STG_INGEST = "ingest";
 export const CORPUS_STG_CHUNKIFY = "chunkify";
 export const CORPUS_STG_CAPTION = "caption";
-export const CORPUS_STG_EMBED = "embed";
 
 export type CorpusOperation =
   | typeof CORPUS_OP_CLONE
   | typeof CORPUS_OP_PULL
   | typeof CORPUS_OP_CHUNKIFY
   | typeof CORPUS_OP_CAPTION
-  | typeof CORPUS_OP_EMBED
   | typeof CORPUS_OP_SYNC;
 
 export type CorpusStage =
@@ -59,15 +54,9 @@ export type CorpusStage =
   | typeof CORPUS_STG_MERGE
   | typeof CORPUS_STG_INGEST
   | typeof CORPUS_STG_CHUNKIFY
-  | typeof CORPUS_STG_CAPTION
-  | typeof CORPUS_STG_EMBED;
+  | typeof CORPUS_STG_CAPTION;
 
 export type CorpusProgress = CloneProgress;
-
-export type CorpusEmbedResult = {
-  children: EmbedStaleChildrenResult;
-  descriptions: EmbedImageDescriptionsResult;
-};
 
 export type CorpusStatus = {
   running: boolean;
@@ -112,8 +101,6 @@ function initialStage(op: CorpusOperation): CorpusStage {
       return CORPUS_STG_CHUNKIFY;
     case CORPUS_OP_CAPTION:
       return CORPUS_STG_CAPTION;
-    case CORPUS_OP_EMBED:
-      return CORPUS_STG_EMBED;
     case CORPUS_OP_SYNC:
       return CORPUS_STG_FETCH;
   }
@@ -262,28 +249,7 @@ export abstract class Corpus {
     }
   }
 
-  /** Embed children and image descriptions whose vector is missing or stale. */
-  static async embed(knowledgeBaseId: string): Promise<CorpusEmbedResult> {
-    if (!Corpus.tryStart(CORPUS_OP_EMBED)) throw new CorpusLockedError();
-    try {
-      Corpus.emitStage(CORPUS_STG_EMBED);
-      const children = await Embedder.embedStaleChildren({
-        knowledgeBaseId,
-        failFast: true,
-      });
-      const descriptions = await ImageDescriptionEmbedder.embedStale({
-        knowledgeBaseId,
-        failFast: true,
-      });
-      Corpus.finish();
-      return { children, descriptions };
-    } catch (err) {
-      Corpus.finish(err);
-      throw err;
-    }
-  }
-
-  /** Start the full sync pipeline (fetch → ingest → reconcile → chunkify → caption → embed → record sha). */
+  /** Start the full sync pipeline (fetch → ingest → chunkify → caption → record sha). */
   static sync(knowledgeBaseId: string): void {
     if (!Corpus.tryStart(CORPUS_OP_SYNC)) throw new CorpusLockedError();
     void Corpus.runSync(knowledgeBaseId).catch(() => {
@@ -296,11 +262,16 @@ export abstract class Corpus {
   ): Promise<CaptionPassResult> {
     Corpus.emitStage(CORPUS_STG_CAPTION);
     const checkout = corpusCheckoutDir(knowledgeBaseId);
-    return ImageCaptioner.captionStale({
+    const result = await ImageCaptioner.captionStale({
       knowledgeBaseId,
       checkoutDir: checkout,
       failFast: true,
     });
+    await ImageDescriptionEmbedder.embedStale({
+      knowledgeBaseId,
+      failFast: true,
+    });
+    return result;
   }
 
   private static async runSync(knowledgeBaseId: string): Promise<void> {
@@ -313,12 +284,6 @@ export abstract class Corpus {
       Corpus.emitStage(CORPUS_STG_CHUNKIFY);
       await Page.chunkifyPages(knowledgeBaseId);
       await Corpus.runCaption(knowledgeBaseId);
-      Corpus.emitStage(CORPUS_STG_EMBED);
-      await Embedder.embedStaleChildren({ knowledgeBaseId, failFast: true });
-      await ImageDescriptionEmbedder.embedStale({
-        knowledgeBaseId,
-        failFast: true,
-      });
       await CorpusSettings.saveLastSyncedSha(knowledgeBaseId, sha);
       Corpus.finish();
     } catch (err) {

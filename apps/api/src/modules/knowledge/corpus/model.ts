@@ -5,7 +5,6 @@ const corpusOperationLiteral = t.Union([
   t.Literal("pull"),
   t.Literal("chunkify"),
   t.Literal("caption"),
-  t.Literal("embed"),
   t.Literal("sync"),
 ]);
 
@@ -17,27 +16,14 @@ const corpusStageLiteral = t.Union([
   t.Literal("ingest"),
   t.Literal("chunkify"),
   t.Literal("caption"),
-  t.Literal("embed"),
 ]);
 
-const embedResponse = t.Object({
-  currentModel: t.String(),
-  considered: t.Integer({ minimum: 0 }),
-  embedded: t.Integer({ minimum: 0 }),
-  skipped: t.Integer({ minimum: 0 }),
-});
-
-/** Schemas for the corpus operation routes (clone / pull / chunkify / embed / sync / events). */
+/** Schemas for the corpus operation routes (clone / pull / chunkify / sync / events). */
 export const CorpusModel = {
   corpusChunkifyResponse: t.Object({
     ok: t.Literal(true),
     pagesProcessed: t.Integer({ minimum: 0 }),
     pagesSkipped: t.Integer({ minimum: 0 }),
-  }),
-  corpusEmbedResponse: t.Object({
-    ok: t.Literal(true),
-    children: embedResponse,
-    descriptions: embedResponse,
   }),
   corpusSyncResponse: t.Object({
     ok: t.Literal(true),

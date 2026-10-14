@@ -5,7 +5,6 @@ import { CorpusGitError } from "../errors.ts";
 import { CorpusModel } from "./model.ts";
 import { Corpus, CorpusLockedError } from "./service.ts";
 import { CorpusSettingsModel } from "./settings/model.ts";
-import { corpusSettings } from "./settings/route.ts";
 
 const corpusDetail = {
   security: [bearerSecurity],
@@ -13,19 +12,18 @@ const corpusDetail = {
 };
 
 /**
- * Corpus operations (clone / pull / chunkify / embed / sync / SSE events),
- * mounted under `/knowledge/corpus`. Remote settings live at
- * `/knowledge/corpus/settings`.
+ * Corpus operations (clone / pull / chunkify / sync / SSE events), scoped to
+ * one knowledge base: `/knowledge-bases/:kbId/corpus`. Settings live at
+ * `/knowledge-bases/:kbId/corpus/settings`.
  */
-export const corpus = new Elysia({ prefix: "/corpus" })
+export const corpus = new Elysia({ prefix: "/knowledge-bases/:kbId/corpus" })
   .use(auth)
   .onError(({ error }) => {
     if (error instanceof CorpusGitError || error instanceof CorpusLockedError) {
       return status(error.httpStatus, { error: error.message });
     }
   })
-  .use(corpusSettings)
-  .post("/clone", () => Corpus.clone(), {
+  .post("/clone", ({ params }) => Corpus.clone(params.kbId), {
     requireAdmin: true,
     response: CorpusSettingsModel.corpusResponse,
     detail: {
@@ -35,7 +33,7 @@ export const corpus = new Elysia({ prefix: "/corpus" })
         "`git clone` the saved `repoUrl` into `apps/api/data/corpus`. Optional saved `branch`. 409 if already cloned. 400 if no `repoUrl` is saved. Git must be on `PATH`; SSH uses the API process user's keys.",
     },
   })
-  .post("/pull", () => Corpus.pull(), {
+  .post("/pull", ({ params }) => Corpus.pull(params.kbId), {
     requireAdmin: true,
     response: CorpusSettingsModel.corpusResponse,
     detail: {
@@ -47,7 +45,10 @@ export const corpus = new Elysia({ prefix: "/corpus" })
   })
   .post(
     "/chunkify",
-    async () => ({ ok: true as const, ...(await Corpus.rechunk()) }),
+    async ({ params }) => ({
+      ok: true as const,
+      ...(await Corpus.rechunk(params.kbId)),
+    }),
     {
       requireAdmin: true,
       response: CorpusModel.corpusChunkifyResponse,
@@ -60,23 +61,9 @@ export const corpus = new Elysia({ prefix: "/corpus" })
     },
   )
   .post(
-    "/embed",
-    async () => ({ ok: true as const, ...(await Corpus.embed()) }),
-    {
-      requireAdmin: true,
-      response: CorpusModel.corpusEmbedResponse,
-      detail: {
-        ...corpusDetail,
-        summary: "Embed stale corpus children",
-        description:
-          "Embeds children with null or stale `embeddingModel`. Fail-fast on provider errors.",
-      },
-    },
-  )
-  .post(
     "/sync",
-    () => {
-      Corpus.sync();
+    ({ params }) => {
+      Corpus.sync(params.kbId);
       return status(202, { ok: true as const });
     },
     {
@@ -88,7 +75,7 @@ export const corpus = new Elysia({ prefix: "/corpus" })
         ...corpusDetail,
         summary: "Start a corpus sync",
         description:
-          "Returns 202 and starts a background singleton Sync: clone-if-missing else pull, walk `docs_root`, ingest/chunkify/persist (hash skip), delete missing `source_path` rows, embed stale children, then write `last_synced_sha` from `HEAD`. Second concurrent operation of any kind returns 409. Fail-fast; no job table. In-process lock (one API process). Stream progress via `/knowledge/corpus/events`.",
+          "Returns 202 and starts a background singleton Sync: clone-if-missing else pull, walk the checkout, ingest/chunkify/persist (hash skip), delete rows for vanished files, embed stale children, then write `last_synced_sha` from `HEAD`. Second concurrent operation of any kind returns 409. Fail-fast; no job table. In-process lock (one API process). Stream progress via `/knowledge/corpus/events`.",
       },
     },
   )

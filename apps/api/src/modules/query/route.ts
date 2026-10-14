@@ -6,18 +6,22 @@ import { Query } from "./service.ts";
 
 export const query = new Elysia()
   .use(auth)
-  .post("/query", ({ user, body }) => Query.ask(user, body), {
-    requireUser: true,
-    body: QueryModel.queryBody,
-    response: QueryModel.queryResponse,
-    detail: {
-      tags: [API_TAGS.query],
-      summary: "Ask the assistant",
-      description:
-        "Pulls recent personal memory + recent chat history, then synthesizes an answer. Writes user/assistant messages to the session.",
-      security: [bearerSecurity],
+  .post(
+    "/query",
+    ({ user, body }) => Query.ask(user, body.knowledgeBaseId, body),
+    {
+      requireUser: true,
+      body: QueryModel.queryBody,
+      response: QueryModel.queryResponse,
+      detail: {
+        tags: [API_TAGS.query],
+        summary: "Ask the assistant",
+        description:
+          "Pulls recent personal memory + recent chat history, then synthesizes an answer. Writes user/assistant messages to the session.",
+        security: [bearerSecurity],
+      },
     },
-  })
+  )
   .post("/remember", ({ user, body }) => Query.remember(user, body), {
     requireUser: true,
     body: QueryModel.rememberBody,

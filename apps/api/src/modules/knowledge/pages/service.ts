@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { isoFromDate } from "../../../shared/serialize.ts";
 import { Chunkifier, ChunkifierSettings } from "../chunkifier/index.ts";
+import { Embedder } from "../embedder/index.ts";
 import { findChildrenByPage } from "./dal/children.dal.ts";
 import {
   chunkTreeRows,
@@ -25,7 +26,6 @@ export type KnowledgePageListItem = {
   id: string;
   title: string;
   tags: string[];
-  sourcePath: string | null;
   contentHash: string;
   updatedAt: string | null;
   parentCount: number;
@@ -54,7 +54,6 @@ export type KnowledgePageDetail = {
   title: string;
   tags: string[];
   body: string;
-  sourcePath: string | null;
   contentHash: string;
   metaHash: string | null;
   updatedAt: string | null;
@@ -67,7 +66,6 @@ export type SaveKnowledgePageInput = {
   title: string;
   tags: string[];
   body: string;
-  sourcePath: string | null;
   /** sha256 of the sibling `*.meta.yaml` bytes, or null when absent. */
   metaHash: string | null;
 };
@@ -108,7 +106,6 @@ export abstract class Page {
       id: summary.id,
       title: summary.title ?? "",
       tags: Array.isArray(summary.tags) ? summary.tags.map(String) : [],
-      sourcePath: summary.source_path,
       contentHash: summary.content_hash ?? "",
       updatedAt: isoFromDate(summary.updated_at),
       parentCount: summary.parent_count,
@@ -160,7 +157,6 @@ export abstract class Page {
       title: page.title ?? "",
       tags: Array.isArray(page.tags) ? page.tags.map(String) : [],
       body: page.body ?? "",
-      sourcePath: page.source_path,
       contentHash: page.content_hash ?? "",
       metaHash: page.meta_hash,
       updatedAt: isoFromDate(page.updated_at),
@@ -171,7 +167,7 @@ export abstract class Page {
   /**
    * Upsert `kb_pages` unless `content_hash` and `meta_hash` already match
    * (skip gate — no rewrite). Chunk trees are built by `chunkifyPages`, not
-   * here; embeddings stay null until the embed pass.
+   * here; children embeddings are written by `chunkifyPages`.
    * @see docs/modern-knowledge-base-design/02-ingest.md
    * @see docs/modern-knowledge-base-design/appendix-a-data-model.md
    */
@@ -199,7 +195,6 @@ export abstract class Page {
       title: input.title,
       tags: input.tags,
       body: input.body,
-      sourcePath: input.sourcePath,
       contentHash,
       metaHash: input.metaHash,
     });
@@ -210,7 +205,9 @@ export abstract class Page {
   /**
    * Rebuild the parent/child tree for pages whose stored tree is missing or
    * stale (`kb_parents.source_page_hash` ≠ the page's `content_hash`), or for
-   * every page when `force`. Knobs come from `ChunkifierSettings`.
+   * every page when `force`, then embed the children via the shared embed
+   * utility (new children, plus any whose `embedding_model` is stale). Knobs
+   * come from `ChunkifierSettings`.
    * @see docs/modern-knowledge-base-design/03.1-chunkify.md
    */
   static async chunkifyPages(
@@ -237,6 +234,8 @@ export abstract class Page {
       pagesProcessed += 1;
       if (chunks.parents.length === 0) pagesSkipped += 1;
     }
+
+    await Embedder.embedStaleChildren({ knowledgeBaseId, failFast: true });
 
     return { pagesProcessed, pagesSkipped };
   }
