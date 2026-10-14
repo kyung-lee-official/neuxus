@@ -194,21 +194,26 @@ model KnowledgeChild {
 model KnowledgeImageDescription {
     knowledgeBaseId            String                 @map("knowledge_base_id")
     pageId                     String                 @map("page_id")
-    /// Path of the image as written inside the markdown body.
+    /// Canonical image path: repo-root-relative POSIX path, or the full `https://` URL for an online image.
     imagePath                  String                 @map("image_path")
     /// sha256 of the image bytes the caption was built from; caption pass; `null` before captioning and for `ignore` / `manual`.
     imageContentHash           String?                @map("image_content_hash")
     /// `ignore` | `manual` | `vision-captioning`.
     policy                     String
+    /// the caption text; `null` for `ignore` and before captioning.
     description                String?
     /// sha256 of `description`; written with the description.
     descriptionHash            String?                @map("description_hash")
+    /// `{providerId}::{modelId}` that produced a `vision-captioning` description (`null` for `manual`).
     captionModel               String?                @map("caption_model")
+    /// sha256 of the hardcoded caption prompt (`null` for `manual`).
     hardcodedCaptionPromptHash String?                @map("hardcoded_caption_prompt_hash")
+    /// the `description_hash` the caption pass wrote (`null` for `manual`).
+    captionedDescriptionHash   String?                @map("captioned_description_hash")
     embedding                  Unsupported("vector")?
     embeddingModel             String?                @map("embedding_model")
     embeddedAt                 DateTime?              @map("embedded_at") @db.Timestamptz(6)
-    /// sha256 of the `description` this `embedding` was computed from; embed pass.
+    /// sha256 of the `description` this `embedding` was computed from; caption pass.
     embedInputHash             String?                @map("embed_input_hash")
 
     page KnowledgePage @relation(fields: [knowledgeBaseId, pageId], references: [knowledgeBaseId, id], onDelete: Cascade)
