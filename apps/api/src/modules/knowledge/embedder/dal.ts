@@ -1,6 +1,6 @@
 /**
- * Embedder DAL. Owns the `kb_children` embedding pass: which children need a
- * vector, and writing the pgvector back.
+ * Embedder DAL. Owns the `kb_children` embedding reads/writes: which children
+ * need a vector, and writing the pgvector back.
  */
 
 import { sql } from "bun";
