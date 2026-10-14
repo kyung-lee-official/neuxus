@@ -6,7 +6,6 @@ const corpusFields = {
     t.Null(),
   ]),
   branch: t.Union([t.String({ examples: ["main"] }), t.Null()]),
-  docsRoot: t.Union([t.String({ examples: ["docs"] }), t.Null()]),
 };
 
 /** Schemas for the corpus settings routes (`kb_corpus_settings` id `default`). */

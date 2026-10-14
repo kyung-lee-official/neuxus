@@ -11,7 +11,6 @@ import {
 } from "./dal.ts";
 import {
   type CorpusSettingsRow,
-  normalizeDocsRoot,
   type StoredCorpusSettings,
 } from "./defaults.ts";
 
@@ -28,7 +27,6 @@ export abstract class CorpusSettings {
       (await findCorpusSettings(knowledgeBaseId)) ?? {
         repoUrl: null,
         branch: null,
-        docsRoot: null,
         lastSyncedSha: null,
       }
     );
@@ -42,7 +40,6 @@ export abstract class CorpusSettings {
     await upsertCorpusRemoteSettings(knowledgeBaseId, {
       repoUrl: blankToNull(row.repoUrl),
       branch: blankToNull(row.branch),
-      docsRoot: normalizeDocsRoot(row.docsRoot) ?? null,
     });
     return CorpusSettings.load(knowledgeBaseId);
   }

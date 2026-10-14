@@ -19,7 +19,6 @@ export async function findCorpusSettings(
   return {
     repoUrl: row.repoUrl,
     branch: row.branch,
-    docsRoot: row.docsRoot,
     lastSyncedSha: row.lastSyncedSha,
   };
 }
@@ -30,7 +29,6 @@ export async function upsertCorpusRemoteSettings(
   fields: {
     repoUrl: string | null;
     branch: string | null;
-    docsRoot: string | null;
   },
 ): Promise<void> {
   await getPrisma().knowledgeCorpusSettings.upsert({

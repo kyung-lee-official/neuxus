@@ -10,12 +10,14 @@ const corpusSettingsDetail = {
 };
 
 /**
- * Corpus remote settings (`kb_corpus_settings` id `default`). Nested under
- * `/knowledge/corpus/settings`.
+ * Corpus remote settings (`kb_corpus_settings`, one row per knowledge base),
+ * served under `/knowledge-bases/:kbId/corpus/settings`.
  */
-export const corpusSettings = new Elysia({ prefix: "/settings" })
+export const corpusSettings = new Elysia({
+  prefix: "/knowledge-bases/:kbId/corpus/settings",
+})
   .use(auth)
-  .get("/", () => CorpusSettings.load(), {
+  .get("/", ({ params }) => CorpusSettings.load(params.kbId), {
     requireAdmin: true,
     response: CorpusSettingsModel.corpusResponse,
     detail: {
@@ -25,7 +27,7 @@ export const corpusSettings = new Elysia({ prefix: "/settings" })
         "Returns the stored `kb_corpus_settings` row (or nulls). `lastSyncedSha` is read-only.",
     },
   })
-  .put("/", ({ body }) => CorpusSettings.save(body), {
+  .put("/", ({ params, body }) => CorpusSettings.save(params.kbId, body), {
     requireAdmin: true,
     body: CorpusSettingsModel.corpusBody,
     response: CorpusSettingsModel.corpusResponse,
