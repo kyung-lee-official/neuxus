@@ -10,8 +10,6 @@
 
 **Never touches** — writes nothing; the prompt is assembled by the caller.
 
-This doc is the **synthesis contract**: resolve the model, call the provider, return text.
-
 ## Provider
 
 Call the provider's **`textChat`** capability with the configured synthesis model. The synthesis model and connection are application wiring; changing either affects only the next call.
