@@ -18,7 +18,7 @@ function errorMessage(err: unknown): string {
 
 function InspectPre({ text }: { text: string }) {
   return (
-    <pre className="m-0 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded border border-line bg-canvas p-2.5 font-mono text-ink text-xs leading-snug">
+    <pre className="wrap-break-word m-0 max-h-64 overflow-auto whitespace-pre-wrap rounded border border-line bg-canvas p-2.5 font-mono text-ink text-xs leading-snug">
       {text === "" ? "(empty)" : text}
     </pre>
   );
