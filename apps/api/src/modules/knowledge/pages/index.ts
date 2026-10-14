@@ -1,5 +1,5 @@
 export {
-  deletePagesMissingSourcePaths as deleteKnowledgePagesMissingSourcePaths,
+  deletePagesMissingIds as deleteKnowledgePagesMissingIds,
   findPageHashes,
 } from "./dal/pages.dal.ts";
 export {

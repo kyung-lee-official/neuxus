@@ -15,7 +15,6 @@ export type PageSummaryRow = {
   id: string;
   title: string | null;
   tags: string[];
-  source_path: string | null;
   content_hash: string | null;
   updated_at: Date | null;
   parent_count: number;
@@ -28,7 +27,6 @@ export type PageDetailRow = {
   title: string | null;
   tags: string[];
   body: string | null;
-  source_path: string | null;
   content_hash: string | null;
   meta_hash: string | null;
   updated_at: Date | null;
@@ -47,7 +45,6 @@ export async function listPageSummaries(
       p.id,
       p.title,
       p.tags,
-      p.source_path,
       p.content_hash,
       p.updated_at,
       (
@@ -60,7 +57,7 @@ export async function listPageSummaries(
       ) AS child_count
     FROM kb_pages p
     WHERE p.knowledge_base_id = ${knowledgeBaseId}
-    ORDER BY p.source_path, p.id
+    ORDER BY p.id
   `;
 }
 
@@ -102,7 +99,7 @@ export async function findPageDetailRow(
 ): Promise<PageDetailRow | null> {
   const rows = await sql<PageDetailRow[]>`
     SELECT
-      knowledge_base_id, id, title, tags, body, source_path, content_hash,
+      knowledge_base_id, id, title, tags, body, content_hash,
       meta_hash, updated_at
     FROM kb_pages
     WHERE knowledge_base_id = ${knowledgeBaseId} AND id = ${pageId}
@@ -135,7 +132,6 @@ export type UpsertPageInput = {
   title: string;
   tags: string[];
   body: string;
-  sourcePath: string | null;
   contentHash: string;
   metaHash: string | null;
 };
@@ -177,7 +173,7 @@ export function chunkTreeRows(
 async function upsertPageRow(tx: SQL, input: UpsertPageInput): Promise<void> {
   await tx`
     INSERT INTO kb_pages (
-      knowledge_base_id, id, title, tags, body, source_path, content_hash,
+      knowledge_base_id, id, title, tags, body, content_hash,
       meta_hash, updated_at
     )
     VALUES (
@@ -186,7 +182,6 @@ async function upsertPageRow(tx: SQL, input: UpsertPageInput): Promise<void> {
       ${input.title},
       ${tx.array(input.tags)}::text[],
       ${input.body},
-      ${input.sourcePath},
       ${input.contentHash},
       ${input.metaHash},
       NOW()
@@ -195,7 +190,6 @@ async function upsertPageRow(tx: SQL, input: UpsertPageInput): Promise<void> {
       title = EXCLUDED.title,
       tags = EXCLUDED.tags,
       body = EXCLUDED.body,
-      source_path = EXCLUDED.source_path,
       content_hash = EXCLUDED.content_hash,
       meta_hash = EXCLUDED.meta_hash,
       updated_at = NOW()
@@ -216,24 +210,22 @@ export async function replacePageChunks(
 }
 
 /**
- * Drop one knowledge base's corpus pages whose `source_path` is not in the
- * current walker list. Rows with null `source_path` are left alone.
+ * Drop one knowledge base's pages whose `id` is not in the current walker list.
  */
-export async function deletePagesMissingSourcePaths(
+export async function deletePagesMissingIds(
   knowledgeBaseId: string,
-  keepSourcePaths: string[],
+  keepIds: string[],
 ): Promise<void> {
-  if (keepSourcePaths.length === 0) {
+  if (keepIds.length === 0) {
     await sql`
       DELETE FROM kb_pages
-      WHERE knowledge_base_id = ${knowledgeBaseId} AND source_path IS NOT NULL
+      WHERE knowledge_base_id = ${knowledgeBaseId}
     `;
     return;
   }
   await sql`
     DELETE FROM kb_pages
     WHERE knowledge_base_id = ${knowledgeBaseId}
-      AND source_path IS NOT NULL
-      AND NOT (source_path = ANY(${sql.array(keepSourcePaths)}::text[]))
+      AND NOT (id = ANY(${sql.array(keepIds)}::text[]))
   `;
 }
