@@ -34,7 +34,6 @@ function parent(
     parentId,
     pageId: "p",
     title: "T",
-    sourcePath: "page.md",
     text,
     score,
   };

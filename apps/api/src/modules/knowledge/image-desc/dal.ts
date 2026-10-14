@@ -15,10 +15,16 @@ export type ImageDescriptionRow = {
   /** `ignore` | `manual` | `vision-captioning`. */
   policy: string;
   description: string | null;
+  /** sha256 of `description`; written with the description. */
+  descriptionHash: string | null;
   captionModel: string | null;
   hardcodedCaptionPromptHash: string | null;
+  /** the `description_hash` the caption pass wrote; compared with `description_hash` to decide re-caption. */
+  captionedDescriptionHash: string | null;
   embeddingModel: string | null;
   embeddedAt: Date | null;
+  /** sha256 of the `description` this `embedding` was computed from; written by the caption pass. */
+  embedInputHash: string | null;
 };
 
 /** One image-description row by its composite key, or null. */
@@ -45,34 +51,23 @@ export async function listImageDescriptionsByPage(
   });
 }
 
-/** An image-description row plus the owning page's `source_path`. */
-export type ImageDescriptionWithSource = ImageDescriptionRow & {
-  sourcePath: string | null;
-};
-
 /**
- * Rows for one `policy` in a knowledge base, each with its page's
- * `source_path` (so a caller can resolve the image file). No domain meaning
- * is attached to `policy` here — the argument names the stored value.
+ * Rows for one `policy` in a knowledge base. No domain meaning is attached to
+ * `policy` here — the argument names the stored value.
  */
 export async function listImageDescriptionsByPolicy(
   knowledgeBaseId: string,
   policy: string,
-): Promise<ImageDescriptionWithSource[]> {
-  const rows = await getPrisma().knowledgeImageDescription.findMany({
+): Promise<ImageDescriptionRow[]> {
+  return getPrisma().knowledgeImageDescription.findMany({
     where: { knowledgeBaseId, policy },
-    include: { page: { select: { sourcePath: true } } },
     orderBy: [{ pageId: "asc" }, { imagePath: "asc" }],
   });
-  return rows.map(({ page, ...row }) => ({
-    ...row,
-    sourcePath: page.sourcePath,
-  }));
 }
 
 /**
  * Upsert one row by its composite key. The pgvector `embedding` is not written
- * here — the embed pass owns it (raw SQL).
+ * here — the caption pass owns it (raw SQL).
  */
 export async function upsertImageDescription(
   row: ImageDescriptionRow,
@@ -81,6 +76,7 @@ export async function upsertImageDescription(
     imageContentHash: row.imageContentHash,
     policy: row.policy,
     description: row.description,
+    descriptionHash: row.descriptionHash,
     captionModel: row.captionModel,
     hardcodedCaptionPromptHash: row.hardcodedCaptionPromptHash,
   };
@@ -107,9 +103,11 @@ export type ImagePolicyInput = {
   policy: string;
   /**
    * `description` to write: a string, or `null` to clear it. Omit to leave the
-   * stored value untouched (the embed/caption passes own those fields).
+   * stored value untouched (the caption pass owns the vision description).
    */
   description?: string | null;
+  /** `description_hash` to write alongside `description`; omit to leave it. */
+  descriptionHash?: string | null;
 };
 
 /**
@@ -124,7 +122,7 @@ export async function upsertImagePolicy(
   imagePath: string,
   input: ImagePolicyInput,
 ): Promise<void> {
-  const { policy, description } = input;
+  const { policy, description, descriptionHash } = input;
   await getPrisma().knowledgeImageDescription.upsert({
     where: {
       knowledgeBaseId_pageId_imagePath: { knowledgeBaseId, pageId, imagePath },
@@ -135,19 +133,23 @@ export async function upsertImagePolicy(
       imagePath,
       policy,
       description: description ?? null,
+      descriptionHash: descriptionHash ?? null,
       captionModel: null,
       hardcodedCaptionPromptHash: null,
+      captionedDescriptionHash: null,
     },
     update: {
       policy,
       ...(description !== undefined ? { description } : {}),
+      ...(descriptionHash !== undefined ? { descriptionHash } : {}),
     },
   });
 }
 
 /**
- * Null the caption fields, the image hash, and the pgvector `embedding` for one
- * row so they re-derive. Storage only — the caller decides when.
+ * Clear the caption inputs (image hash, model, prompt hash) for one row so a
+ * later caption pass re-derives. Storage only — the caller decides when. The
+ * `embedding` is owned by the caption pass and is left alone.
  */
 export async function resetImageDerivedFields(
   knowledgeBaseId: string,
@@ -159,8 +161,7 @@ export async function resetImageDerivedFields(
     SET
       image_content_hash = NULL,
       caption_model = NULL,
-      hardcoded_caption_prompt_hash = NULL,
-      embedding = NULL
+      hardcoded_caption_prompt_hash = NULL
     WHERE knowledge_base_id = ${knowledgeBaseId}
       AND page_id = ${pageId}
       AND image_path = ${imagePath}
@@ -185,12 +186,23 @@ export type ImageDescriptionToEmbed = {
   imagePath: string;
   /** The description text to embed. */
   text: string;
+  /** sha256 of `text` (the row's `description_hash`), stamped as `embed_input_hash` at embed time. */
+  descriptionHash: string | null;
+};
+
+type ImageDescriptionCandidateRow = {
+  knowledge_base_id: string;
+  page_id: string;
+  image_path: string;
+  description: string | null;
+  description_hash: string | null;
 };
 
 /**
  * Description rows needing a vector: `policy` in `policies` (the caller names
- * them), a `description` present, and `embedding_model` missing or differing
- * from `currentModel`. Scope to one knowledge base optionally.
+ * them), a `description` present, and either no vector, a stale
+ * `embedding_model`, or a description whose hash differs from the one that was
+ * embedded. Scope to one knowledge base optionally.
  * @see docs/modern-knowledge-base-design/03.2-image-descriptions.md
  */
 export async function findImageDescriptionsNeedingEmbedding(
@@ -198,44 +210,43 @@ export async function findImageDescriptionsNeedingEmbedding(
   policies: string[],
   scope: { knowledgeBaseId?: string } = {},
 ): Promise<ImageDescriptionToEmbed[]> {
-  const rows = await getPrisma().knowledgeImageDescription.findMany({
-    where: {
-      ...(scope.knowledgeBaseId
-        ? { knowledgeBaseId: scope.knowledgeBaseId }
-        : {}),
-      policy: { in: policies },
-      description: { not: null },
-      OR: [{ embeddingModel: null }, { embeddingModel: { not: currentModel } }],
-    },
-    select: {
-      knowledgeBaseId: true,
-      pageId: true,
-      imagePath: true,
-      description: true,
-    },
-  });
+  const kb = scope.knowledgeBaseId ?? null;
+  const rows = await sql<ImageDescriptionCandidateRow[]>`
+    SELECT knowledge_base_id, page_id, image_path, description, description_hash
+    FROM kb_image_descriptions
+    WHERE policy = ANY(${sql.array(policies, "text[]")})
+      AND description IS NOT NULL
+      AND (embedding IS NULL
+           OR embedding_model IS DISTINCT FROM ${currentModel}
+           OR description_hash IS DISTINCT FROM embed_input_hash)
+      AND (${kb}::text IS NULL OR knowledge_base_id = ${kb})
+    ORDER BY page_id, image_path
+  `;
   return rows.map((row) => ({
-    knowledgeBaseId: row.knowledgeBaseId,
-    pageId: row.pageId,
-    imagePath: row.imagePath,
+    knowledgeBaseId: row.knowledge_base_id,
+    pageId: row.page_id,
+    imagePath: row.image_path,
     text: row.description ?? "",
+    descriptionHash: row.description_hash,
   }));
 }
 
-/** Write one image description's pgvector + model stamp. */
+/* * Write one image description's pgvector + model stamp + embedded input hash. */
 export async function writeImageDescriptionEmbedding(
   knowledgeBaseId: string,
   pageId: string,
   imagePath: string,
   embeddingLiteral: string,
   model: string,
+  descriptionHash: string | null,
 ): Promise<void> {
   await sql`
     UPDATE kb_image_descriptions
     SET
       embedding = ${embeddingLiteral}::vector,
       embedding_model = ${model},
-      embedded_at = NOW()
+      embedded_at = NOW(),
+      embed_input_hash = ${descriptionHash}
     WHERE knowledge_base_id = ${knowledgeBaseId}
       AND page_id = ${pageId}
       AND image_path = ${imagePath}
@@ -245,11 +256,16 @@ export async function writeImageDescriptionEmbedding(
 export type ImageDescriptionUpdate = {
   imageContentHash: string;
   description: string;
+  descriptionHash: string;
   captionModel: string;
   hardcodedCaptionPromptHash: string;
 };
 
-/** Write new description fields and clear the pgvector `embedding` to re-embed. */
+/**
+ * Write a caption's inputs and text, and stamp `captioned_description_hash` with
+ * the `description_hash` just written. The `embedding` is left alone — re-embedding
+ * is detected when `description_hash` differs from `embed_input_hash`.
+ */
 export async function updateImageDescription(
   knowledgeBaseId: string,
   pageId: string,
@@ -261,9 +277,10 @@ export async function updateImageDescription(
     SET
       image_content_hash = ${fields.imageContentHash},
       description = ${fields.description},
+      description_hash = ${fields.descriptionHash},
       caption_model = ${fields.captionModel},
       hardcoded_caption_prompt_hash = ${fields.hardcodedCaptionPromptHash},
-      embedding = NULL
+      captioned_description_hash = ${fields.descriptionHash}
     WHERE knowledge_base_id = ${knowledgeBaseId}
       AND page_id = ${pageId}
       AND image_path = ${imagePath}

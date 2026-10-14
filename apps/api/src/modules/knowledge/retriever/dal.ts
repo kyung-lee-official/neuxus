@@ -18,7 +18,6 @@ export type ParentLookupRow = {
   page_id: string;
   text: string | null;
   title: string | null;
-  source_path: string | null;
 };
 
 export type ImageDescriptionHitRow = {
@@ -58,7 +57,7 @@ export async function findParentsByIds(
   parentIds: string[],
 ): Promise<ParentLookupRow[]> {
   return sql<ParentLookupRow[]>`
-    SELECT p.id, p.page_id, p.text, pg.title, pg.source_path
+    SELECT p.id, p.page_id, p.text, pg.title
     FROM kb_parents p
     JOIN kb_pages pg
       ON pg.knowledge_base_id = p.knowledge_base_id
@@ -69,15 +68,15 @@ export async function findParentsByIds(
 }
 
 /**
- * Top-K image descriptions by cosine distance within one knowledge base,
- * each with its page title. `policies` names the searchable stored values.
+ * Top-3 image descriptions by cosine distance within one knowledge base,
+ * each with its page title. Capped at a hardcoded 3 (not a knob). `policies`
+ * names the searchable stored values.
  * @see docs/modern-knowledge-base-design/04-retrieval.md
  */
 export async function scanImageDescriptionVectors(args: {
   knowledgeBaseId: string;
   currentModel: string;
   embeddingLiteral: string;
-  limit: number;
   policies: string[];
 }): Promise<ImageDescriptionHitRow[]> {
   return sql<ImageDescriptionHitRow[]>`
@@ -96,6 +95,6 @@ export async function scanImageDescriptionVectors(args: {
       AND d.knowledge_base_id = ${args.knowledgeBaseId}
       AND d.policy = ANY(${sql.array(args.policies, "text[]")})
     ORDER BY d.embedding <=> ${args.embeddingLiteral}::vector
-    LIMIT ${args.limit}
+    LIMIT 3
   `;
 }

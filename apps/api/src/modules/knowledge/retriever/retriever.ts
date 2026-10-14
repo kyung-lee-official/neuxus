@@ -27,8 +27,6 @@ export type RetrievedParent = {
   parentId: string;
   pageId: string;
   title: string;
-  /** Docs-root-relative POSIX `kb_pages.source_path` (`""` when null). */
-  sourcePath: string;
   text: string;
   score: number;
 };
@@ -182,7 +180,6 @@ export abstract class Retriever {
           knowledgeBaseId: options.knowledgeBaseId,
           currentModel,
           embeddingLiteral,
-          limit: knobs.childLimit,
           policies: [...DESCRIBED_IMAGE_POLICIES],
         }),
       ]);
@@ -244,7 +241,6 @@ export abstract class Retriever {
             parentId: row.id,
             pageId: row.page_id,
             title: row.title ?? "",
-            sourcePath: row.source_path ?? "",
             text: row.text ?? "",
             score: scores.get(row.id) ?? 0,
           } satisfies RetrievedParent,
