@@ -2,6 +2,7 @@ import { openapi } from "@elysia/openapi";
 import { cors } from "@elysiajs/cors";
 import { Elysia, status } from "elysia";
 import { health } from "./modules/health/route.ts";
+import { knowledgeBases } from "./modules/knowledge/knowledge-bases/route.ts";
 import { knowledge } from "./modules/knowledge/route.ts";
 import { Logger, LogSettings, PostgresTransport } from "./modules/log/index.ts";
 import { logRoutes } from "./modules/log/route.ts";
@@ -68,6 +69,7 @@ const app = new Elysia()
     }
   })
   .use(health)
+  .use(knowledgeBases)
   .use(knowledge)
   .use(modelProviders)
   .use(logRoutes)
