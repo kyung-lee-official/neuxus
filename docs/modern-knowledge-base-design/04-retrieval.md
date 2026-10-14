@@ -94,10 +94,10 @@ WHERE d.embedding IS NOT NULL
   AND d.knowledge_base_id = $kb
   AND d.policy <> 'ignore'
 ORDER BY d.embedding <=> $1::vector
-LIMIT $2;
+LIMIT 3;
 ```
 
-Its hits are capped and merged into the synthesis context ([05-synthesis.md](./05-synthesis.md#image-handling)); the row shape is defined under [Result](#result).
+Its top **3** hits (a hardcoded cap, not a knob) are merged into the synthesis context ([05-synthesis.md](./05-synthesis.md#image-handling)); the row shape is defined under [Result](#result).
 
 ## Result
 
