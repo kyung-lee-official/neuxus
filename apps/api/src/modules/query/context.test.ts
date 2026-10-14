@@ -12,7 +12,6 @@ describe("buildSynthesisPrompt", () => {
           parentId: "1",
           pageId: "p",
           title: "Setup",
-          sourcePath: "setup.md",
           text: "Run bun install.",
           score: 0.9,
         },
