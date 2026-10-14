@@ -62,8 +62,6 @@ export type CaptionPassOptions = {
   knowledgeBaseId: string;
   /** Local corpus checkout root (the knowledge base's working tree). */
   checkoutDir: string;
-  /** Docs root within the checkout (POSIX; `""` walks the checkout root). */
-  docsRoot: string;
   describer?: ImageDescriber;
   /** Throw on the first failure instead of skipping the image. */
   failFast?: boolean;
@@ -107,11 +105,7 @@ export class ImageCaptioner {
 
     for (const candidate of candidates) {
       try {
-        const imageAbsPath = join(
-          options.checkoutDir,
-          options.docsRoot,
-          candidate.imagePath,
-        );
+        const imageAbsPath = join(options.checkoutDir, candidate.imagePath);
         const bytes = await readFile(imageAbsPath);
         const imageContentHash = sha256Hex(bytes);
 
@@ -119,6 +113,7 @@ export class ImageCaptioner {
           imageContentHash === candidate.imageContentHash &&
           candidate.captionModel === currentModel &&
           candidate.hardcodedCaptionPromptHash === currentPromptHash &&
+          candidate.descriptionHash === candidate.captionedDescriptionHash &&
           candidate.description != null;
         if (fresh) {
           skipped += 1;
@@ -142,6 +137,7 @@ export class ImageCaptioner {
           {
             imageContentHash,
             description,
+            descriptionHash: sha256Hex(Buffer.from(description, "utf8")),
             captionModel: currentModel,
             hardcodedCaptionPromptHash: currentPromptHash,
           },
@@ -185,7 +181,8 @@ export type EmbedImageDescriptionsResult = {
 export class ImageDescriptionEmbedder {
   /**
    * Embed `manual` / `vision-captioning` descriptions whose `embedding` is
-   * missing or whose `embedding_model` differs from the current model.
+   * missing, whose `embedding_model` differs from the current model, or whose
+   * description changed since it was embedded.
    */
   static async embedStale(
     options?: EmbedImageDescriptionsOptions,
@@ -208,6 +205,7 @@ export class ImageDescriptionEmbedder {
           row.imagePath,
           Embedder.pgvectorLiteral(vector),
           currentModel,
+          row.descriptionHash,
         );
       },
     });
