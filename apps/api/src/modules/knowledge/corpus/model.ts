@@ -3,7 +3,6 @@ import { type Static, t } from "elysia";
 const corpusOperationLiteral = t.Union([
   t.Literal("clone"),
   t.Literal("pull"),
-  t.Literal("reconcile"),
   t.Literal("chunkify"),
   t.Literal("caption"),
   t.Literal("embed"),
@@ -16,7 +15,6 @@ const corpusStageLiteral = t.Union([
   t.Literal("checkout"),
   t.Literal("merge"),
   t.Literal("ingest"),
-  t.Literal("reconcile"),
   t.Literal("chunkify"),
   t.Literal("caption"),
   t.Literal("embed"),
