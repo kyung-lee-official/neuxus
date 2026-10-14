@@ -31,7 +31,7 @@ function substituteParentImages(
 
   const byLine = new Map<number, string>();
   for (const [line, ref] of refs) {
-    const canonical = canonicalImagePath(parent.sourcePath, ref);
+    const canonical = canonicalImagePath(`${parent.pageId}.md`, ref);
     if (canonical == null) continue;
     const image = imageByPath.get(canonical);
     if (!image || image.description === "") continue;

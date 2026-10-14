@@ -7,10 +7,9 @@ import { formatKnowledgeContext } from "./images.ts";
 
 function parent(overrides: Partial<RetrievedParent> = {}): RetrievedParent {
   return {
-    parentId: "p1:par:0",
-    pageId: "p1",
+    parentId: "guide/relay:par:0",
+    pageId: "guide/relay",
     title: "North Quay Relay",
-    sourcePath: "guide/relay.md",
     text: "## Wiring\n\n![North quay](assets/wiring.png)\n\nThe relay sits between the two quays.",
     score: 0.9,
     ...overrides,
@@ -19,7 +18,7 @@ function parent(overrides: Partial<RetrievedParent> = {}): RetrievedParent {
 
 function image(overrides: Partial<RetrievedImage> = {}): RetrievedImage {
   return {
-    pageId: "p1",
+    pageId: "guide/relay",
     title: "North Quay Relay",
     imagePath: "guide/assets/wiring.png",
     description: "A relay switch between two quays, with a 12V line labeled A.",
