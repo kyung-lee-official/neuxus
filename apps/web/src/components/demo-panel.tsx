@@ -12,11 +12,13 @@ import {
   ApiError,
   apiBaseUrl,
   getHealth,
+  listKnowledgeBases,
   listUsers,
   postQuery,
   UserQueryKey,
 } from "@/lib/api";
 import { ActiveUserPanel } from "./active-user-panel";
+import { KnowledgeBaseSelector } from "./knowledge-base-selector";
 import { type ApiPayload } from "./response-view";
 import { SessionStatusChip } from "./session-status-chip";
 import { UserDataPanel } from "./user-data-panel";
@@ -47,6 +49,7 @@ export function DemoPanel() {
   const setActiveUserId = useActiveUserStore((s) => s.setActiveUserId);
   const [storeReady, setStoreReady] = useState(false);
   const [payload, setPayload] = useState<ApiPayload | null>(null);
+  const [kbId, setKbId] = useState<string | null>(null);
 
   useEffect(() => {
     setStoreReady(useActiveUserStore.persist.hasHydrated());
@@ -72,6 +75,18 @@ export function DemoPanel() {
     return users.find((u) => u.id === activeUserId) ?? null;
   }, [usersQuery.data, activeUserId]);
 
+  const basesQuery = useQuery({
+    queryKey: UserQueryKey.KnowledgeBases,
+    queryFn: () => listKnowledgeBases(active?.apiKey ?? ""),
+    enabled: Boolean(active),
+  });
+
+  useEffect(() => {
+    if (kbId) return;
+    const first = basesQuery.data?.[0];
+    if (first) setKbId(first.id);
+  }, [kbId, basesQuery.data]);
+
   useEffect(() => {
     if (!storeReady) return;
     if (!activeUserId) {
@@ -94,10 +109,12 @@ export function DemoPanel() {
   const askMutation = useMutation({
     mutationFn: (values: MessageValues) => {
       if (!active) throw new Error("Select a signed-in user.");
+      if (!kbId) throw new Error("Select a knowledge base.");
       return postQuery({
         apiKey: active.apiKey,
         message: values.message,
         mode: "ask",
+        knowledgeBaseId: kbId,
         sessionId: activeSessionId,
       });
     },
@@ -171,6 +188,11 @@ export function DemoPanel() {
 
         <div className="shrink-0 bg-canvas px-5 py-3">
           <div className="mx-auto flex max-w-4xl flex-col gap-2.5">
+            <KnowledgeBaseSelector
+              actorApiKey={active.apiKey}
+              selectedId={kbId}
+              onSelect={setKbId}
+            />
             <form
               className="flex flex-col gap-2.5"
               onSubmit={askForm.handleSubmit((values) => {

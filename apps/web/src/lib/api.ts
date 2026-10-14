@@ -876,10 +876,9 @@ export async function subscribeCorpusEvents(
 }
 
 export type KnowledgePageListItem = {
+  knowledgeBaseId: string;
   id: string;
-  slug: string;
   title: string;
-  type: string | null;
   tags: string[];
   contentHash: string;
   updatedAt: string | null;
@@ -891,8 +890,6 @@ export type KnowledgeChildInspect = {
   id: string;
   childIndex: number;
   text: string;
-  startOffset: number | null;
-  endOffset: number | null;
   embeddingModel: string | null;
   embeddedAt: string | null;
   embedded: boolean;
@@ -902,19 +899,17 @@ export type KnowledgeParentInspect = {
   id: string;
   parentIndex: number;
   text: string;
-  startOffset: number | null;
-  endOffset: number | null;
   children: KnowledgeChildInspect[];
 };
 
 export type KnowledgePageDetail = {
+  knowledgeBaseId: string;
   id: string;
-  slug: string;
   title: string;
-  type: string | null;
   tags: string[];
   body: string;
   contentHash: string;
+  metaHash: string | null;
   updatedAt: string | null;
   parents: KnowledgeParentInspect[];
 };

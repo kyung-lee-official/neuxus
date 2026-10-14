@@ -16,7 +16,6 @@ import {
   putCorpusSettings,
   startChunkify,
   startCorpusSync,
-  startEmbed,
   subscribeCorpusEvents,
   UserQueryKey,
 } from "@/lib/api";
@@ -24,7 +23,6 @@ import {
 const corpusSchema = z.object({
   repoUrl: z.string(),
   branch: z.string(),
-  docsRoot: z.string(),
 });
 
 type CorpusValues = z.infer<typeof corpusSchema>;
@@ -45,14 +43,7 @@ type SyncHint = {
   text: string;
 };
 
-type ActionKey =
-  | "settings"
-  | "save"
-  | "clone"
-  | "pull"
-  | "chunkify"
-  | "embed"
-  | "sync";
+type ActionKey = "settings" | "save" | "clone" | "pull" | "chunkify" | "sync";
 
 function hintClass(tone: SyncHint["tone"]): string {
   if (tone === "ok") return "m-0 text-ok text-sm";
@@ -67,7 +58,7 @@ const STAGE_LABELS: Record<Exclude<CorpusStatus["stage"], null>, string> = {
   merge: "Merging",
   ingest: "Ingesting",
   chunkify: "Chunkifying",
-  embed: "Embedding",
+  caption: "Captioning",
 };
 
 function stageLabel(stage: CorpusStatus["stage"]): string {
@@ -79,7 +70,6 @@ const OPERATION_PAST: Record<CorpusOperation, string> = {
   clone: "Clone",
   pull: "Pull",
   chunkify: "Chunkify",
-  embed: "Embed",
   sync: "Sync",
 };
 
@@ -134,7 +124,13 @@ function operationHint(args: {
   return null;
 }
 
-export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
+export function CorpusSettingsBlock({
+  actorApiKey,
+  knowledgeBaseId,
+}: {
+  actorApiKey: string;
+  knowledgeBaseId: string;
+}) {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<CorpusStatus | null>(null);
   const [finished, setFinished] = useState<CorpusOperation | null>(null);
@@ -142,12 +138,12 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
   const wasRunning = useRef(false);
   const lastOpRef = useRef<CorpusOperation | null>(null);
   const settingsQuery = useQuery({
-    queryKey: UserQueryKey.CorpusSettings,
-    queryFn: () => getCorpusSettings(actorApiKey),
+    queryKey: UserQueryKey.CorpusSettings(knowledgeBaseId),
+    queryFn: () => getCorpusSettings(actorApiKey, knowledgeBaseId),
   });
   const pagesQuery = useQuery({
-    queryKey: UserQueryKey.KnowledgePages,
-    queryFn: () => listKnowledgePages(actorApiKey),
+    queryKey: UserQueryKey.KnowledgePages(knowledgeBaseId),
+    queryFn: () => listKnowledgePages(actorApiKey, knowledgeBaseId),
   });
 
   const form = useForm<CorpusValues>({
@@ -155,7 +151,6 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
     defaultValues: {
       repoUrl: "",
       branch: "",
-      docsRoot: "",
     },
   });
 
@@ -165,7 +160,6 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
     form.reset({
       repoUrl: data.repoUrl ?? "",
       branch: data.branch ?? "",
-      docsRoot: data.docsRoot ?? "",
     });
   }, [settingsQuery.data, form]);
 
@@ -183,7 +177,12 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
     const run = async () => {
       while (!ac.signal.aborted) {
         try {
-          await subscribeCorpusEvents(actorApiKey, setStatus, ac.signal);
+          await subscribeCorpusEvents(
+            actorApiKey,
+            knowledgeBaseId,
+            setStatus,
+            ac.signal,
+          );
         } catch {
           if (ac.signal.aborted) return;
         }
@@ -193,7 +192,7 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
     };
     void run();
     return () => ac.abort();
-  }, [actorApiKey]);
+  }, [actorApiKey, knowledgeBaseId]);
 
   useEffect(() => {
     const running = status?.running ?? false;
@@ -204,65 +203,61 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
     if (wasRunning.current && !running) {
       setFinished(status?.lastError ? null : lastOpRef.current);
       void queryClient.invalidateQueries({
-        queryKey: UserQueryKey.CorpusSettings,
+        queryKey: UserQueryKey.CorpusSettings(knowledgeBaseId),
       });
       void queryClient.invalidateQueries({
-        queryKey: UserQueryKey.KnowledgePages,
+        queryKey: UserQueryKey.KnowledgePages(knowledgeBaseId),
       });
     }
     wasRunning.current = running;
-  }, [status, queryClient]);
+  }, [status, queryClient, knowledgeBaseId]);
 
   const saveMutation = useMutation({
     mutationFn: (values: CorpusValues) =>
       putCorpusSettings({
         apiKey: actorApiKey,
+        knowledgeBaseId,
         settings: {
           repoUrl: blankToNull(values.repoUrl),
           branch: blankToNull(values.branch),
-          docsRoot: blankToNull(values.docsRoot),
         },
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: UserQueryKey.CorpusSettings,
+        queryKey: UserQueryKey.CorpusSettings(knowledgeBaseId),
       });
     },
   });
 
   const cloneMutation = useMutation({
-    mutationFn: () => cloneCorpus(actorApiKey),
+    mutationFn: () => cloneCorpus(actorApiKey, knowledgeBaseId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: UserQueryKey.CorpusSettings,
+        queryKey: UserQueryKey.CorpusSettings(knowledgeBaseId),
       });
     },
   });
 
   const pullMutation = useMutation({
-    mutationFn: () => pullCorpus(actorApiKey),
+    mutationFn: () => pullCorpus(actorApiKey, knowledgeBaseId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: UserQueryKey.CorpusSettings,
+        queryKey: UserQueryKey.CorpusSettings(knowledgeBaseId),
       });
     },
   });
 
   const chunkifyMutation = useMutation({
-    mutationFn: () => startChunkify(actorApiKey),
+    mutationFn: () => startChunkify(actorApiKey, knowledgeBaseId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: UserQueryKey.KnowledgePages,
+        queryKey: UserQueryKey.KnowledgePages(knowledgeBaseId),
       });
     },
   });
 
-  const embedMutation = useMutation({
-    mutationFn: () => startEmbed(actorApiKey),
-  });
-
   const syncMutation = useMutation({
-    mutationFn: () => startCorpusSync(actorApiKey),
+    mutationFn: () => startCorpusSync(actorApiKey, knowledgeBaseId),
   });
 
   const running = status?.running === true;
@@ -272,7 +267,6 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
     cloneMutation.isPending ||
     pullMutation.isPending ||
     chunkifyMutation.isPending ||
-    embedMutation.isPending ||
     syncMutation.isPending ||
     running ||
     form.formState.isSubmitting;
@@ -285,7 +279,6 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
     clone: cloneMutation.error,
     pull: pullMutation.error,
     chunkify: chunkifyMutation.error,
-    embed: embedMutation.error,
     sync: syncMutation.error,
   };
   const activeError = errorByAction[lastAction];
@@ -343,15 +336,6 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
               {...form.register("branch")}
             />
           </label>
-          <label className="flex flex-col gap-1.5 text-sm">
-            <span>Docs root</span>
-            <input
-              className="w-full rounded border border-line bg-canvas px-2.5 py-2 text-ink disabled:opacity-60"
-              placeholder="repo root if empty"
-              disabled={busy}
-              {...form.register("docsRoot")}
-            />
-          </label>
           <p className="m-0 font-mono text-muted text-xs">
             Last synced SHA: {lastSyncedSha ?? "none"}
           </p>
@@ -402,17 +386,6 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
             </button>
             <button
               type="button"
-              className="rounded border border-line bg-transparent px-3.5 py-1.5 text-ink text-sm disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={busy || !hasPages}
-              onClick={() => {
-                setLastAction("embed");
-                embedMutation.mutate();
-              }}
-            >
-              {opButtonLabel("embed", "Embed")}
-            </button>
-            <button
-              type="button"
               className="rounded border border-accent bg-transparent px-3.5 py-1.5 text-accent text-sm disabled:cursor-not-allowed disabled:opacity-60"
               disabled={busy || !hasSavedRepo}
               onClick={() => {
@@ -425,9 +398,10 @@ export function CorpusSettingsBlock({ actorApiKey }: { actorApiKey: string }) {
           </div>
           {!running ? (
             <p className="m-0 text-muted text-xs">
-              Sync clones if needed, then ingests, chunkifies, and embeds. Clone
-              and Pull only update the git checkout. Chunkify re-chunks all
-              pages; Embed fills stale embeddings.
+              Sync clones if needed, then ingests, chunkifies, and captions
+              (embedding children and descriptions as it goes). Clone and Pull
+              only update the git checkout. Chunkify re-chunks all pages and
+              re-embeds their children.
             </p>
           ) : null}
         </form>

@@ -24,30 +24,28 @@ function InspectPre({ text }: { text: string }) {
   );
 }
 
-function offsetLabel(
-  startOffset: number | null,
-  endOffset: number | null,
-): string | null {
-  if (startOffset == null && endOffset == null) return null;
-  return `${startOffset ?? "?"}–${endOffset ?? "?"}`;
-}
-
-export function KnowledgePagesBlock({ actorApiKey }: { actorApiKey: string }) {
+export function KnowledgePagesBlock({
+  actorApiKey,
+  knowledgeBaseId,
+}: {
+  actorApiKey: string;
+  knowledgeBaseId: string;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const selectedId = searchParams.get("page");
 
   const listQuery = useQuery({
-    queryKey: UserQueryKey.KnowledgePages,
-    queryFn: () => listKnowledgePages(actorApiKey),
+    queryKey: UserQueryKey.KnowledgePages(knowledgeBaseId),
+    queryFn: () => listKnowledgePages(actorApiKey, knowledgeBaseId),
   });
 
   const pageQuery = useQuery({
-    queryKey: UserQueryKey.KnowledgePage(selectedId ?? ""),
+    queryKey: UserQueryKey.KnowledgePage(knowledgeBaseId, selectedId ?? ""),
     queryFn: () => {
       if (!selectedId) throw new Error("No page selected");
-      return getKnowledgePage(actorApiKey, selectedId);
+      return getKnowledgePage(actorApiKey, knowledgeBaseId, selectedId);
     },
     enabled: Boolean(selectedId),
   });
@@ -63,9 +61,7 @@ export function KnowledgePagesBlock({ actorApiKey }: { actorApiKey: string }) {
   if (selectedId) {
     const page = pageQuery.data;
     const err = pageQuery.isError ? errorMessage(pageQuery.error) : null;
-    const heading = page?.title?.trim()
-      ? page.title
-      : (page?.slug ?? selectedId);
+    const heading = page?.title?.trim() ? page.title : (page?.id ?? selectedId);
 
     return (
       <section className="flex flex-col gap-3.5 rounded-md border border-line bg-surface p-6">
@@ -87,15 +83,9 @@ export function KnowledgePagesBlock({ actorApiKey }: { actorApiKey: string }) {
             <h2 className="m-0 font-display text-ink text-lg">{heading}</h2>
             <dl className="m-0 grid gap-1.5 text-sm">
               <div>
-                <dt className="m-0 text-muted">Slug</dt>
+                <dt className="m-0 text-muted">Id</dt>
                 <dd className="m-0 break-all font-mono text-ink text-xs">
-                  {page.slug}
-                </dd>
-              </div>
-              <div>
-                <dt className="m-0 text-muted">Source path</dt>
-                <dd className="m-0 break-all font-mono text-ink text-xs">
-                  {page.sourcePath ?? "—"}
+                  {page.id}
                 </dd>
               </div>
               <div>
@@ -103,10 +93,6 @@ export function KnowledgePagesBlock({ actorApiKey }: { actorApiKey: string }) {
                 <dd className="m-0 break-all font-mono text-ink text-xs">
                   {page.contentHash}
                 </dd>
-              </div>
-              <div>
-                <dt className="m-0 text-muted">Type</dt>
-                <dd className="m-0 text-ink">{page.type ?? "—"}</dd>
               </div>
               <div>
                 <dt className="m-0 text-muted">Tags</dt>
@@ -133,10 +119,6 @@ export function KnowledgePagesBlock({ actorApiKey }: { actorApiKey: string }) {
                 <p className="m-0 text-muted text-sm">No parents.</p>
               ) : (
                 page.parents.map((parent) => {
-                  const span = offsetLabel(
-                    parent.startOffset,
-                    parent.endOffset,
-                  );
                   return (
                     <div
                       key={parent.id}
@@ -144,7 +126,6 @@ export function KnowledgePagesBlock({ actorApiKey }: { actorApiKey: string }) {
                     >
                       <p className="m-0 font-mono text-muted text-xs">
                         Parent {parent.parentIndex}
-                        {span ? ` · ${span}` : ""}
                       </p>
                       <InspectPre text={parent.text} />
                       <div className="flex flex-col gap-2 border-line border-l pl-3">
@@ -152,10 +133,6 @@ export function KnowledgePagesBlock({ actorApiKey }: { actorApiKey: string }) {
                           <p className="m-0 text-muted text-sm">No children.</p>
                         ) : (
                           parent.children.map((child) => {
-                            const childSpan = offsetLabel(
-                              child.startOffset,
-                              child.endOffset,
-                            );
                             return (
                               <div
                                 key={child.id}
@@ -163,7 +140,6 @@ export function KnowledgePagesBlock({ actorApiKey }: { actorApiKey: string }) {
                               >
                                 <p className="m-0 font-mono text-muted text-xs">
                                   Child {child.childIndex}
-                                  {childSpan ? ` · ${childSpan}` : ""}
                                   {" · "}
                                   {child.embedded ? "embedded" : "not embedded"}
                                   {child.embeddingModel
@@ -208,7 +184,7 @@ export function KnowledgePagesBlock({ actorApiKey }: { actorApiKey: string }) {
       {pages.length > 0 ? (
         <ul className="m-0 flex list-none flex-col gap-2 p-0">
           {pages.map((page) => {
-            const label = page.title.trim() === "" ? page.slug : page.title;
+            const label = page.title.trim() === "" ? page.id : page.title;
             return (
               <li key={page.id} className="m-0">
                 <button
@@ -218,10 +194,9 @@ export function KnowledgePagesBlock({ actorApiKey }: { actorApiKey: string }) {
                 >
                   <span className="font-display text-ink text-sm">{label}</span>
                   <span className="break-all font-mono text-muted text-xs">
-                    {page.slug}
+                    {page.id}
                   </span>
                   <span className="text-muted text-xs">
-                    {page.sourcePath ?? "no source path"} ·{" "}
                     {formatDateTime(page.updatedAt)} · {page.parentCount}{" "}
                     parents · {page.childCount} children
                   </span>
