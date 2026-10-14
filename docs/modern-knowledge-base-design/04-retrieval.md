@@ -1,5 +1,15 @@
 # Retrieval (question to ranked parents + image descriptions)
 
+**Does** — embed the question once, then per knowledge base similarity-search `kb_children.embedding` and `kb_image_descriptions.embedding`, expand child hits to parents, and return two capped lists (parents + image-description hits).
+
+**Reads** — `kb_children`, `kb_parents`, `kb_pages.title`, `kb_image_descriptions`, `kb_knowledge_bases`; the global cap knobs ([`kb_retrieve_settings`](./appendix-a-data-model.md#retrieval-knobs-table)).
+
+**Owns** — nothing (read-only).
+
+**Staleness** — none; retrieval compares `embedding_model` at query time and excludes stale rows, whose owning stage re-embeds ([Stale vectors](#stale-vectors)).
+
+**Never touches** — writes nothing.
+
 Question (string) in, ranked rows out.
 
 A search query targets a **set** of one or more knowledge bases; the caller chooses the set ([Multiple knowledge bases](#multiple-knowledge-bases)).
@@ -93,13 +103,13 @@ Its hits are capped and merged into the synthesis context ([05-synthesis.md](./0
 
 Retrieval returns two independent lists:
 
-| List                   | Row                                                                     |
-| ---------------------- | ----------------------------------------------------------------------- |
-| Parents                | `{ knowledgeBaseId, parentId, pageId, title, sourcePath, text, score }` |
-| Image-description hits | `{ knowledgeBaseId, pageId, title, imagePath, description, score }`     |
+| List                   | Row                                                                 |
+| ---------------------- | ------------------------------------------------------------------- |
+| Parents                | `{ knowledgeBaseId, parentId, pageId, title, text, score }`         |
+| Image-description hits | `{ knowledgeBaseId, pageId, title, imagePath, description, score }` |
 
 `05-synthesis.md` folds both into the prompt ([05-synthesis.md](./05-synthesis.md#image-handling)).
 
 ## Stale vectors
 
-A null `embedding`, or an `embedding_model` that differs from the current embedding model `identifier`, excludes the row from search; repair it with a re-embed pass. Provider connection changes do not make vectors stale.
+A null `embedding`, or an `embedding_model` that differs from the current embedding model `identifier`, excludes the row from search; the owning stage repairs it — **Chunkify** re-embeds children, the **Caption pass** re-embeds image descriptions. Provider connection changes do not make vectors stale.
