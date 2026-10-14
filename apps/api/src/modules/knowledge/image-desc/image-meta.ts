@@ -124,17 +124,20 @@ export function parseImageMeta(yaml: string): ImageMetaParse {
 }
 
 /**
- * Docs-root-relative POSIX path for an image reference in a page. Returns null
- * when the reference is absolute or a URL (out of meta contract).
+ * Canonical `image_path` for an image reference in a page: the repo-root-relative
+ * POSIX path for a repo image, or the `https://` URL for an online image. Returns
+ * null when the reference is out of contract (empty, a system-absolute path, or a
+ * non-`https` scheme).
  */
 export function canonicalImagePath(
-  sourcePath: string,
+  pagePath: string,
   ref: string,
 ): string | null {
   if (ref === "") return null;
+  if (ref.startsWith("https://")) return ref;
   if (ref.startsWith("/")) return null;
   if (/^[A-Za-z]:[\\/]/.test(ref)) return null;
   if (ref.includes("://")) return null;
-  const dir = posix.dirname(sourcePath);
+  const dir = posix.dirname(pagePath);
   return posix.normalize(posix.join(dir, ref));
 }
