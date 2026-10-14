@@ -10,12 +10,6 @@
 
 **Never touches** — writes nothing.
 
-Question (string) in, ranked rows out.
-
-A search query targets a **set** of one or more knowledge bases; the caller chooses the set ([Multiple knowledge bases](#multiple-knowledge-bases)).
-
-Embed the question, similarity-search `kb_children.embedding`, expand to parents for the LLM.
-
 ## Flow
 
 1. Embed the question once (same model as children)
