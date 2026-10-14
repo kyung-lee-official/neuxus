@@ -93,11 +93,15 @@ export const UserQueryKey = {
   Sessions: (userId: string) => ["sessions", userId] as const,
   ModelConfig: ["model-providers"] as const,
   TaskModelMap: ["server-setting", "task-model-map"] as const,
-  CorpusSettings: ["knowledge", "corpus", "settings"] as const,
+  KnowledgeBases: ["knowledge-bases"] as const,
+  CorpusSettings: (knowledgeBaseId: string) =>
+    ["knowledge-bases", knowledgeBaseId, "corpus", "settings"] as const,
   LogSettings: ["log", "settings"] as const,
-  RetrieveSettings: ["knowledge", "retriever", "settings"] as const,
-  KnowledgePages: ["knowledge", "pages"] as const,
-  KnowledgePage: (id: string) => ["knowledge", "pages", id] as const,
+  RetrieveSettings: ["retriever", "settings"] as const,
+  KnowledgePages: (knowledgeBaseId: string) =>
+    ["knowledge-bases", knowledgeBaseId, "pages"] as const,
+  KnowledgePage: (knowledgeBaseId: string, id: string) =>
+    ["knowledge-bases", knowledgeBaseId, "pages", id] as const,
   /** Page of the current user's own retrieve/synthesis logs. */
   MyLogs: (userId: string, cursor: string | null) =>
     ["users", userId, "logs", cursor] as const,
@@ -286,6 +290,7 @@ export async function postQuery(input: {
   apiKey: string;
   message: string;
   mode: AskMode;
+  knowledgeBaseId: string;
   sessionId?: string | null;
 }): Promise<QueryResult> {
   return apiFetch<QueryResult>("/query", {
@@ -294,6 +299,7 @@ export async function postQuery(input: {
     body: JSON.stringify({
       message: input.message,
       mode: input.mode,
+      knowledgeBaseId: input.knowledgeBaseId,
       ...(input.sessionId ? { sessionId: input.sessionId } : {}),
     }),
   });
@@ -508,7 +514,7 @@ export type RetrieveSettings = {
 export async function getRetrieveSettings(
   apiKey: string,
 ): Promise<RetrieveSettings> {
-  return apiFetch<RetrieveSettings>("/knowledge/retriever/settings", {
+  return apiFetch<RetrieveSettings>("/retriever/settings", {
     apiKey,
   });
 }
@@ -521,7 +527,7 @@ export async function putRetrieveSettings(input: {
     maxCharacters: number | null;
   };
 }): Promise<RetrieveSettings> {
-  return apiFetch<RetrieveSettings>("/knowledge/retriever/settings", {
+  return apiFetch<RetrieveSettings>("/retriever/settings", {
     method: "PUT",
     apiKey: input.apiKey,
     body: JSON.stringify(input.settings),
@@ -531,7 +537,7 @@ export async function putRetrieveSettings(input: {
 export async function resetRetrieveSettings(
   apiKey: string,
 ): Promise<RetrieveSettings> {
-  return apiFetch<RetrieveSettings>("/knowledge/retriever/settings/reset", {
+  return apiFetch<RetrieveSettings>("/retriever/settings/reset", {
     method: "POST",
     apiKey,
   });
@@ -592,46 +598,123 @@ export async function purgeLogSettings(
 export type CorpusSettings = {
   repoUrl: string | null;
   branch: string | null;
-  docsRoot: string | null;
   lastSyncedSha: string | null;
 };
 
+// --- Knowledge-base registry ---
+
+export type KnowledgeBase = {
+  id: string;
+  name: string;
+  writable: boolean;
+  createdAt: string | null;
+};
+
+export async function listKnowledgeBases(
+  apiKey: string,
+): Promise<KnowledgeBase[]> {
+  const data = await apiFetch<{ knowledgeBases: KnowledgeBase[] }>(
+    "/knowledge-bases",
+    { apiKey },
+  );
+  return data.knowledgeBases ?? [];
+}
+
+export async function createKnowledgeBase(input: {
+  apiKey: string;
+  id: string;
+  name: string;
+  writable?: boolean;
+}): Promise<KnowledgeBase> {
+  return apiFetch<KnowledgeBase>("/knowledge-bases", {
+    method: "POST",
+    apiKey: input.apiKey,
+    body: JSON.stringify({
+      id: input.id,
+      name: input.name,
+      ...(input.writable !== undefined ? { writable: input.writable } : {}),
+    }),
+  });
+}
+
+export async function updateKnowledgeBase(input: {
+  apiKey: string;
+  id: string;
+  name?: string;
+  writable?: boolean;
+}): Promise<KnowledgeBase> {
+  return apiFetch<KnowledgeBase>(
+    `/knowledge-bases/${encodeURIComponent(input.id)}`,
+    {
+      method: "PATCH",
+      apiKey: input.apiKey,
+      body: JSON.stringify({
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.writable !== undefined ? { writable: input.writable } : {}),
+      }),
+    },
+  );
+}
+
+export async function deleteKnowledgeBase(input: {
+  apiKey: string;
+  id: string;
+}): Promise<{ deleted: boolean; id: string }> {
+  return apiFetch<{ deleted: boolean; id: string }>(
+    `/knowledge-bases/${encodeURIComponent(input.id)}`,
+    { method: "DELETE", apiKey: input.apiKey },
+  );
+}
+
 export async function getCorpusSettings(
   apiKey: string,
+  knowledgeBaseId: string,
 ): Promise<CorpusSettings> {
-  return apiFetch<CorpusSettings>("/knowledge/corpus/settings", { apiKey });
+  return apiFetch<CorpusSettings>(
+    `/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/corpus/settings`,
+    { apiKey },
+  );
 }
 
 export async function putCorpusSettings(input: {
   apiKey: string;
+  knowledgeBaseId: string;
   settings: {
     repoUrl: string | null;
     branch: string | null;
-    docsRoot: string | null;
   };
 }): Promise<CorpusSettings> {
-  return apiFetch<CorpusSettings>("/knowledge/corpus/settings", {
-    method: "PUT",
-    apiKey: input.apiKey,
-    body: JSON.stringify(input.settings),
-  });
+  return apiFetch<CorpusSettings>(
+    `/knowledge-bases/${encodeURIComponent(input.knowledgeBaseId)}/corpus/settings`,
+    {
+      method: "PUT",
+      apiKey: input.apiKey,
+      body: JSON.stringify(input.settings),
+    },
+  );
 }
 
-export async function cloneCorpus(apiKey: string): Promise<CorpusSettings> {
-  return apiFetch<CorpusSettings>("/knowledge/corpus/clone", {
-    method: "POST",
-    apiKey,
-  });
+export async function cloneCorpus(
+  apiKey: string,
+  knowledgeBaseId: string,
+): Promise<CorpusSettings> {
+  return apiFetch<CorpusSettings>(
+    `/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/corpus/clone`,
+    { method: "POST", apiKey },
+  );
 }
 
-export async function pullCorpus(apiKey: string): Promise<CorpusSettings> {
-  return apiFetch<CorpusSettings>("/knowledge/corpus/pull", {
-    method: "POST",
-    apiKey,
-  });
+export async function pullCorpus(
+  apiKey: string,
+  knowledgeBaseId: string,
+): Promise<CorpusSettings> {
+  return apiFetch<CorpusSettings>(
+    `/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/corpus/pull`,
+    { method: "POST", apiKey },
+  );
 }
 
-export type CorpusOperation = "clone" | "pull" | "chunkify" | "embed" | "sync";
+export type CorpusOperation = "clone" | "pull" | "chunkify" | "sync";
 
 export type CorpusStage =
   | "clone"
@@ -640,7 +723,7 @@ export type CorpusStage =
   | "merge"
   | "ingest"
   | "chunkify"
-  | "embed";
+  | "caption";
 
 export type CorpusProgress = {
   phase: "receiving" | "resolving" | "checking-out";
@@ -671,7 +754,6 @@ function parseCorpusStatus(value: unknown): CorpusStatus | null {
     row.operation === "clone" ||
     row.operation === "pull" ||
     row.operation === "chunkify" ||
-    row.operation === "embed" ||
     row.operation === "sync"
       ? row.operation
       : null;
@@ -682,7 +764,7 @@ function parseCorpusStatus(value: unknown): CorpusStatus | null {
     row.stage === "merge" ||
     row.stage === "ingest" ||
     row.stage === "chunkify" ||
-    row.stage === "embed"
+    row.stage === "caption"
       ? row.stage
       : null;
   let progress: CorpusProgress | null = null;
@@ -718,25 +800,24 @@ function parseCorpusStatus(value: unknown): CorpusStatus | null {
   };
 }
 
-export async function startChunkify(apiKey: string): Promise<{ ok: true }> {
-  return apiFetch<{ ok: true }>("/knowledge/corpus/chunkify", {
-    method: "POST",
-    apiKey,
-  });
+export async function startChunkify(
+  apiKey: string,
+  knowledgeBaseId: string,
+): Promise<{ ok: true }> {
+  return apiFetch<{ ok: true }>(
+    `/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/corpus/chunkify`,
+    { method: "POST", apiKey },
+  );
 }
 
-export async function startEmbed(apiKey: string): Promise<{ ok: true }> {
-  return apiFetch<{ ok: true }>("/knowledge/corpus/embed", {
-    method: "POST",
-    apiKey,
-  });
-}
-
-export async function startCorpusSync(apiKey: string): Promise<{ ok: true }> {
-  return apiFetch<{ ok: true }>("/knowledge/corpus/sync", {
-    method: "POST",
-    apiKey,
-  });
+export async function startCorpusSync(
+  apiKey: string,
+  knowledgeBaseId: string,
+): Promise<{ ok: true }> {
+  return apiFetch<{ ok: true }>(
+    `/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/corpus/sync`,
+    { method: "POST", apiKey },
+  );
 }
 
 function consumeCorpusSseBuffer(
@@ -764,14 +845,18 @@ function consumeCorpusSseBuffer(
 /** Stay-open SSE via fetch (Bearer). Resolves when the stream ends. */
 export async function subscribeCorpusEvents(
   apiKey: string,
+  knowledgeBaseId: string,
   onStatus: (status: CorpusStatus) => void,
   signal: AbortSignal,
 ): Promise<void> {
-  const res = await fetch(`${apiBaseUrl()}/knowledge/corpus/events`, {
-    headers: { Authorization: `Bearer ${apiKey}` },
-    signal,
-    cache: "no-store",
-  });
+  const res = await fetch(
+    `${apiBaseUrl()}/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/corpus/events`,
+    {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal,
+      cache: "no-store",
+    },
+  );
   if (!res.ok) {
     throw new ApiError(`HTTP ${res.status}`, res.status);
   }
@@ -796,7 +881,6 @@ export type KnowledgePageListItem = {
   title: string;
   type: string | null;
   tags: string[];
-  sourcePath: string | null;
   contentHash: string;
   updatedAt: string | null;
   parentCount: number;
@@ -830,31 +914,36 @@ export type KnowledgePageDetail = {
   type: string | null;
   tags: string[];
   body: string;
-  sourcePath: string | null;
   contentHash: string;
   updatedAt: string | null;
   parents: KnowledgeParentInspect[];
 };
 
-function knowledgePageApiPath(id: string): string {
+function knowledgePageApiPath(knowledgeBaseId: string, id: string): string {
   const encoded = id
     .split("/")
     .map((segment) => encodeURIComponent(segment))
     .join("/");
-  return `/knowledge/pages/${encoded}`;
+  return `/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/pages/${encoded}`;
 }
 
 export async function listKnowledgePages(
   apiKey: string,
+  knowledgeBaseId: string,
 ): Promise<{ pages: KnowledgePageListItem[] }> {
-  return apiFetch<{ pages: KnowledgePageListItem[] }>("/knowledge/pages", {
-    apiKey,
-  });
+  return apiFetch<{ pages: KnowledgePageListItem[] }>(
+    `/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/pages`,
+    { apiKey },
+  );
 }
 
 export async function getKnowledgePage(
   apiKey: string,
+  knowledgeBaseId: string,
   id: string,
 ): Promise<KnowledgePageDetail> {
-  return apiFetch<KnowledgePageDetail>(knowledgePageApiPath(id), { apiKey });
+  return apiFetch<KnowledgePageDetail>(
+    knowledgePageApiPath(knowledgeBaseId, id),
+    { apiKey },
+  );
 }
