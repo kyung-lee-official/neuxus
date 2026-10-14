@@ -16,7 +16,6 @@ export {
   findImageDescription,
   type ImageDescriptionRow,
   type ImageDescriptionUpdate,
-  type ImageDescriptionWithSource,
   listImageDescriptionsByPage,
   listImageDescriptionsByPolicy,
   updateImageDescription,

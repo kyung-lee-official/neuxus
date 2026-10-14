@@ -18,9 +18,11 @@ describe("canonicalImagePath", () => {
     );
   });
 
-  test("absolute and URL refs are out of contract", () => {
+  test("system-absolute refs are out of contract; https is an online image", () => {
     expect(canonicalImagePath("a.md", "/etc/a.png")).toBeNull();
-    expect(canonicalImagePath("a.md", "https://x/a.png")).toBeNull();
+    expect(canonicalImagePath("a.md", "https://x/a.png")).toBe(
+      "https://x/a.png",
+    );
     expect(canonicalImagePath("a.md", "C:\\x\\a.png")).toBeNull();
   });
 });
