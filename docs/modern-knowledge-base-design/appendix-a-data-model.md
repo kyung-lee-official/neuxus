@@ -9,13 +9,13 @@ Knowledge base ──* Page ──* Parent ──* Child (embedding)
 Knowledge base ──* Page ──* Image description (embedding)
 ```
 
-| Entity                | Role                                                                                                                                                                           | `vector`? |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------- |
-| **Knowledge base**    | Isolated knowledge set (e.g. one product); `writable` false = corpus-backed (ingest-written), true = directly written. Every row and DAL query is scoped to one knowledge base | No        |
-| **Page**              | Markdown `body`: `id`, title, ingest-normalized [`body`](./02-ingest.md#body), `content_hash`, `meta_hash`                                                                     | No        |
-| **Parent**            | Generation slice of `body`; `source_page_hash` records the `kb_pages.content_hash` it was built from                                                                           | No        |
-| **Child**             | Retrieval unit                                                                                                                                                                 | Yes       |
-| **Image description** | Per-image caption vector; identity `(knowledge_base_id, page_id, image_path)`                                                                                                  | Yes       |
+| Entity                | Role                                                                                                                                                                                               | `vector`? |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| **Knowledge base**    | Isolated knowledge set (e.g. one product); `writable` false = corpus-backed (ingest-written), true = directly written (fixed at creation). Every row and DAL query is scoped to one knowledge base | No        |
+| **Page**              | Markdown `body`: `id`, title, ingest-normalized [`body`](./02-ingest.md#body), `content_hash`, `meta_hash`                                                                                         | No        |
+| **Parent**            | Generation slice of `body`; `source_page_hash` records the `kb_pages.content_hash` it was built from                                                                                               | No        |
+| **Child**             | Retrieval unit                                                                                                                                                                                     | Yes       |
+| **Image description** | Per-image caption vector; identity `(knowledge_base_id, page_id, image_path)`                                                                                                                      | Yes       |
 
 - Every content table carries `knowledge_base_id`; primary and foreign keys are scoped to it (`(knowledge_base_id, id)`), and every DAL query filters by a single `knowledge_base_id`. `kb_children` also denormalizes `page_id` for its scans. The service layer decides which knowledge bases to read and merges a set ([04-retrieval.md](./04-retrieval.md#multiple-knowledge-bases)).
 - A **read-only** knowledge base (`kb_knowledge_bases.writable = false`) is written only by the **ingest** stage.
