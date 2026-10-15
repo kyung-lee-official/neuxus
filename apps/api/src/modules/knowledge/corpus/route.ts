@@ -12,8 +12,8 @@ const corpusDetail = {
 };
 
 /**
- * Corpus operations (clone / pull / chunkify / sync / SSE events), scoped to
- * one knowledge base: `/knowledge-bases/:kbId/corpus`. Settings live at
+ * Corpus operations (clone / pull / ingest / chunkify / caption / sync / SSE
+ * events), scoped to one knowledge base: `/knowledge-bases/:kbId/corpus`. Settings live at
  * `/knowledge-bases/:kbId/corpus/settings`.
  */
 export const corpus = new Elysia({ prefix: "/knowledge-bases/:kbId/corpus" })
@@ -44,6 +44,23 @@ export const corpus = new Elysia({ prefix: "/knowledge-bases/:kbId/corpus" })
     },
   })
   .post(
+    "/ingest",
+    async ({ params }) => ({
+      ok: true as const,
+      ...(await Corpus.ingest(params.kbId)),
+    }),
+    {
+      requireAdmin: true,
+      response: CorpusModel.corpusIngestResponse,
+      detail: {
+        ...corpusDetail,
+        summary: "Ingest the checkout",
+        description:
+          "Walk the checkout, upsert `kb_pages` (hash skip), and write image rows. Fail-fast on a body/`*.meta.yaml` mismatch. Needs a checkout — Clone first.",
+      },
+    },
+  )
+  .post(
     "/chunkify",
     async ({ params }) => ({
       ok: true as const,
@@ -56,7 +73,24 @@ export const corpus = new Elysia({ prefix: "/knowledge-bases/:kbId/corpus" })
         ...corpusDetail,
         summary: "Chunkify the corpus",
         description:
-          "Re-chunk every page (replace each page's `kb_parents` and `kb_children`). Existing embeddings become stale; run `/knowledge/corpus/embed` or a full Sync next.",
+          "Re-chunk every page (replace each page's `kb_parents` and `kb_children`) and re-embed the children. Needs ingested pages — run Ingest or Sync first.",
+      },
+    },
+  )
+  .post(
+    "/caption",
+    async ({ params }) => ({
+      ok: true as const,
+      ...(await Corpus.caption(params.kbId)),
+    }),
+    {
+      requireAdmin: true,
+      response: CorpusModel.corpusCaptionResponse,
+      detail: {
+        ...corpusDetail,
+        summary: "Caption + embed image descriptions",
+        description:
+          "Re-caption stale `vision-captioning` images and embed the descriptions. Needs a checkout (image bytes) and a linked caption model.",
       },
     },
   )

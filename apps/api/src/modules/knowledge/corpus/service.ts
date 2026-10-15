@@ -1,7 +1,7 @@
 /**
  * Corpus service. Owns the per-knowledge-base corpus operations (clone / pull /
- * rechunk / embed / sync) and the single-operation lock + progress stream they
- * share.
+ * ingest / rechunk / caption / sync) and the single-operation lock + progress
+ * stream they share.
  *
  * Lower-level pieces stay separate: `git.ts` (git plumbing), `settings/`
  * (`kb_corpus_settings`), and the checkout → pages write path in `../ingest/`.
@@ -12,7 +12,10 @@ import {
   ImageCaptioner,
   ImageDescriptionEmbedder,
 } from "../image-desc/index.ts";
-import { ingestCorpusCheckout } from "../ingest/index.ts";
+import {
+  type IngestCorpusCheckoutResult,
+  ingestCorpusCheckout,
+} from "../ingest/index.ts";
 import { Page } from "../pages/index.ts";
 import {
   type CloneProgress,
@@ -27,6 +30,7 @@ import { CorpusSettings } from "./settings/service.ts";
 /** Corpus operation ids — single source of truth. */
 export const CORPUS_OP_CLONE = "clone";
 export const CORPUS_OP_PULL = "pull";
+export const CORPUS_OP_INGEST = "ingest";
 export const CORPUS_OP_CHUNKIFY = "chunkify";
 export const CORPUS_OP_CAPTION = "caption";
 export const CORPUS_OP_SYNC = "sync";
@@ -43,6 +47,7 @@ export const CORPUS_STG_CAPTION = "caption";
 export type CorpusOperation =
   | typeof CORPUS_OP_CLONE
   | typeof CORPUS_OP_PULL
+  | typeof CORPUS_OP_INGEST
   | typeof CORPUS_OP_CHUNKIFY
   | typeof CORPUS_OP_CAPTION
   | typeof CORPUS_OP_SYNC;
@@ -97,6 +102,8 @@ function initialStage(op: CorpusOperation): CorpusStage {
       return CORPUS_STG_CLONE;
     case CORPUS_OP_PULL:
       return CORPUS_STG_FETCH;
+    case CORPUS_OP_INGEST:
+      return CORPUS_STG_INGEST;
     case CORPUS_OP_CHUNKIFY:
       return CORPUS_STG_CHUNKIFY;
     case CORPUS_OP_CAPTION:
@@ -222,6 +229,21 @@ export abstract class Corpus {
     }
   }
 
+  /** Ingest the checkout into `kb_pages` + image rows for one knowledge base. */
+  static async ingest(
+    knowledgeBaseId: string,
+  ): Promise<IngestCorpusCheckoutResult> {
+    if (!Corpus.tryStart(CORPUS_OP_INGEST)) throw new CorpusLockedError();
+    try {
+      const result = await Corpus.runIngest(knowledgeBaseId);
+      Corpus.finish();
+      return result;
+    } catch (err) {
+      Corpus.finish(err);
+      throw err;
+    }
+  }
+
   /** Force-rebuild every `kb_pages` row of one knowledge base into fresh trees. */
   static async rechunk(knowledgeBaseId: string): Promise<{
     pagesProcessed: number;
@@ -260,6 +282,14 @@ export abstract class Corpus {
     });
   }
 
+  private static async runIngest(
+    knowledgeBaseId: string,
+  ): Promise<IngestCorpusCheckoutResult> {
+    Corpus.emitStage(CORPUS_STG_INGEST);
+    const checkout = corpusCheckoutDir(knowledgeBaseId);
+    return ingestCorpusCheckout(knowledgeBaseId, checkout);
+  }
+
   private static async runCaption(
     knowledgeBaseId: string,
   ): Promise<CaptionPassResult> {
@@ -279,11 +309,9 @@ export abstract class Corpus {
 
   private static async runSync(knowledgeBaseId: string): Promise<void> {
     try {
-      const checkout = corpusCheckoutDir(knowledgeBaseId);
       Corpus.emitStage(CORPUS_STG_FETCH);
       const sha = await refreshCorpusCheckout(knowledgeBaseId);
-      Corpus.emitStage(CORPUS_STG_INGEST);
-      await ingestCorpusCheckout(knowledgeBaseId, checkout);
+      await Corpus.runIngest(knowledgeBaseId);
       Corpus.emitStage(CORPUS_STG_CHUNKIFY);
       await Page.chunkifyPages(knowledgeBaseId);
       await Corpus.runCaption(knowledgeBaseId);

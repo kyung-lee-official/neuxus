@@ -3,6 +3,7 @@ import { type Static, t } from "elysia";
 const corpusOperationLiteral = t.Union([
   t.Literal("clone"),
   t.Literal("pull"),
+  t.Literal("ingest"),
   t.Literal("chunkify"),
   t.Literal("caption"),
   t.Literal("sync"),
@@ -18,12 +19,26 @@ const corpusStageLiteral = t.Union([
   t.Literal("caption"),
 ]);
 
-/** Schemas for the corpus operation routes (clone / pull / chunkify / sync / events). */
+/** Schemas for the corpus operation routes (clone / pull / ingest / chunkify / caption / sync / events). */
 export const CorpusModel = {
+  corpusIngestResponse: t.Object({
+    ok: t.Literal(true),
+    pagesProcessed: t.Integer({ minimum: 0 }),
+    imagesUpserted: t.Integer({ minimum: 0 }),
+    imagesDeleted: t.Integer({ minimum: 0 }),
+  }),
   corpusChunkifyResponse: t.Object({
     ok: t.Literal(true),
     pagesProcessed: t.Integer({ minimum: 0 }),
     pagesSkipped: t.Integer({ minimum: 0 }),
+  }),
+  corpusCaptionResponse: t.Object({
+    ok: t.Literal(true),
+    currentModel: t.String(),
+    considered: t.Integer({ minimum: 0 }),
+    captioned: t.Integer({ minimum: 0 }),
+    skipped: t.Integer({ minimum: 0 }),
+    failed: t.Integer({ minimum: 0 }),
   }),
   corpusSyncResponse: t.Object({
     ok: t.Literal(true),
