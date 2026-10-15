@@ -14,8 +14,10 @@ import {
   listKnowledgePages,
   pullCorpus,
   putCorpusSettings,
+  startCaption,
   startChunkify,
   startCorpusSync,
+  startIngest,
   subscribeCorpusEvents,
   UserQueryKey,
 } from "@/lib/api";
@@ -43,7 +45,15 @@ type SyncHint = {
   text: string;
 };
 
-type ActionKey = "settings" | "save" | "clone" | "pull" | "chunkify" | "sync";
+type ActionKey =
+  | "settings"
+  | "save"
+  | "clone"
+  | "pull"
+  | "ingest"
+  | "chunkify"
+  | "caption"
+  | "sync";
 
 function hintClass(tone: SyncHint["tone"]): string {
   if (tone === "ok") return "m-0 text-ok text-sm";
@@ -69,7 +79,9 @@ function stageLabel(stage: CorpusStatus["stage"]): string {
 const OPERATION_PAST: Record<CorpusOperation, string> = {
   clone: "Clone",
   pull: "Pull",
+  ingest: "Ingest",
   chunkify: "Chunkify",
+  caption: "Caption",
   sync: "Sync",
 };
 
@@ -247,6 +259,15 @@ export function CorpusSettingsBlock({
     },
   });
 
+  const ingestMutation = useMutation({
+    mutationFn: () => startIngest(actorApiKey, knowledgeBaseId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: UserQueryKey.KnowledgePages(knowledgeBaseId),
+      });
+    },
+  });
+
   const chunkifyMutation = useMutation({
     mutationFn: () => startChunkify(actorApiKey, knowledgeBaseId),
     onSuccess: async () => {
@@ -254,6 +275,10 @@ export function CorpusSettingsBlock({
         queryKey: UserQueryKey.KnowledgePages(knowledgeBaseId),
       });
     },
+  });
+
+  const captionMutation = useMutation({
+    mutationFn: () => startCaption(actorApiKey, knowledgeBaseId),
   });
 
   const syncMutation = useMutation({
@@ -266,7 +291,9 @@ export function CorpusSettingsBlock({
     saveMutation.isPending ||
     cloneMutation.isPending ||
     pullMutation.isPending ||
+    ingestMutation.isPending ||
     chunkifyMutation.isPending ||
+    captionMutation.isPending ||
     syncMutation.isPending ||
     running ||
     form.formState.isSubmitting;
@@ -278,7 +305,9 @@ export function CorpusSettingsBlock({
     save: saveMutation.error,
     clone: cloneMutation.error,
     pull: pullMutation.error,
+    ingest: ingestMutation.error,
     chunkify: chunkifyMutation.error,
+    caption: captionMutation.error,
     sync: syncMutation.error,
   };
   const activeError = errorByAction[lastAction];
@@ -376,6 +405,17 @@ export function CorpusSettingsBlock({
             <button
               type="button"
               className="rounded border border-line bg-transparent px-3.5 py-1.5 text-ink text-sm disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={busy || !hasSavedRepo}
+              onClick={() => {
+                setLastAction("ingest");
+                ingestMutation.mutate();
+              }}
+            >
+              {opButtonLabel("ingest", "Ingest")}
+            </button>
+            <button
+              type="button"
+              className="rounded border border-line bg-transparent px-3.5 py-1.5 text-ink text-sm disabled:cursor-not-allowed disabled:opacity-60"
               disabled={busy || !hasPages}
               onClick={() => {
                 setLastAction("chunkify");
@@ -383,6 +423,17 @@ export function CorpusSettingsBlock({
               }}
             >
               {opButtonLabel("chunkify", "Chunkify")}
+            </button>
+            <button
+              type="button"
+              className="rounded border border-line bg-transparent px-3.5 py-1.5 text-ink text-sm disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={busy || !hasPages}
+              onClick={() => {
+                setLastAction("caption");
+                captionMutation.mutate();
+              }}
+            >
+              {opButtonLabel("caption", "Caption")}
             </button>
             <button
               type="button"

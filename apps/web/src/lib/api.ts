@@ -712,7 +712,13 @@ export async function pullCorpus(
   );
 }
 
-export type CorpusOperation = "clone" | "pull" | "chunkify" | "sync";
+export type CorpusOperation =
+  | "clone"
+  | "pull"
+  | "ingest"
+  | "chunkify"
+  | "caption"
+  | "sync";
 
 export type CorpusStage =
   | "clone"
@@ -751,7 +757,9 @@ function parseCorpusStatus(value: unknown): CorpusStatus | null {
   const operation =
     row.operation === "clone" ||
     row.operation === "pull" ||
+    row.operation === "ingest" ||
     row.operation === "chunkify" ||
+    row.operation === "caption" ||
     row.operation === "sync"
       ? row.operation
       : null;
@@ -798,12 +806,32 @@ function parseCorpusStatus(value: unknown): CorpusStatus | null {
   };
 }
 
+export async function startIngest(
+  apiKey: string,
+  knowledgeBaseId: string,
+): Promise<{ ok: true }> {
+  return apiFetch<{ ok: true }>(
+    `/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/corpus/ingest`,
+    { method: "POST", apiKey },
+  );
+}
+
 export async function startChunkify(
   apiKey: string,
   knowledgeBaseId: string,
 ): Promise<{ ok: true }> {
   return apiFetch<{ ok: true }>(
     `/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/corpus/chunkify`,
+    { method: "POST", apiKey },
+  );
+}
+
+export async function startCaption(
+  apiKey: string,
+  knowledgeBaseId: string,
+): Promise<{ ok: true }> {
+  return apiFetch<{ ok: true }>(
+    `/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/corpus/caption`,
     { method: "POST", apiKey },
   );
 }
