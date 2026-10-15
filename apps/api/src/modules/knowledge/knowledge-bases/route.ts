@@ -63,7 +63,7 @@ export const knowledgeBases = new Elysia({ prefix: "/knowledge-bases" })
       detail: {
         ...knowledgeBaseDetail,
         summary: "Update a knowledge base",
-        description: "Update `name` and/or `writable`. 404 when missing.",
+        description: "Update `name`. 404 when missing.",
       },
     },
   )

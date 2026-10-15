@@ -16,7 +16,6 @@ export const KnowledgeBasesModel = {
   }),
   updateBody: t.Object({
     name: t.Optional(t.String()),
-    writable: t.Optional(t.Boolean()),
   }),
   listResponse: t.Object({ knowledgeBases: t.Array(knowledgeBase) }),
   knowledgeBaseResponse: knowledgeBase,

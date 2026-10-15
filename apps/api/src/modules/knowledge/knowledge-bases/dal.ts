@@ -52,10 +52,10 @@ export async function createKnowledgeBase(input: {
   await getPrisma().knowledgeBase.create({ data: input });
 }
 
-/** Update `name` and/or `writable`. Missing fields are left unchanged. */
+/** Update `name`. Missing fields are left unchanged. */
 export async function updateKnowledgeBase(
   id: string,
-  fields: { name?: string; writable?: boolean },
+  fields: { name?: string },
 ): Promise<void> {
   await getPrisma().knowledgeBase.update({ where: { id }, data: fields });
 }

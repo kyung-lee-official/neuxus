@@ -641,7 +641,6 @@ export async function updateKnowledgeBase(input: {
   apiKey: string;
   id: string;
   name?: string;
-  writable?: boolean;
 }): Promise<KnowledgeBase> {
   return apiFetch<KnowledgeBase>(
     `/knowledge-bases/${encodeURIComponent(input.id)}`,
@@ -650,7 +649,6 @@ export async function updateKnowledgeBase(input: {
       apiKey: input.apiKey,
       body: JSON.stringify({
         ...(input.name !== undefined ? { name: input.name } : {}),
-        ...(input.writable !== undefined ? { writable: input.writable } : {}),
       }),
     },
   );

@@ -68,15 +68,15 @@ export abstract class KnowledgeBases {
     return (await KnowledgeBases.get(id))!;
   }
 
-  /** Update `name` and/or `writable`. 404 when missing. */
+  /** Update `name`. 404 when missing. */
   static async update(
     id: string,
-    fields: { name?: string; writable?: boolean },
+    fields: { name?: string },
   ): Promise<KnowledgeBaseView> {
     if (!(await findKnowledgeBase(id))) {
       throw status(404, { error: "Knowledge base not found" });
     }
-    const patch: { name?: string; writable?: boolean } = {};
+    const patch: { name?: string } = {};
     if (fields.name !== undefined) {
       const name = fields.name.trim();
       if (name === "") {
@@ -84,7 +84,6 @@ export abstract class KnowledgeBases {
       }
       patch.name = name;
     }
-    if (fields.writable !== undefined) patch.writable = fields.writable;
     await updateKnowledgeBase(id, patch);
     return (await KnowledgeBases.get(id))!;
   }
