@@ -132,7 +132,10 @@ export abstract class Corpus {
             /* closed */
           }
         };
-        send(Corpus.status());
+        // On connect, omit the last operation's error — it is a transient
+        // event, delivered live via `broadcast`, not replayed on a fresh
+        // connection.
+        send({ ...Corpus.status(), lastError: null });
         unsub = subscribe(send);
         ping = setInterval(() => {
           try {
