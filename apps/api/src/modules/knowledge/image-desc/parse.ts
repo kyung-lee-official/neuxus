@@ -7,6 +7,36 @@ import { dirname, isAbsolute, normalize } from "node:path";
 
 const IMAGE_MD = /^!\[.*?\]\(.*\)\s*$/;
 const IMAGE_HTML = /^<img\b[^>]*>\s*$/i;
+const FENCE_OPEN = /^( {0,3})(`{3,}|~{3,})(.*)$/;
+const FENCE_CLOSE = /^( {0,3})(`{3,}|~{3,})[ \t]*$/;
+
+/**
+ * Line indices inside fenced code blocks (fence lines included), using the same
+ * open/close rules as chunkify's lexer.
+ */
+function fencedLineIndices(lines: string[]): Set<number> {
+  const fenced = new Set<number>();
+  let ch: string | null = null;
+  let minLen = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const text = lines[i]!;
+    if (ch == null) {
+      const open = text.match(FENCE_OPEN);
+      if (open) {
+        ch = open[2]![0]!;
+        minLen = open[2]!.length;
+        fenced.add(i);
+      }
+      continue;
+    }
+    fenced.add(i);
+    const close = text.match(FENCE_CLOSE);
+    if (close && close[2]![0] === ch && close[2]!.length >= minLen) {
+      ch = null;
+    }
+  }
+  return fenced;
+}
 
 export type ParsedImageRef = {
   /** 0-based line index of the image line in the body. */
@@ -26,10 +56,15 @@ export function parseImageRefs(
   sourceAbsPath: string,
 ): ParsedImageRef[] {
   const lines = body.split("\n");
+  const fenced = fencedLineIndices(lines);
   const results: ParsedImageRef[] = [];
   let byteOffset = 0;
   for (let i = 0; i < lines.length; i++) {
     const t = lines[i]!;
+    if (fenced.has(i)) {
+      byteOffset += t.length + 1;
+      continue;
+    }
     const mdPath = pathFromMarkdown(t);
     const htmlPath = mdPath == null ? pathFromHtml(t) : null;
     if (mdPath == null && htmlPath == null) {
@@ -85,7 +120,9 @@ function resolveImagePath(sourceAbsPath: string, imagePath: string): string {
 export function imageRefsByLine(body: string): Map<number, string> {
   const out = new Map<number, string>();
   const lines = body.split("\n");
+  const fenced = fencedLineIndices(lines);
   for (let i = 0; i < lines.length; i++) {
+    if (fenced.has(i)) continue;
     const ref = pathFromMarkdown(lines[i]!) ?? pathFromHtml(lines[i]!);
     if (ref != null) out.set(i, ref);
   }

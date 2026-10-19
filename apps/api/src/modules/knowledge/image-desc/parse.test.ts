@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { normalize } from "node:path";
-import { dedupByPath, parseImageRefs } from "./parse.ts";
+import { dedupByPath, imageRefsByLine, parseImageRefs } from "./parse.ts";
 
 /**
  * Normalize path separators for portable assertions (Windows
@@ -63,5 +63,35 @@ describe("dedupByPath", () => {
     const refs = parseImageRefs(body, "/abs/dir/foo.md");
     const deduped = dedupByPath(refs);
     expect(deduped).toHaveLength(2);
+  });
+});
+
+describe("fenced code blocks", () => {
+  test("image-like line inside a fence is ignored", () => {
+    const body = ["```md", "![x](./a.png)", "```"].join("\n");
+    expect(parseImageRefs(body, "/abs/dir/foo.md")).toEqual([]);
+  });
+
+  test("a real image after a closed fence is detected", () => {
+    const body = ["```md", "![x](./a.png)", "```", "![y](./b.png)"].join("\n");
+    const refs = parseImageRefs(body, "/abs/dir/foo.md");
+    expect(refs).toHaveLength(1);
+    expect(refs[0]!.imagePath).toBe("./b.png");
+    expect(refs[0]!.imageLine).toBe(3);
+  });
+
+  test("an unclosed fence hides the rest of the body", () => {
+    const body = ["```md", "![x](./a.png)"].join("\n");
+    expect(parseImageRefs(body, "/abs/dir/foo.md")).toEqual([]);
+  });
+
+  test("tilde fences are code too", () => {
+    const body = ["~~~", "![x](./a.png)", "~~~"].join("\n");
+    expect(parseImageRefs(body, "/abs/dir/foo.md")).toEqual([]);
+  });
+
+  test("imageRefsByLine skips fenced lines", () => {
+    const body = ["```", "![x](./a.png)", "```", "![y](./b.png)"].join("\n");
+    expect([...imageRefsByLine(body).keys()]).toEqual([3]);
   });
 });
