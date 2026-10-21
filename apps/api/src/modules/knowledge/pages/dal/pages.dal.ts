@@ -180,7 +180,7 @@ async function upsertPageRow(tx: SQL, input: UpsertPageInput): Promise<void> {
       ${input.knowledgeBaseId},
       ${input.id},
       ${input.title},
-      ${tx.array(input.tags)}::text[],
+      ${tx.array(input.tags, "text[]")},
       ${input.body},
       ${input.contentHash},
       ${input.metaHash},
@@ -226,6 +226,6 @@ export async function deletePagesMissingIds(
   await sql`
     DELETE FROM kb_pages
     WHERE knowledge_base_id = ${knowledgeBaseId}
-      AND NOT (id = ANY(${sql.array(keepIds)}::text[]))
+      AND NOT (id = ANY(${sql.array(keepIds, "text[]")}))
   `;
 }
