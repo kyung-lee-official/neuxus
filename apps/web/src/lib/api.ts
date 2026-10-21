@@ -102,6 +102,8 @@ export const UserQueryKey = {
     ["knowledge-bases", knowledgeBaseId, "pages"] as const,
   KnowledgePage: (knowledgeBaseId: string, id: string) =>
     ["knowledge-bases", knowledgeBaseId, "pages", id] as const,
+  KnowledgeImages: (knowledgeBaseId: string) =>
+    ["knowledge-bases", knowledgeBaseId, "images"] as const,
   /** Page of the current user's own retrieve/synthesis logs. */
   MyLogs: (userId: string, cursor: string | null) =>
     ["users", userId, "logs", cursor] as const,
@@ -965,6 +967,34 @@ export async function getKnowledgePage(
 ): Promise<KnowledgePageDetail> {
   return apiFetch<KnowledgePageDetail>(
     knowledgePageApiPath(knowledgeBaseId, id),
+    { apiKey },
+  );
+}
+
+export type KnowledgeImageListItem = {
+  knowledgeBaseId: string;
+  pageId: string;
+  imagePath: string;
+  policy: string;
+  description: string | null;
+  imageContentHash: string | null;
+  captionModel: string | null;
+  embeddingModel: string | null;
+  embeddedAt: string | null;
+  embedded: boolean;
+};
+
+export async function listKnowledgeImages(
+  apiKey: string,
+  knowledgeBaseId: string,
+  query?: { pageId?: string; policy?: string },
+): Promise<{ images: KnowledgeImageListItem[] }> {
+  const params = new URLSearchParams();
+  if (query?.pageId) params.set("pageId", query.pageId);
+  if (query?.policy) params.set("policy", query.policy);
+  const qs = params.toString();
+  return apiFetch<{ images: KnowledgeImageListItem[] }>(
+    `/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/images${qs ? `?${qs}` : ""}`,
     { apiKey },
   );
 }

@@ -14,8 +14,10 @@
 
 export {
   findImageDescription,
+  type ImageDescriptionListRow,
   type ImageDescriptionRow,
   type ImageDescriptionUpdate,
+  listImageDescriptions,
   listImageDescriptionsByPage,
   listImageDescriptionsByPolicy,
   updateImageDescription,
@@ -44,4 +46,6 @@ export {
   ImageCaptioner,
   type ImageDescriber,
   ImageDescriptionEmbedder,
+  ImageDescriptions,
+  type KnowledgeImageListItem,
 } from "./service.ts";

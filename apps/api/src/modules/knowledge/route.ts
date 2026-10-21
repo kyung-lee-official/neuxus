@@ -39,6 +39,24 @@ const knowledgePages = new Elysia({ prefix: "/knowledge-bases/:kbId" })
           "Path is the page `id` (may contain `/`, e.g. `guide/install`). 404 if missing. Includes `body` and `parents` (ordered by `parentIndex`), each with their `children` (ordered by `childIndex`). Does not return embedding vectors.",
       },
     },
+  )
+  .get(
+    "/images",
+    ({ params, query }) =>
+      Knowledge.listImages(params.kbId, {
+        pageId: query.pageId,
+        policy: query.policy,
+      }),
+    {
+      requireAdmin: true,
+      response: KnowledgeModel.imageListResponse,
+      detail: {
+        ...pageDetail,
+        summary: "List knowledge images",
+        description:
+          "Inspect the knowledge base's `kb_image_descriptions` rows (no embedding vector). Optional `pageId` / `policy` filters.",
+      },
+    },
   );
 
 /**

@@ -10,6 +10,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 
+import { isoFromDate } from "../../../shared/serialize.ts";
 import {
   resolveTaskModelLink,
   TASK_MD_IMAGE_CAPTIONING,
@@ -17,6 +18,7 @@ import {
 import { Embedder, type EmbedFn } from "../embedder/index.ts";
 import {
   findImageDescriptionsNeedingEmbedding,
+  listImageDescriptions,
   listImageDescriptionsByPolicy,
   updateImageDescription,
   writeImageDescriptionEmbedding,
@@ -216,5 +218,40 @@ export class ImageDescriptionEmbedder {
       embedded: result.embedded,
       skipped: result.skipped,
     };
+  }
+}
+
+export type KnowledgeImageListItem = {
+  knowledgeBaseId: string;
+  pageId: string;
+  imagePath: string;
+  policy: string;
+  description: string | null;
+  imageContentHash: string | null;
+  captionModel: string | null;
+  embeddingModel: string | null;
+  embeddedAt: string | null;
+  embedded: boolean;
+};
+
+/** Read-only inspection view of `kb_image_descriptions`. */
+export abstract class ImageDescriptions {
+  static async list(
+    knowledgeBaseId: string,
+    filters?: { pageId?: string; policy?: string },
+  ): Promise<KnowledgeImageListItem[]> {
+    const rows = await listImageDescriptions(knowledgeBaseId, filters);
+    return rows.map((row) => ({
+      knowledgeBaseId: row.knowledge_base_id,
+      pageId: row.page_id,
+      imagePath: row.image_path,
+      policy: row.policy,
+      description: row.description,
+      imageContentHash: row.image_content_hash,
+      captionModel: row.caption_model,
+      embeddingModel: row.embedding_model,
+      embeddedAt: isoFromDate(row.embedded_at),
+      embedded: row.embedded,
+    }));
   }
 }

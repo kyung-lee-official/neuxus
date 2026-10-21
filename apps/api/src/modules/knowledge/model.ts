@@ -42,6 +42,22 @@ export const KnowledgeModel = {
     updatedAt: t.Union([t.String(), t.Null()]),
     parents: t.Array(knowledgeParent),
   }),
+  imageListResponse: t.Object({
+    images: t.Array(
+      t.Object({
+        knowledgeBaseId: t.String(),
+        pageId: t.String(),
+        imagePath: t.String(),
+        policy: t.String(),
+        description: t.Union([t.String(), t.Null()]),
+        imageContentHash: t.Union([t.String(), t.Null()]),
+        captionModel: t.Union([t.String(), t.Null()]),
+        embeddingModel: t.Union([t.String(), t.Null()]),
+        embeddedAt: t.Union([t.String(), t.Null()]),
+        embedded: t.Boolean(),
+      }),
+    ),
+  }),
 } as const;
 
 export type KnowledgeModel = {

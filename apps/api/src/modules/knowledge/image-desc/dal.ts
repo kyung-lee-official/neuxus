@@ -264,3 +264,46 @@ export async function updateImageDescription(
       AND image_path = ${imagePath}
   `;
 }
+
+export type ImageDescriptionListRow = {
+  knowledge_base_id: string;
+  page_id: string;
+  image_path: string;
+  policy: string;
+  description: string | null;
+  image_content_hash: string | null;
+  caption_model: string | null;
+  embedding_model: string | null;
+  embedded_at: Date | null;
+  embedded: boolean;
+};
+
+/**
+ * Image-description rows for one knowledge base, optionally narrowed by `pageId`
+ * and/or `policy`, ordered by page + image path. Never returns the vector.
+ */
+export async function listImageDescriptions(
+  knowledgeBaseId: string,
+  filters: { pageId?: string; policy?: string } = {},
+): Promise<ImageDescriptionListRow[]> {
+  const pageId = filters.pageId ?? null;
+  const policy = filters.policy ?? null;
+  return sql<ImageDescriptionListRow[]>`
+    SELECT
+      knowledge_base_id,
+      page_id,
+      image_path,
+      policy,
+      description,
+      image_content_hash,
+      caption_model,
+      embedding_model,
+      embedded_at,
+      (embedding IS NOT NULL) AS embedded
+    FROM kb_image_descriptions
+    WHERE knowledge_base_id = ${knowledgeBaseId}
+      AND (${pageId}::text IS NULL OR page_id = ${pageId})
+      AND (${policy}::text IS NULL OR policy = ${policy})
+    ORDER BY page_id, image_path
+  `;
+}

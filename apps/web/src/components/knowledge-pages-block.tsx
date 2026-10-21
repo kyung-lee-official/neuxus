@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ApiError,
   getKnowledgePage,
+  listKnowledgeImages,
   listKnowledgePages,
   UserQueryKey,
 } from "@/lib/api";
@@ -46,6 +47,17 @@ export function KnowledgePagesBlock({
     queryFn: () => {
       if (!selectedId) throw new Error("No page selected");
       return getKnowledgePage(actorApiKey, knowledgeBaseId, selectedId);
+    },
+    enabled: Boolean(selectedId),
+  });
+
+  const imagesQuery = useQuery({
+    queryKey: [...UserQueryKey.KnowledgeImages(knowledgeBaseId), selectedId],
+    queryFn: () => {
+      if (!selectedId) throw new Error("No page selected");
+      return listKnowledgeImages(actorApiKey, knowledgeBaseId, {
+        pageId: selectedId,
+      });
     },
     enabled: Boolean(selectedId),
   });
@@ -159,6 +171,54 @@ export function KnowledgePagesBlock({
                   );
                 })
               )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <h3 className="m-0 font-display text-base text-ink">
+                Images ({imagesQuery.data?.images.length ?? 0})
+              </h3>
+              {imagesQuery.isLoading ? (
+                <p className="m-0 text-muted text-sm">Loading images…</p>
+              ) : null}
+              {imagesQuery.isError ? (
+                <p className="m-0 text-danger text-sm">
+                  {errorMessage(imagesQuery.error)}
+                </p>
+              ) : null}
+              {imagesQuery.data && imagesQuery.data.images.length === 0 ? (
+                <p className="m-0 text-muted text-sm">
+                  No images on this page.
+                </p>
+              ) : null}
+              {imagesQuery.data?.images.map((image) => {
+                return (
+                  <div
+                    key={image.imagePath}
+                    className="flex flex-col gap-1 rounded border border-line p-3"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="break-all font-mono text-ink text-xs">
+                        {image.imagePath}
+                      </span>
+                      <span className="rounded border border-line px-1.5 py-0.5 font-mono text-muted text-xs">
+                        {image.policy}
+                      </span>
+                    </div>
+                    {image.description ? (
+                      <p className="m-0 line-clamp-2 text-ink text-sm">
+                        {image.description}
+                      </p>
+                    ) : (
+                      <p className="m-0 text-muted text-sm">No description.</p>
+                    )}
+                    <span className="text-muted text-xs">
+                      {image.embedded
+                        ? `Embedded · ${image.embeddingModel ?? "?"} · ${formatDateTime(image.embeddedAt)}`
+                        : "Not embedded"}
+                      {image.captionModel ? ` · ${image.captionModel}` : ""}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </>
         ) : null}
