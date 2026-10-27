@@ -37,6 +37,20 @@ export type EmbedStaleChildrenOptions = {
   embedder?: EmbedFn;
   /** Throw on the first provider failure instead of skipping the child. */
   failFast?: boolean;
+  /** Texts sent per provider call. Defaults to 32. */
+  batchSize?: number;
+  /** Called after each batch with (processed, total non-empty texts). */
+  onProgress?: (processed: number, total: number) => void;
+};
+
+export type EmbedRowsOptions<TRow> = {
+  embedder: EmbedFn;
+  writeVector: (row: TRow, vector: number[]) => Promise<void>;
+  failFast?: boolean;
+  /** Texts sent per provider call. Defaults to 32. */
+  batchSize?: number;
+  /** Called after each batch with (processed, total non-empty texts). */
+  onProgress?: (processed: number, total: number) => void;
 };
 
 export type EmbedStaleChildrenResult = EmbedRowsResult & {
@@ -68,41 +82,44 @@ export abstract class Embedder {
   }
 
   /**
-   * Embed each row; skip empty text or a failed provider call (leave DB unchanged).
+   * Embed rows in batches; skip empty text or a failed batch (leave DB
+   * unchanged). One provider call covers up to `batchSize` texts.
    * @see docs/model-management/README.md
    */
   static async embedRows<TRow extends { text: string }>(
     rows: TRow[],
-    args: {
-      embedder: EmbedFn;
-      writeVector: (row: TRow, vector: number[]) => Promise<void>;
-      failFast?: boolean;
-    },
+    args: EmbedRowsOptions<TRow>,
   ): Promise<EmbedRowsResult> {
+    const batchSize = Math.max(1, args.batchSize ?? 32);
+    const pending = rows.filter((row) => row.text !== "");
     let embedded = 0;
-    let skipped = 0;
+    let skipped = rows.length - pending.length;
+    let processed = 0;
 
-    for (const row of rows) {
-      if (row.text === "") {
-        skipped += 1;
-        continue;
-      }
+    for (let start = 0; start < pending.length; start += batchSize) {
+      const batch = pending.slice(start, start + batchSize);
+      let written = 0;
       try {
-        const vectors = await args.embedder([row.text]);
-        const vector = vectors[0];
-        if (!vector) {
-          if (args.failFast) {
-            throw new Error("embedder returned no vector");
-          }
-          skipped += 1;
-          continue;
+        const vectors = await args.embedder(batch.map((row) => row.text));
+        if (vectors.length !== batch.length) {
+          throw new Error(
+            `embedder returned ${vectors.length} vectors for ${batch.length} texts`,
+          );
         }
-        await args.writeVector(row, vector);
-        embedded += 1;
+        for (let i = 0; i < batch.length; i++) {
+          const row = batch[i];
+          const vector = vectors[i];
+          if (!row || !vector) throw new Error("embedder returned no vector");
+          await args.writeVector(row, vector);
+          written += 1;
+          embedded += 1;
+        }
       } catch (err) {
         if (args.failFast) throw err;
-        skipped += 1;
+        skipped += batch.length - written;
       }
+      processed += batch.length;
+      args.onProgress?.(processed, pending.length);
     }
 
     return { embedded, skipped };
@@ -125,6 +142,8 @@ export abstract class Embedder {
     const result = await Embedder.embedRows(children, {
       embedder: embed,
       failFast: options?.failFast,
+      batchSize: options?.batchSize,
+      onProgress: options?.onProgress,
       writeVector: async (row, vector) => {
         await writeChildEmbedding(
           row.knowledgeBaseId,
