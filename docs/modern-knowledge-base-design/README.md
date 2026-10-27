@@ -8,7 +8,7 @@
 
 Vectors are produced and consumed through a shared embed utility, not a flow step. Embedding is not a stage: a stage that produces embeddable content calls the utility as part of its own write.
 
-The stages are independent: each can run on its own, and its staleness gate decides whether it does any work. Wiring them together (an application-level job, a "sync") is optional and application layer.
+The stages are independent: each can run on its own, and its staleness gate decides whether it does any work. This app triggers every stage manually; wiring them together (an application-level job, a "sync") is optional and would live at the application layer.
 
 Content lives in **knowledge bases**: each is either **read-only** (pages ingested from a corpus and written only by the ingest stage) or **writable** (pages updated directly, not by ingest). `writable` is fixed at creation. Every write targets one knowledge base; a search query targets a set of one or more, specified by the request. The backend persists no grouping.
 
