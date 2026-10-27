@@ -81,18 +81,20 @@ export const corpus = new Elysia({ prefix: "/knowledge-bases/:kbId/corpus" })
   )
   .post(
     "/caption",
-    async ({ params }) => ({
-      ok: true as const,
-      ...(await Corpus.caption(params.kbId)),
-    }),
+    ({ params }) => {
+      Corpus.caption(params.kbId);
+      return status(202, { ok: true as const });
+    },
     {
       requireAdmin: true,
-      response: CorpusModel.corpusCaptionResponse,
+      response: {
+        202: CorpusModel.corpusAcceptedResponse,
+      },
       detail: {
         ...corpusDetail,
         summary: "Caption + embed image descriptions",
         description:
-          "Re-caption stale `vision-captioning` images and embed the descriptions. Needs a checkout (image bytes) and a linked caption model.",
+          "Re-caption stale `vision-captioning` images and embed the descriptions. Needs a checkout (image bytes) and a linked caption model. Returns 202 and runs in the background; second concurrent operation of any kind returns 409. Stream progress via `/knowledge-bases/:kbId/corpus/events`.",
       },
     },
   )

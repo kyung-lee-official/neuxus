@@ -738,7 +738,7 @@ export type CorpusProgress =
       total?: number;
     }
   | {
-      phase: "chunkify" | "embed";
+      phase: "chunkify" | "caption" | "embed";
       percent: number;
       processed: number;
       total: number;
@@ -795,7 +795,11 @@ function parseCorpusStatus(value: unknown): CorpusStatus | null {
     const processed = typeof p.processed === "number" ? p.processed : undefined;
     const total = typeof p.total === "number" ? p.total : undefined;
     if (percent !== null) {
-      if (p.phase === "chunkify" || p.phase === "embed") {
+      if (
+        p.phase === "chunkify" ||
+        p.phase === "caption" ||
+        p.phase === "embed"
+      ) {
         if (processed !== undefined && total !== undefined) {
           progress = { phase: p.phase, percent, processed, total };
         }

@@ -8,7 +8,6 @@
  */
 
 import {
-  type CaptionPassResult,
   ImageCaptioner,
   ImageDescriptionEmbedder,
 } from "../image-desc/index.ts";
@@ -59,7 +58,7 @@ export type CorpusStage =
 
 /** Progress for a non-git corpus operation (chunkify, embedding). */
 export type WorkProgress = {
-  phase: "chunkify" | "embed";
+  phase: "chunkify" | "caption" | "embed";
   percent: number;
   processed: number;
   total: number;
@@ -260,16 +259,11 @@ export abstract class Corpus {
   }
 
   /** Caption every stale `vision-captioning` image of one knowledge base. */
-  static async caption(knowledgeBaseId: string): Promise<CaptionPassResult> {
+  static caption(knowledgeBaseId: string): void {
     if (!Corpus.tryStart(CORPUS_OP_CAPTION)) throw new CorpusLockedError();
-    try {
-      const result = await Corpus.runCaption(knowledgeBaseId);
-      Corpus.finish();
-      return result;
-    } catch (err) {
-      Corpus.finish(err);
-      throw err;
-    }
+    void Corpus.runCaption(knowledgeBaseId).catch(() => {
+      /* errors already recorded in status via finish(err) */
+    });
   }
 
   private static async runChunkify(knowledgeBaseId: string): Promise<void> {
@@ -309,21 +303,40 @@ export abstract class Corpus {
     return ingestCorpusCheckout(knowledgeBaseId, checkout);
   }
 
-  private static async runCaption(
-    knowledgeBaseId: string,
-  ): Promise<CaptionPassResult> {
-    Corpus.emitStage(CORPUS_STG_CAPTION);
-    const checkout = corpusCheckoutDir(knowledgeBaseId);
-    const result = await ImageCaptioner.captionStale({
-      knowledgeBaseId,
-      checkoutDir: checkout,
-      failFast: true,
-    });
-    await ImageDescriptionEmbedder.embedStale({
-      knowledgeBaseId,
-      failFast: true,
-    });
-    return result;
+  private static async runCaption(knowledgeBaseId: string): Promise<void> {
+    try {
+      Corpus.emitStage(CORPUS_STG_CAPTION);
+      const checkout = corpusCheckoutDir(knowledgeBaseId);
+      await ImageCaptioner.captionStale({
+        knowledgeBaseId,
+        checkoutDir: checkout,
+        failFast: true,
+        onProgress: (processed, total) => {
+          Corpus.emitProgress({
+            phase: "caption",
+            percent: percentOf(processed, total),
+            processed,
+            total,
+          });
+        },
+      });
+      await ImageDescriptionEmbedder.embedStale({
+        knowledgeBaseId,
+        failFast: true,
+        onProgress: (processed, total) => {
+          Corpus.emitProgress({
+            phase: "embed",
+            percent: percentOf(processed, total),
+            processed,
+            total,
+          });
+        },
+      });
+      Corpus.finish();
+    } catch (err) {
+      Corpus.finish(err);
+      throw err;
+    }
   }
 }
 

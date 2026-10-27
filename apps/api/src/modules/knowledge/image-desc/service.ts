@@ -67,6 +67,8 @@ export type CaptionPassOptions = {
   describer?: ImageDescriber;
   /** Throw on the first failure instead of skipping the image. */
   failFast?: boolean;
+  /** Called after each candidate with (processed, total). */
+  onProgress?: (processed: number, total: number) => void;
 };
 
 export type CaptionPassResult = {
@@ -104,6 +106,7 @@ export class ImageCaptioner {
     let captioned = 0;
     let skipped = 0;
     let failed = 0;
+    let processed = 0;
 
     for (const candidate of candidates) {
       try {
@@ -148,6 +151,9 @@ export class ImageCaptioner {
       } catch (err) {
         if (options.failFast) throw err;
         failed += 1;
+      } finally {
+        processed += 1;
+        options.onProgress?.(processed, candidates.length);
       }
     }
 
@@ -171,6 +177,8 @@ export type EmbedImageDescriptionsOptions = {
   embedder?: EmbedFn;
   /** Throw on the first provider failure instead of skipping the row. */
   failFast?: boolean;
+  /** Called after each embedding batch with (processed, total). */
+  onProgress?: (processed: number, total: number) => void;
 };
 
 export type EmbedImageDescriptionsResult = {
@@ -200,6 +208,7 @@ export class ImageDescriptionEmbedder {
     const result = await Embedder.embedRows(rows, {
       embedder: embed,
       failFast: options?.failFast,
+      onProgress: options?.onProgress,
       writeVector: async (row, vector) => {
         await writeImageDescriptionEmbedding(
           row.knowledgeBaseId,

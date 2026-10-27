@@ -29,14 +29,6 @@ export const CorpusModel = {
     imagesUpserted: t.Integer({ minimum: 0 }),
     imagesDeleted: t.Integer({ minimum: 0 }),
   }),
-  corpusCaptionResponse: t.Object({
-    ok: t.Literal(true),
-    currentModel: t.String(),
-    considered: t.Integer({ minimum: 0 }),
-    captioned: t.Integer({ minimum: 0 }),
-    skipped: t.Integer({ minimum: 0 }),
-    failed: t.Integer({ minimum: 0 }),
-  }),
   corpusEvent: t.Object({
     running: t.Boolean(),
     operation: t.Union([corpusOperationLiteral, t.Null()]),

@@ -92,9 +92,11 @@ function progressText(progress: CorpusStatus["progress"]): string | null {
         ? "Resolving deltas"
         : phase === "chunkify"
           ? "Chunking pages"
-          : phase === "embed"
-            ? "Embedding children"
-            : "Checking out files";
+          : phase === "caption"
+            ? "Captioning images"
+            : phase === "embed"
+              ? "Embedding"
+              : "Checking out files";
   if (processed !== undefined && total !== undefined) {
     return `${phaseLabel}: ${percent}% (${processed}/${total})`;
   }
