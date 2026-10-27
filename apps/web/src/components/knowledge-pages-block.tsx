@@ -238,7 +238,7 @@ export function KnowledgePagesBlock({
       {err ? <p className="m-0 text-danger text-sm">{err}</p> : null}
       {!listQuery.isLoading && !err && pages.length === 0 ? (
         <p className="m-0 text-muted text-sm">
-          No pages yet. Run Sync to ingest the corpus.
+          No pages yet. Run Ingest to load the corpus.
         </p>
       ) : null}
       {pages.length > 0 ? (

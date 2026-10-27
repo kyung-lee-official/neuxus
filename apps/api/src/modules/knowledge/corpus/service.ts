@@ -1,7 +1,7 @@
 /**
  * Corpus service. Owns the per-knowledge-base corpus operations (clone / pull /
- * ingest / rechunk / caption / sync) and the single-operation lock + progress
- * stream they share.
+ * ingest / rechunk / caption) and the single-operation lock + progress stream
+ * they share.
  *
  * Lower-level pieces stay separate: `git.ts` (git plumbing), `settings/`
  * (`kb_corpus_settings`), and the checkout → pages write path in `../ingest/`.
@@ -22,10 +22,8 @@ import {
   cloneCorpusStream,
   corpusCheckoutDir,
   pullCorpusStream,
-  refreshCorpusCheckout,
 } from "./git.ts";
 import { type StoredCorpusSettings } from "./settings/defaults.ts";
-import { CorpusSettings } from "./settings/service.ts";
 
 /** Corpus operation ids — single source of truth. */
 export const CORPUS_OP_CLONE = "clone";
@@ -33,7 +31,6 @@ export const CORPUS_OP_PULL = "pull";
 export const CORPUS_OP_INGEST = "ingest";
 export const CORPUS_OP_CHUNKIFY = "chunkify";
 export const CORPUS_OP_CAPTION = "caption";
-export const CORPUS_OP_SYNC = "sync";
 
 /** Corpus stage ids — single source of truth. */
 export const CORPUS_STG_CLONE = "clone";
@@ -49,8 +46,7 @@ export type CorpusOperation =
   | typeof CORPUS_OP_PULL
   | typeof CORPUS_OP_INGEST
   | typeof CORPUS_OP_CHUNKIFY
-  | typeof CORPUS_OP_CAPTION
-  | typeof CORPUS_OP_SYNC;
+  | typeof CORPUS_OP_CAPTION;
 
 export type CorpusStage =
   | typeof CORPUS_STG_CLONE
@@ -61,7 +57,15 @@ export type CorpusStage =
   | typeof CORPUS_STG_CHUNKIFY
   | typeof CORPUS_STG_CAPTION;
 
-export type CorpusProgress = CloneProgress;
+/** Progress for a non-git corpus operation (chunkify, embedding). */
+export type WorkProgress = {
+  phase: "chunkify" | "embed";
+  percent: number;
+  processed: number;
+  total: number;
+};
+
+export type CorpusProgress = CloneProgress | WorkProgress;
 
 export type CorpusStatus = {
   running: boolean;
@@ -96,6 +100,11 @@ function errorMessage(err: unknown): string {
   return String(err);
 }
 
+function percentOf(processed: number, total: number): number {
+  if (total <= 0) return 100;
+  return Math.min(100, Math.round((processed / total) * 100));
+}
+
 function initialStage(op: CorpusOperation): CorpusStage {
   switch (op) {
     case CORPUS_OP_CLONE:
@@ -108,8 +117,6 @@ function initialStage(op: CorpusOperation): CorpusStage {
       return CORPUS_STG_CHUNKIFY;
     case CORPUS_OP_CAPTION:
       return CORPUS_STG_CAPTION;
-    case CORPUS_OP_SYNC:
-      return CORPUS_STG_FETCH;
   }
 }
 
@@ -245,20 +252,11 @@ export abstract class Corpus {
   }
 
   /** Force-rebuild every `kb_pages` row of one knowledge base into fresh trees. */
-  static async rechunk(knowledgeBaseId: string): Promise<{
-    pagesProcessed: number;
-    pagesSkipped: number;
-  }> {
+  static rechunk(knowledgeBaseId: string): void {
     if (!Corpus.tryStart(CORPUS_OP_CHUNKIFY)) throw new CorpusLockedError();
-    try {
-      Corpus.emitStage(CORPUS_STG_CHUNKIFY);
-      const result = await Page.chunkifyPages(knowledgeBaseId, { force: true });
-      Corpus.finish();
-      return result;
-    } catch (err) {
-      Corpus.finish(err);
-      throw err;
-    }
+    void Corpus.runChunkify(knowledgeBaseId).catch(() => {
+      /* errors already recorded in status via finish(err) */
+    });
   }
 
   /** Caption every stale `vision-captioning` image of one knowledge base. */
@@ -274,12 +272,33 @@ export abstract class Corpus {
     }
   }
 
-  /** Start the full sync pipeline (fetch → ingest → chunkify → caption → record sha). */
-  static sync(knowledgeBaseId: string): void {
-    if (!Corpus.tryStart(CORPUS_OP_SYNC)) throw new CorpusLockedError();
-    void Corpus.runSync(knowledgeBaseId).catch(() => {
-      /* errors already recorded in status via finish(err) */
-    });
+  private static async runChunkify(knowledgeBaseId: string): Promise<void> {
+    try {
+      Corpus.emitStage(CORPUS_STG_CHUNKIFY);
+      await Page.chunkifyPages(knowledgeBaseId, {
+        force: true,
+        onPageProgress: (processed, total) => {
+          Corpus.emitProgress({
+            phase: "chunkify",
+            percent: percentOf(processed, total),
+            processed,
+            total,
+          });
+        },
+        onEmbedProgress: (processed, total) => {
+          Corpus.emitProgress({
+            phase: "embed",
+            percent: percentOf(processed, total),
+            processed,
+            total,
+          });
+        },
+      });
+      Corpus.finish();
+    } catch (err) {
+      Corpus.finish(err);
+      throw err;
+    }
   }
 
   private static async runIngest(
@@ -305,22 +324,6 @@ export abstract class Corpus {
       failFast: true,
     });
     return result;
-  }
-
-  private static async runSync(knowledgeBaseId: string): Promise<void> {
-    try {
-      Corpus.emitStage(CORPUS_STG_FETCH);
-      const sha = await refreshCorpusCheckout(knowledgeBaseId);
-      await Corpus.runIngest(knowledgeBaseId);
-      Corpus.emitStage(CORPUS_STG_CHUNKIFY);
-      await Page.chunkifyPages(knowledgeBaseId);
-      await Corpus.runCaption(knowledgeBaseId);
-      await CorpusSettings.saveLastSyncedSha(knowledgeBaseId, sha);
-      Corpus.finish();
-    } catch (err) {
-      Corpus.finish(err);
-      throw err;
-    }
   }
 }
 

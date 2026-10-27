@@ -1,4 +1,4 @@
-/** Fallbacks when a sync walker reads a null column (not used to fill the admin form). */
+/** Fallbacks when a corpus walker reads a null column (not used to fill the admin form). */
 
 export const CORPUS_DEFAULTS = {
   repoUrl: null as string | null,

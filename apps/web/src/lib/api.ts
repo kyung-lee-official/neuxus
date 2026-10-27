@@ -719,8 +719,7 @@ export type CorpusOperation =
   | "pull"
   | "ingest"
   | "chunkify"
-  | "caption"
-  | "sync";
+  | "caption";
 
 export type CorpusStage =
   | "clone"
@@ -731,12 +730,19 @@ export type CorpusStage =
   | "chunkify"
   | "caption";
 
-export type CorpusProgress = {
-  phase: "receiving" | "resolving" | "checking-out";
-  percent: number;
-  processed?: number;
-  total?: number;
-};
+export type CorpusProgress =
+  | {
+      phase: "receiving" | "resolving" | "checking-out";
+      percent: number;
+      processed?: number;
+      total?: number;
+    }
+  | {
+      phase: "chunkify" | "embed";
+      percent: number;
+      processed: number;
+      total: number;
+    };
 
 export type CorpusStatus = {
   running: boolean;
@@ -761,8 +767,7 @@ function parseCorpusStatus(value: unknown): CorpusStatus | null {
     row.operation === "pull" ||
     row.operation === "ingest" ||
     row.operation === "chunkify" ||
-    row.operation === "caption" ||
-    row.operation === "sync"
+    row.operation === "caption"
       ? row.operation
       : null;
   const stage =
@@ -783,19 +788,24 @@ function parseCorpusStatus(value: unknown): CorpusStatus | null {
       processed?: unknown;
       total?: unknown;
     };
-    if (
-      (p.phase === "receiving" ||
+    const percent =
+      typeof p.percent === "number" && Number.isFinite(p.percent)
+        ? p.percent
+        : null;
+    const processed = typeof p.processed === "number" ? p.processed : undefined;
+    const total = typeof p.total === "number" ? p.total : undefined;
+    if (percent !== null) {
+      if (p.phase === "chunkify" || p.phase === "embed") {
+        if (processed !== undefined && total !== undefined) {
+          progress = { phase: p.phase, percent, processed, total };
+        }
+      } else if (
+        p.phase === "receiving" ||
         p.phase === "resolving" ||
-        p.phase === "checking-out") &&
-      typeof p.percent === "number" &&
-      Number.isFinite(p.percent)
-    ) {
-      progress = {
-        phase: p.phase,
-        percent: p.percent,
-        processed: typeof p.processed === "number" ? p.processed : undefined,
-        total: typeof p.total === "number" ? p.total : undefined,
-      };
+        p.phase === "checking-out"
+      ) {
+        progress = { phase: p.phase, percent, processed, total };
+      }
     }
   }
   if (row.lastError !== null && typeof row.lastError !== "string") return null;
@@ -834,16 +844,6 @@ export async function startCaption(
 ): Promise<{ ok: true }> {
   return apiFetch<{ ok: true }>(
     `/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/corpus/caption`,
-    { method: "POST", apiKey },
-  );
-}
-
-export async function startCorpusSync(
-  apiKey: string,
-  knowledgeBaseId: string,
-): Promise<{ ok: true }> {
-  return apiFetch<{ ok: true }>(
-    `/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/corpus/sync`,
     { method: "POST", apiKey },
   );
 }

@@ -37,7 +37,7 @@ export const apiTagList: { name: string; description: string }[] = [
   {
     name: API_TAGS.knowledgeCorpus,
     description:
-      "Admin corpus sync: remote settings, clone, pull, chunkify, embed, SSE events",
+      "Admin corpus checkout: remote settings, clone, pull, ingest, chunkify, caption, SSE events",
   },
   {
     name: API_TAGS.knowledgeRetriever,

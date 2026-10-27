@@ -93,7 +93,7 @@ console.log(
 );
 console.log("Knowledge: GET /knowledge/pages, GET /knowledge/pages/*");
 console.log(
-  "Corpus: GET/PUT /knowledge/corpus/settings; POST /knowledge/corpus/clone, /knowledge/corpus/pull, /knowledge/corpus/chunkify, /knowledge/corpus/embed, /knowledge/corpus/sync; GET /knowledge/corpus/events",
+  "Corpus: GET/PUT /knowledge/corpus/settings; POST /knowledge/corpus/clone, /knowledge/corpus/pull, /knowledge/corpus/chunkify, /knowledge/corpus/embed; GET /knowledge/corpus/events",
 );
 console.log(
   "Retriever: GET/PUT /knowledge/retriever/settings; POST /knowledge/retriever/settings/reset",

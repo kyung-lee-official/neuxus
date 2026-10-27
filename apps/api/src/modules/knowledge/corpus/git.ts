@@ -200,20 +200,3 @@ export async function pullCorpusStream(
   const sha = await requireHeadSha(checkout);
   return CorpusSettings.saveLastSyncedSha(knowledgeBaseId, sha);
 }
-
-/**
- * Clone if missing, otherwise pull. Returns HEAD; does not write
- * `last_synced_sha` (full Sync writes that after ingest + embed).
- */
-export async function refreshCorpusCheckout(
-  knowledgeBaseId: string,
-): Promise<string> {
-  const settings = await requireRepoUrl(knowledgeBaseId);
-  const checkout = corpusCheckoutDir(knowledgeBaseId);
-  if (existsSync(gitDir(checkout))) {
-    await pullInCheckout(settings, checkout);
-  } else {
-    await cloneIntoCheckout(settings, checkout);
-  }
-  return requireHeadSha(checkout);
-}

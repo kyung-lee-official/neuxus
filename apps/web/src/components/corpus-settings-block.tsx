@@ -16,7 +16,6 @@ import {
   putCorpusSettings,
   startCaption,
   startChunkify,
-  startCorpusSync,
   startIngest,
   subscribeCorpusEvents,
   UserQueryKey,
@@ -52,8 +51,7 @@ type ActionKey =
   | "pull"
   | "ingest"
   | "chunkify"
-  | "caption"
-  | "sync";
+  | "caption";
 
 function hintClass(tone: SyncHint["tone"]): string {
   if (tone === "ok") return "m-0 text-ok text-sm";
@@ -82,7 +80,6 @@ const OPERATION_PAST: Record<CorpusOperation, string> = {
   ingest: "Ingest",
   chunkify: "Chunkify",
   caption: "Caption",
-  sync: "Sync",
 };
 
 function progressText(progress: CorpusStatus["progress"]): string | null {
@@ -93,7 +90,11 @@ function progressText(progress: CorpusStatus["progress"]): string | null {
       ? "Receiving objects"
       : phase === "resolving"
         ? "Resolving deltas"
-        : "Checking out files";
+        : phase === "chunkify"
+          ? "Chunking pages"
+          : phase === "embed"
+            ? "Embedding children"
+            : "Checking out files";
   if (processed !== undefined && total !== undefined) {
     return `${phaseLabel}: ${percent}% (${processed}/${total})`;
   }
@@ -281,10 +282,6 @@ export function CorpusSettingsBlock({
     mutationFn: () => startCaption(actorApiKey, knowledgeBaseId),
   });
 
-  const syncMutation = useMutation({
-    mutationFn: () => startCorpusSync(actorApiKey, knowledgeBaseId),
-  });
-
   const running = status?.running === true;
   const busy =
     settingsQuery.isFetching ||
@@ -294,7 +291,6 @@ export function CorpusSettingsBlock({
     ingestMutation.isPending ||
     chunkifyMutation.isPending ||
     captionMutation.isPending ||
-    syncMutation.isPending ||
     running ||
     form.formState.isSubmitting;
 
@@ -308,7 +304,6 @@ export function CorpusSettingsBlock({
     ingest: ingestMutation.error,
     chunkify: chunkifyMutation.error,
     caption: captionMutation.error,
-    sync: syncMutation.error,
   };
   const activeError = errorByAction[lastAction];
   const actionError = activeError ? errorMessage(activeError) : null;
@@ -330,7 +325,7 @@ export function CorpusSettingsBlock({
     <section className="flex flex-col gap-3.5 rounded-md border border-line bg-surface p-6">
       <h2 className="m-0 font-display text-ink text-lg">Corpus repo</h2>
       <p className="m-0 text-muted text-sm">
-        Git remote for markdown sync. Empty URL means no clone.
+        Git remote for the markdown corpus. Empty URL means no clone.
       </p>
       <p className="m-0 text-danger/60 text-sm">
         Add this machine's SSH public key to the git repo (deploy key or
@@ -435,24 +430,12 @@ export function CorpusSettingsBlock({
             >
               {opButtonLabel("caption", "Caption")}
             </button>
-            <button
-              type="button"
-              className="rounded border border-accent bg-transparent px-3.5 py-1.5 text-accent text-sm disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={busy || !hasSavedRepo}
-              onClick={() => {
-                setLastAction("sync");
-                syncMutation.mutate();
-              }}
-            >
-              {opButtonLabel("sync", "Sync")}
-            </button>
           </div>
           {!running ? (
             <p className="m-0 text-muted text-xs">
-              Sync clones if needed, then ingests, chunkifies, and captions
-              (embedding children and descriptions as it goes). Clone and Pull
-              only update the git checkout. Chunkify re-chunks all pages and
-              re-embeds their children.
+              Clone and Pull only update the git checkout. Ingest walks the
+              checkout into pages. Chunkify re-chunks all pages and re-embeds
+              their children. Caption re-captions and embeds image descriptions.
             </p>
           ) : null}
         </form>

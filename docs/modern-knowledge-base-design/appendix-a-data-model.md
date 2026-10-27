@@ -116,7 +116,7 @@ CREATE TABLE kb_image_descriptions (
 
 Per knowledge base: git remote **and** which commit line to follow ([01-corpus.md](./01-corpus.md#source)). Not env. Nullable columns; **defaults live in application code**, not SQL `DEFAULT`. Missing row means **no remote** (`repo_url` null): do not clone; layout rules still apply to an explicit local checkout.
 
-`repo_url` / `branch` are how we fetch. `last_synced_sha` is last successful sync (not vector identity). Changing the remote does not stale embeddings by itself; reading a different commit does. Do not log future credential columns.
+`repo_url` / `branch` are how we fetch. `last_synced_sha` is the last successful clone or pull (not vector identity). Changing the remote does not stale embeddings by itself; reading a different commit does. Do not log future credential columns.
 
 App defaults (when null / no row): `repo_url` = none, `branch` = `main`, `last_synced_sha` = none.
 

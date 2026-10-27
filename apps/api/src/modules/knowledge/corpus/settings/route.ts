@@ -35,6 +35,6 @@ export const corpusSettings = new Elysia({
       ...corpusSettingsDetail,
       summary: "Update corpus settings",
       description:
-        "Empty / `null` fields store as null. Null `repoUrl` means do not clone. `lastSyncedSha` is read-only (clone, pull, and a finished Sync write it).",
+        "Empty / `null` fields store as null. Null `repoUrl` means do not clone. `lastSyncedSha` is read-only (clone and pull write it).",
     },
   });

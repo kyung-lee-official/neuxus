@@ -78,6 +78,10 @@ export type SaveKnowledgePageResult = {
 export type ChunkifyPagesOptions = {
   /** Rebuild every page's tree, ignoring the freshness gate. */
   force?: boolean;
+  /** Called after each page's tree is written. */
+  onPageProgress?: (processed: number, total: number) => void;
+  /** Called after each embedding batch. */
+  onEmbedProgress?: (processed: number, total: number) => void;
 };
 
 export type ChunkifyPagesResult = {
@@ -233,9 +237,14 @@ export abstract class Page {
       );
       pagesProcessed += 1;
       if (chunks.parents.length === 0) pagesSkipped += 1;
+      options?.onPageProgress?.(pagesProcessed, pages.length);
     }
 
-    await Embedder.embedStaleChildren({ knowledgeBaseId, failFast: true });
+    await Embedder.embedStaleChildren({
+      knowledgeBaseId,
+      failFast: true,
+      onProgress: options?.onEmbedProgress,
+    });
 
     return { pagesProcessed, pagesSkipped };
   }

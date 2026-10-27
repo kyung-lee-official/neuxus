@@ -12,7 +12,7 @@ const corpusDetail = {
 };
 
 /**
- * Corpus operations (clone / pull / ingest / chunkify / caption / sync / SSE
+ * Corpus operations (clone / pull / ingest / chunkify / caption / SSE
  * events), scoped to one knowledge base: `/knowledge-bases/:kbId/corpus`. Settings live at
  * `/knowledge-bases/:kbId/corpus/settings`.
  */
@@ -62,18 +62,20 @@ export const corpus = new Elysia({ prefix: "/knowledge-bases/:kbId/corpus" })
   )
   .post(
     "/chunkify",
-    async ({ params }) => ({
-      ok: true as const,
-      ...(await Corpus.rechunk(params.kbId)),
-    }),
+    ({ params }) => {
+      Corpus.rechunk(params.kbId);
+      return status(202, { ok: true as const });
+    },
     {
       requireAdmin: true,
-      response: CorpusModel.corpusChunkifyResponse,
+      response: {
+        202: CorpusModel.corpusAcceptedResponse,
+      },
       detail: {
         ...corpusDetail,
         summary: "Chunkify the corpus",
         description:
-          "Re-chunk every page (replace each page's `kb_parents` and `kb_children`) and re-embed the children. Needs ingested pages — run Ingest or Sync first.",
+          "Re-chunk every page (replace each page's `kb_parents` and `kb_children`) and re-embed the children. Needs ingested pages — run Ingest first. Returns 202 and runs in the background; second concurrent operation of any kind returns 409. Stream progress via `/knowledge-bases/:kbId/corpus/events`.",
       },
     },
   )
@@ -94,31 +96,12 @@ export const corpus = new Elysia({ prefix: "/knowledge-bases/:kbId/corpus" })
       },
     },
   )
-  .post(
-    "/sync",
-    ({ params }) => {
-      Corpus.sync(params.kbId);
-      return status(202, { ok: true as const });
-    },
-    {
-      requireAdmin: true,
-      response: {
-        202: CorpusModel.corpusSyncResponse,
-      },
-      detail: {
-        ...corpusDetail,
-        summary: "Start a corpus sync",
-        description:
-          "Returns 202 and starts a background singleton Sync: clone-if-missing else pull, walk the checkout, ingest/chunkify/persist (hash skip), delete rows for vanished files, embed stale children, then write `last_synced_sha` from `HEAD`. Second concurrent operation of any kind returns 409. Fail-fast; no job table. In-process lock (one API process). Stream progress via `/knowledge/corpus/events`.",
-      },
-    },
-  )
   .get("/events", () => Corpus.events(), {
     requireAdmin: true,
     response: CorpusModel.corpusEvent,
     detail: {
       ...corpusDetail,
-      summary: "Stream corpus sync events (SSE)",
+      summary: "Stream corpus operation events (SSE)",
       description:
         "Stay-open SSE. Sends a status snapshot on connect, then `{ running, operation, stage, progress, lastError }` updates and comment pings (every 15s) to keep the socket alive. Use `fetch` with `Authorization` — the browser `EventSource` API cannot set Bearer.",
     },

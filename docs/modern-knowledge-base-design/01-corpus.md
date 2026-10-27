@@ -18,7 +18,7 @@ The corpus is materialized into a local checkout before anything reads it:
 - **clone** — when the checkout is missing, from `repo_url` + `branch`.
 - **pull** — when it exists, fetch and fast-forward to the branch tip.
 
-`last_synced_sha` records the commit the checkout holds after a successful sync. Changing `repo_url` / `branch` selects a different source; the layout rules below are unchanged.
+`last_synced_sha` records the commit the checkout holds after a successful clone or pull. Changing `repo_url` / `branch` selects a different source; the layout rules below are unchanged.
 
 ## Repo layout
 
