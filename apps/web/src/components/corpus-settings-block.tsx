@@ -152,6 +152,9 @@ export function CorpusSettingsBlock({
   const [lastAction, setLastAction] = useState<ActionKey>("settings");
   const wasRunning = useRef(false);
   const lastOpRef = useRef<CorpusOperation | null>(null);
+  const running = status?.running === true;
+  const operation = status?.operation ?? null;
+  const lastError = status?.lastError ?? null;
   const settingsQuery = useQuery({
     queryKey: UserQueryKey.CorpusSettings(knowledgeBaseId),
     queryFn: () => getCorpusSettings(actorApiKey, knowledgeBaseId),
@@ -210,13 +213,12 @@ export function CorpusSettingsBlock({
   }, [actorApiKey, knowledgeBaseId]);
 
   useEffect(() => {
-    const running = status?.running ?? false;
     if (running) {
       setFinished(null);
-      if (status?.operation) lastOpRef.current = status.operation;
+      if (operation) lastOpRef.current = operation;
     }
     if (wasRunning.current && !running) {
-      setFinished(status?.lastError ? null : lastOpRef.current);
+      setFinished(lastError ? null : lastOpRef.current);
       void queryClient.invalidateQueries({
         queryKey: UserQueryKey.CorpusSettings(knowledgeBaseId),
       });
@@ -225,7 +227,7 @@ export function CorpusSettingsBlock({
       });
     }
     wasRunning.current = running;
-  }, [status, queryClient, knowledgeBaseId]);
+  }, [running, operation, lastError, queryClient, knowledgeBaseId]);
 
   const saveMutation = useMutation({
     mutationFn: (values: CorpusValues) =>
@@ -284,7 +286,6 @@ export function CorpusSettingsBlock({
     mutationFn: () => startCaption(actorApiKey, knowledgeBaseId),
   });
 
-  const running = status?.running === true;
   const busy =
     settingsQuery.isFetching ||
     saveMutation.isPending ||

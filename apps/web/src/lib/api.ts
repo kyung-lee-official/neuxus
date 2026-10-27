@@ -852,6 +852,73 @@ export async function startCaption(
   );
 }
 
+const STATUS_THROTTLE_MS = 100;
+
+function sameCorpusStatus(a: CorpusStatus, b: CorpusStatus): boolean {
+  if (
+    a.running !== b.running ||
+    a.operation !== b.operation ||
+    a.stage !== b.stage ||
+    a.lastError !== b.lastError
+  ) {
+    return false;
+  }
+  const ap = a.progress;
+  const bp = b.progress;
+  if (ap === null || bp === null) return ap === bp;
+  return (
+    ap.phase === bp.phase &&
+    ap.percent === bp.percent &&
+    ap.processed === bp.processed &&
+    ap.total === bp.total
+  );
+}
+
+type StatusSink = ((status: CorpusStatus) => void) & { flush: () => void };
+
+/**
+ * Deliver status transitions immediately; coalesce progress frames to one
+ * update per `STATUS_THROTTLE_MS`. Keeps a burst of per-item progress frames
+ * from scheduling hundreds of React updates in a single read.
+ */
+function createStatusSink(
+  onStatus: (status: CorpusStatus) => void,
+): StatusSink {
+  let latest: CorpusStatus | null = null;
+  let delivered: CorpusStatus | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  const flush = () => {
+    if (timer !== null) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    const next = latest;
+    latest = null;
+    if (next === null) return;
+    if (delivered !== null && sameCorpusStatus(delivered, next)) return;
+    delivered = next;
+    onStatus(next);
+  };
+
+  const push = (status: CorpusStatus) => {
+    latest = status;
+    const transition =
+      delivered === null ||
+      delivered.running !== status.running ||
+      delivered.operation !== status.operation ||
+      delivered.stage !== status.stage ||
+      delivered.lastError !== status.lastError;
+    if (transition) {
+      flush();
+      return;
+    }
+    if (timer === null) timer = setTimeout(flush, STATUS_THROTTLE_MS);
+  };
+
+  return Object.assign(push, { flush }) as StatusSink;
+}
+
 function consumeCorpusSseBuffer(
   buffer: string,
   onStatus: (status: CorpusStatus) => void,
@@ -898,13 +965,15 @@ export async function subscribeCorpusEvents(
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
+  const sink = createStatusSink(onStatus);
   let buffer = "";
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
-    buffer = consumeCorpusSseBuffer(buffer, onStatus);
+    buffer = consumeCorpusSseBuffer(buffer, sink);
   }
+  sink.flush();
 }
 
 export type KnowledgePageListItem = {
