@@ -82,7 +82,6 @@ type AnswerRequest = {
       content: string;
     }>;
     memories?: Array<{
-      slug?: string;
       content: string;
     }>;
     locale?: string;
@@ -116,9 +115,7 @@ Example:
       { "role": "user", "content": "I print at 0.1 mm." },
       { "role": "assistant", "content": "That is a fine layer height." }
     ],
-    "memories": [
-      { "slug": "printer", "content": "The user owns a resin printer." }
-    ],
+    "memories": [{ "content": "The user owns a resin printer." }],
     "locale": "en-US"
   },
   "options": {
