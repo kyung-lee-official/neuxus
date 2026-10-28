@@ -1,0 +1,19 @@
+{
+  "name": "@neuxus/api-chat",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --env-file=../../.env --watch run src/index.ts",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@elysia/openapi": "^1.4.15",
+    "@elysiajs/cors": "^1.4.2",
+    "elysia": "^1.4.29"
+  },
+  "devDependencies": {
+    "@neuxus/typescript-config": "workspace:*",
+    "@types/bun": "latest",
+    "typescript": "^5.9.2"
+  }
+}

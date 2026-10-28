@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "turbo run dev",
     "dev:api": "turbo run dev --filter=@neuxus/api",
+    "dev:api-chat": "turbo run dev --filter=@neuxus/api-chat",
     "dev:web": "turbo run dev --filter=@neuxus/web",
     "seed": "bun --env-file=.env run --filter @neuxus/api seed",
     "check-types": "turbo run check-types",
@@ -18,6 +19,7 @@
   },
   "workspaces": [
     "apps/api",
+    "apps/api-chat",
     "apps/web",
     "packages/*"
   ]
