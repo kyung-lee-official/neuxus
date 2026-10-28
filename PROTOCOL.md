@@ -1,4 +1,4 @@
-# neuxus Core Contract
+# neuxus Core Protocol
 
 This document defines the HTTP/JSON protocol between downstream applications and the stateless neuxus core. A request supplies the question, knowledge base, principal, and optional context. The core returns a structured knowledge outcome with citations, or a typed non-answer.
 
@@ -188,7 +188,7 @@ type Outcome =
       answer: string;
       citations: Citation[];
       signals: Signals;
-      /** Present only when options.includeRaw is true. Not part of the contract. */
+      /** Present only when options.includeRaw is true. Not part of the protocol. */
       raw?: string;
     }
   | {
@@ -231,7 +231,7 @@ type Outcome =
 | `insufficient_context` | No grounded answer. `signals.citedClaims === 0`. `reason` explains why.                                 |
 | `needs_clarification`  | The question is ambiguous. No answer and no citations.                                                  |
 
-`answer` is the validated answer assembled from grounded claims. `raw` is unvalidated model output; it is present only when requested and must never be treated as the contract.
+`answer` is the validated answer assembled from grounded claims. `raw` is unvalidated model output; it is present only when requested and must never be treated as the protocol.
 
 ### Examples
 
