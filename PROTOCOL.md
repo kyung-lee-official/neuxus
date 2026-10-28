@@ -1,37 +1,37 @@
 # neuxus Core Protocol
 
-This document defines the HTTP/JSON protocol between downstream applications and the stateless neuxus core. A request supplies the question, knowledge base, principal, and optional context. The core returns a structured knowledge outcome with citations, or a typed non-answer.
+This document defines the HTTP/JSON protocol between client apps and the stateless neuxus core. A request sends the question, knowledge base, user, and optional context. The core returns a structured result with citations, or a structured no-answer result.
 
-The core does not own sessions, messages, memory, or end-user accounts, and it does not return commands. Downstream applications own those concerns and decide what to do with an outcome.
+The core does not store sessions, messages, memory, or user accounts, and it does not return commands. Client apps own those things and decide what to do with a result.
 
 ---
 
-## Transport
+## HTTP
 
 - Base URL: `https://<core-host>`
 - Content type: `application/json; charset=utf-8`
 - Errors: `application/problem+json`
-- `GET /health` is unauthenticated.
+- `GET /health` does not require a token.
 
 ### Endpoints
 
-| Method | Path               | Purpose                                | Scope            |
-| ------ | ------------------ | -------------------------------------- | ---------------- |
-| `POST` | `/answer`          | Grounded answer or explicit non-answer | `answer:read`    |
-| `POST` | `/retrieve`        | Evidence only, no synthesis            | `retrieve:read`  |
-| `GET`  | `/knowledge-bases` | Discover available knowledge bases     | `knowledge:read` |
-| `GET`  | `/health`          | Liveness                               | none             |
+| Method | Path               | Purpose                                      | Scope            |
+| ------ | ------------------ | -------------------------------------------- | ---------------- |
+| `POST` | `/answer`          | Answer with citations, or a no-answer result | `answer:read`    |
+| `POST` | `/retrieve`        | Evidence only, no LLM answer                 | `retrieve:read`  |
+| `GET`  | `/knowledge-bases` | List knowledge bases                         | `knowledge:read` |
+| `GET`  | `/health`          | Health check                                 | none             |
 
-### Request metadata
+### Request headers
 
-- `X-Request-Id` is optional. If supplied, the core echoes it as `requestId`. If omitted, the core generates one.
-- `traceparent` (W3C Trace Context) is optional and is attached to core logs.
-- `POST /answer` and `POST /retrieve` are read-only. They do not require an `Idempotency-Key`.
+- `X-Request-Id` is optional. If supplied, the core returns it as `requestId`. If omitted, the core generates one.
+- `traceparent` (W3C Trace Context) is optional and is added to core logs.
+- `POST /answer` and `POST /retrieve` are read-only. They do not need an `Idempotency-Key`.
 - Recommended client timeout for `/answer`: 60 seconds. Streaming is not supported.
 
 ---
 
-## Authentication and principal
+## Authentication and user
 
 Every endpoint except `GET /health` requires a **service token**:
 
@@ -39,7 +39,7 @@ Every endpoint except `GET /health` requires a **service token**:
 Authorization: Bearer <service-token>
 ```
 
-A service token belongs to a downstream application, not to an end user. Each token has scopes:
+A service token belongs to a client app, not to an end user. Each token has scopes:
 
 | Scope            | Grants                 |
 | ---------------- | ---------------------- |
@@ -47,7 +47,7 @@ A service token belongs to a downstream application, not to an end user. Each to
 | `retrieve:read`  | `POST /retrieve`       |
 | `knowledge:read` | `GET /knowledge-bases` |
 
-The downstream app authenticates its own end users, then calls the core with its service token and asserts the end-user principal in the request body:
+The client app verifies its own users, then calls the core with its service token and sends the user it is acting for in the `principal` object:
 
 ```json
 {
@@ -58,9 +58,9 @@ The downstream app authenticates its own end users, then calls the core with its
 }
 ```
 
-- `principal.userId` is an opaque string used for logging and context scoping.
+- `principal.userId` is a string ID used for logging and context.
 - `principal.role` is optional and is `"admin"` or `"member"`.
-- The core trusts the calling service to assert the principal. It does not own end-user accounts.
+- The core trusts the calling app to send the principal. It does not own user accounts.
 - Do not send an end-user API key to the core.
 
 ---
@@ -89,23 +89,23 @@ type AnswerRequest = {
     locale?: string;
   };
   options?: {
-    /** Hints; the core clamps these to its server settings. */
+    /** Optional; the core caps these to its server settings. */
     childLimit?: number;
     maxParents?: number;
     maxCharacters?: number;
-    /** Include the raw model output in the response. Default: false. */
+    /** Include the model's raw output in the response. Default: false. */
     includeRaw?: boolean;
   };
 };
 ```
 
-Guidance:
+Notes:
 
 - `question` is the current user question, not a prompt.
-- `recentTurns` are for follow-ups and coreference. Send at most the most recent 20 turns; the core may truncate.
-- `memories` are user-specific context snippets. The core uses them but does not store them.
+- `recentTurns` are for follow-ups and references like "it" or "that one". Send at most the 20 most recent turns; the core may shorten them.
+- `memories` are short user-specific notes. The core uses them but does not store them.
 - `locale` is an optional language hint (BCP 47, for example `en-US`).
-- `options` are hints. The response returns the resolved limits.
+- `options` are optional; the core caps them to its server settings. The response returns the limits that were used.
 
 Example:
 
@@ -161,16 +161,16 @@ type Citation = {
   parentId: string;
   pageId: string;
   title: string;
-  /** Exact substring of the cited parent text. */
+  /** Exact text from the cited parent. */
   quote: string;
-  /** Retriever score; higher is better. Not comparable across embedding models. */
+  /** Retrieval score; higher is better. Scores from different embedding models cannot be compared. */
   score: number;
 };
 
 type Signals = {
-  /** Raw child hits before parent dedupe. */
+  /** Child hits before duplicate parents are merged. */
   hits: number;
-  /** Parents included in the synthesis prompt. */
+  /** Parents included in the answer prompt. */
   usedParents: number;
   /** Highest parent score, or null when there were no hits. */
   topScore: number | null;
@@ -178,7 +178,7 @@ type Signals = {
   margin: number | null;
   citedClaims: number;
   totalClaims: number;
-  /** The prompt or context was truncated to fit the model budget. */
+  /** The prompt or context was shortened to fit the model's limit. */
   truncated: boolean;
 };
 
@@ -195,7 +195,7 @@ type Outcome =
       kind: "partial";
       answer: string;
       citations: Citation[];
-      /** Aspects the knowledge base did not support. */
+      /** Parts the knowledge base did not support. */
       missing: string[];
       signals: Signals;
       raw?: string;
@@ -208,9 +208,9 @@ type Outcome =
         | "unsupported_claims"
         | "conflicting_evidence"
         | "budget_exceeded";
-      /** Aspects the knowledge base did not support. */
+      /** Parts the knowledge base did not support. */
       missing: string[];
-      /** Human-readable next steps. Not commands. */
+      /** Next steps for a person to read. Not commands. */
       suggestions: string[];
       signals: Signals;
     }
@@ -222,20 +222,20 @@ type Outcome =
     };
 ```
 
-### Outcome invariants
+### Outcome rules
 
-| Kind                   | Guarantees                                                                                              |
-| ---------------------- | ------------------------------------------------------------------------------------------------------- |
-| `answered`             | At least one citation. `signals.citedClaims > 0` and `signals.citedClaims === signals.totalClaims`.     |
-| `partial`              | At least one citation and at least one missing aspect. `0 < signals.citedClaims < signals.totalClaims`. |
-| `insufficient_context` | No grounded answer. `signals.citedClaims === 0`. `reason` explains why.                                 |
-| `needs_clarification`  | The question is ambiguous. No answer and no citations.                                                  |
+| Kind                   | Rules                                                                                                 |
+| ---------------------- | ----------------------------------------------------------------------------------------------------- |
+| `answered`             | At least one citation. `signals.citedClaims > 0` and `signals.citedClaims === signals.totalClaims`.   |
+| `partial`              | At least one citation and at least one missing part. `0 < signals.citedClaims < signals.totalClaims`. |
+| `insufficient_context` | No supported answer. `signals.citedClaims === 0`. `reason` explains why.                              |
+| `needs_clarification`  | The question is unclear. No answer and no citations.                                                  |
 
-`answer` is the validated answer assembled from grounded claims. `raw` is unvalidated model output; it is present only when requested and must never be treated as the protocol.
+`answer` is the checked answer built from cited claims. `raw` is the model's raw output and is not checked; it is present only when requested and must not be treated as part of the protocol.
 
 ### Examples
 
-Clearly grounded:
+A supported answer:
 
 ```json
 {
@@ -300,7 +300,7 @@ Nothing relevant in the knowledge base:
 }
 ```
 
-The question is ambiguous:
+The question is unclear:
 
 ```json
 {
@@ -332,7 +332,7 @@ The question is ambiguous:
 
 ## `POST /retrieve`
 
-Evidence only. No LLM call. Use this when the downstream app wants to do its own synthesis.
+Returns evidence only. It does not call the LLM. Use it when the client app wants to build its own answer.
 
 ### Request
 
@@ -421,7 +421,7 @@ type RetrieveResponse = {
 
 ## `GET /knowledge-bases`
 
-Discovery for downstream apps that let users choose a knowledge base.
+Lists knowledge bases so client apps can let users choose one.
 
 ```json
 {
@@ -436,13 +436,13 @@ Discovery for downstream apps that let users choose a knowledge base.
 }
 ```
 
-The response is ordered by creation time, oldest first. It contains no page content.
+The list is sorted oldest first. It contains no page content.
 
 ---
 
 ## Errors
 
-Semantic outcomes are `200`. Transport and request failures use `application/problem+json`, based on RFC 9457:
+Knowledge outcomes return `200`. HTTP and request failures use `application/problem+json`, based on RFC 9457:
 
 ```json
 {
@@ -459,37 +459,37 @@ Semantic outcomes are `200`. Transport and request failures use `application/pro
 
 ### Status codes
 
-| Status | When                                                 | `retryable` |
-| ------ | ---------------------------------------------------- | ----------- |
-| `400`  | Malformed JSON, missing `question`, invalid limits   | `false`     |
-| `401`  | Missing or invalid service token                     | `false`     |
-| `403`  | Token lacks the required scope                       | `false`     |
-| `404`  | Unknown `knowledgeBaseId`                            | `false`     |
-| `409`  | Reserved; not used by answer/retrieve                | `false`     |
-| `413`  | Request body too large                               | `false`     |
-| `429`  | Rate limited; honor `Retry-After`                    | `true`      |
-| `500`  | Unexpected core failure                              | `false`     |
-| `502`  | Upstream model or embedding provider failed          | `true`      |
-| `503`  | Core temporarily unavailable or model not configured | `true`      |
-| `504`  | Upstream provider timed out                          | `true`      |
+| Status | When                                               | `retryable` |
+| ------ | -------------------------------------------------- | ----------- |
+| `400`  | Malformed JSON, missing `question`, invalid limits | `false`     |
+| `401`  | Missing or invalid service token                   | `false`     |
+| `403`  | Token lacks the required scope                     | `false`     |
+| `404`  | Unknown `knowledgeBaseId`                          | `false`     |
+| `409`  | Not used by answer/retrieve                        | `false`     |
+| `413`  | Request body too large                             | `false`     |
+| `429`  | Rate limited; wait for `Retry-After`               | `true`      |
+| `500`  | Unexpected core failure                            | `false`     |
+| `502`  | Model or embedding provider failed                 | `true`      |
+| `503`  | Core is unavailable or the model is not configured | `true`      |
+| `504`  | Model provider timed out                           | `true`      |
 
-### Important distinctions
+### Key rules
 
 - An empty knowledge base or a query with no relevant evidence is `200` with `insufficient_context` / `reason: "no_hits"`. It is not `404`.
 - An unknown knowledge base is `404`. It is not `insufficient_context`.
 - A model provider failure is `502`/`504`. It is not `insufficient_context`.
 - Do not retry a `200 insufficient_context`. Retrying will not add knowledge.
-- Do retry `429`, `502`, `503`, and `504` with backoff.
+- Retry `429`, `502`, `503`, and `504` after waiting.
 
 ---
 
-## Interpreting outcomes
+## What outcomes mean
 
-| Kind                   | Meaning                                                       | Downstream action                                                    |
-| ---------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `answered`             | The knowledge base supports the answer; every claim is cited. | Use it.                                                              |
-| `partial`              | Some claims are grounded; `missing` lists what is not.        | Show it with a caveat, or confirm before acting.                     |
-| `insufficient_context` | The knowledge base does not support an answer.                | Fall back or say the knowledge base does not cover it. Do not retry. |
-| `needs_clarification`  | The question is ambiguous.                                    | Ask the returned `questions`. Do not guess.                          |
+| Kind                   | Meaning                                                             | What the app should do                                                |
+| ---------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `answered`             | The knowledge base supports the answer; every claim has a citation. | Use it.                                                               |
+| `partial`              | Some claims are supported; `missing` lists the rest.                | Show it with a warning, or confirm before acting.                     |
+| `insufficient_context` | The knowledge base does not support an answer.                      | Fall back, or say the knowledge base does not cover it. Do not retry. |
+| `needs_clarification`  | The question is unclear.                                            | Ask the returned `questions`. Do not guess.                           |
 
-Never derive actions from `raw` or parse `answer` as a command. The core does not return commands.
+Never build actions from `raw` or treat `answer` as a command. The core does not return commands.
