@@ -22,6 +22,8 @@ The core does not store sessions, messages, memory, or user accounts, and it doe
 | `GET`  | `/knowledge-bases` | List knowledge bases                         | `knowledge:read` |
 | `GET`  | `/health`          | Health check                                 | none             |
 
+The core sets retrieval limits such as child count, parent count, and character budget.
+
 ### Request headers
 
 - `X-Request-Id` is optional. If supplied, the core returns it as `requestId`. If omitted, the core generates one.
@@ -86,10 +88,6 @@ type AnswerRequest = {
     locale?: string;
   };
   options?: {
-    /** Optional; the core caps these to its server settings. */
-    childLimit?: number;
-    maxParents?: number;
-    maxCharacters?: number;
     /** Include the model's raw output in the response. Default: false. */
     includeRaw?: boolean;
   };
@@ -102,7 +100,7 @@ Notes:
 - `recentTurns` are for follow-ups and references like "it" or "that one". Send at most the 20 most recent turns; the core may shorten them.
 - `memories` are short user-specific notes. The core uses them but does not store them.
 - `locale` is an optional language hint (BCP 47, for example `en-US`).
-- `options` are optional; the core caps them to its server settings. The response returns the limits that were used.
+- `includeRaw` adds the model's raw output to the response.
 
 Example:
 
@@ -124,7 +122,6 @@ Example:
     "locale": "en-US"
   },
   "options": {
-    "maxParents": 8,
     "includeRaw": false
   }
 }
@@ -138,11 +135,6 @@ type AnswerResponse = {
   knowledgeBaseId: string;
   model: string; // "{providerId}::{modelId}"
   latencyMs: number;
-  limits: {
-    childLimit: number;
-    maxParents: number;
-    maxCharacters: number;
-  };
   outcome: Outcome;
 };
 ```
@@ -239,7 +231,6 @@ A supported answer:
   "knowledgeBaseId": "docs-chitubox-com",
   "model": "deepseek::deepseek-flash",
   "latencyMs": 842,
-  "limits": { "childLimit": 24, "maxParents": 8, "maxCharacters": 12000 },
   "outcome": {
     "kind": "answered",
     "answer": "Use the 0.2 mm profile when your resin and exposure settings are calibrated for it.",
@@ -274,7 +265,6 @@ Nothing relevant in the knowledge base:
   "knowledgeBaseId": "docs-chitubox-com",
   "model": "deepseek::deepseek-flash",
   "latencyMs": 61,
-  "limits": { "childLimit": 24, "maxParents": 8, "maxCharacters": 12000 },
   "outcome": {
     "kind": "insufficient_context",
     "reason": "no_hits",
@@ -304,7 +294,6 @@ The question is unclear:
   "knowledgeBaseId": "docs-chitubox-com",
   "model": "deepseek::deepseek-flash",
   "latencyMs": 44,
-  "limits": { "childLimit": 24, "maxParents": 8, "maxCharacters": 12000 },
   "outcome": {
     "kind": "needs_clarification",
     "questions": [
@@ -341,9 +330,6 @@ type RetrieveRequest = {
     userId: string;
   };
   options?: {
-    childLimit?: number;
-    maxParents?: number;
-    maxCharacters?: number;
     /** Include raw top-K child hits. Default: false. */
     includeChildren?: boolean;
   };
@@ -358,11 +344,6 @@ type RetrieveResponse = {
   knowledgeBaseId: string;
   embeddingModel: string;
   latencyMs: number;
-  limits: {
-    childLimit: number;
-    maxParents: number;
-    maxCharacters: number;
-  };
   outcome:
     | {
         kind: "hits";
@@ -457,7 +438,7 @@ Knowledge outcomes return `200`. HTTP and request failures use `application/prob
 
 | Status | When                                               | `retryable` |
 | ------ | -------------------------------------------------- | ----------- |
-| `400`  | Malformed JSON, missing `question`, invalid limits | `false`     |
+| `400`  | Malformed JSON, missing `question`                 | `false`     |
 | `401`  | Missing or invalid service token                   | `false`     |
 | `403`  | Token lacks the required scope                     | `false`     |
 | `404`  | Unknown `knowledgeBaseId`                          | `false`     |
