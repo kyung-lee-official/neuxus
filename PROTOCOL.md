@@ -30,7 +30,7 @@ The core does not store sessions, messages, memory, or user accounts, and it doe
 
 ---
 
-## Authentication and user
+## Authentication
 
 Every endpoint except `GET /health` requires a **service token**:
 
@@ -46,20 +46,18 @@ A service token belongs to a client app, not to an end user. Each token has scop
 | `retrieve:read`  | `POST /retrieve`       |
 | `knowledge:read` | `GET /knowledge-bases` |
 
-The client app verifies its own users, then calls the core with its service token and sends the user it is acting for in the `principal` object:
+The client app verifies its own users. It calls the core with its service token and sends the user ID for log attribution:
 
 ```json
 {
   "principal": {
-    "userId": "discord:123456789",
-    "role": "member"
+    "userId": "discord:123456789"
   }
 }
 ```
 
-- `principal.userId` is a string ID used for logging and context.
-- `principal.role` is optional and is `"admin"` or `"member"`.
-- The core trusts the calling app to send the principal. It does not own user accounts.
+- `principal.userId` is used only for logs.
+- The core does not use it for authentication, lookup, or permissions, and it does not store users.
 - Do not send an end-user API key to the core.
 
 ---
@@ -72,9 +70,9 @@ The client app verifies its own users, then calls the core with its service toke
 type AnswerRequest = {
   knowledgeBaseId: string;
   question: string;
+  /** User ID for logs only. Not used for auth or lookup. */
   principal: {
     userId: string;
-    role?: "admin" | "member";
   };
   context?: {
     recentTurns?: Array<{
@@ -113,8 +111,7 @@ Example:
   "knowledgeBaseId": "docs-chitubox-com",
   "question": "Which profiles support layer height 0.2 mm?",
   "principal": {
-    "userId": "desktop:user-42",
-    "role": "member"
+    "userId": "desktop:user-42"
   },
   "context": {
     "recentTurns": [
@@ -339,9 +336,9 @@ Returns evidence only. It does not call the LLM. Use it when the client app want
 type RetrieveRequest = {
   knowledgeBaseId: string;
   question: string;
+  /** User ID for logs only. Not used for auth or lookup. */
   principal: {
     userId: string;
-    role?: "admin" | "member";
   };
   options?: {
     childLimit?: number;
