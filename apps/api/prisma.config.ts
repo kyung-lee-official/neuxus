@@ -2,7 +2,7 @@ import { defineConfig } from "prisma/config";
 
 /**
  * Prisma CLI datasource — `DATABASE_URL` (neuxus).
- * Load env via `bun --env-file=../../.env` (see package.json scripts).
+ * Load env via `bun --env-file=.env` (see package.json scripts).
  */
 function databaseUrl(): string {
   const url = process.env.DATABASE_URL?.trim();

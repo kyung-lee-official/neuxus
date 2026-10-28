@@ -4,17 +4,17 @@
  * as indented JSON, and top-K hits are listed with score + full text.
  *
  * Usage:
- *   bun --env-file=../../.env run scripts/format-log.ts <log-id>
+ *   bun --env-file=.env run scripts/format-log.ts <log-id>
  *
  * Example:
- *   bun --env-file=../../.env run scripts/format-log.ts 377
+ *   bun --env-file=.env run scripts/format-log.ts 377
  */
 import { findLogById } from "../src/modules/log/dal.ts";
 
 const logId = process.argv[2];
 if (!logId) {
   console.error(
-    "usage: bun --env-file=../../.env run scripts/format-log.ts <log-id>",
+    "usage: bun --env-file=.env run scripts/format-log.ts <log-id>",
   );
   process.exit(1);
 }
