@@ -18,7 +18,7 @@ Thumbs.db
 .opencode/
 
 # Prisma Client (generated)
-apps/api/src/generated/
+apps/*/src/generated/
 
 # Corpus git checkout
 apps/api/data/
