@@ -25,9 +25,8 @@ The core does not store sessions, messages, memory, or user accounts, and it doe
 ### Request headers
 
 - `X-Request-Id` is optional. If supplied, the core returns it as `requestId`. If omitted, the core generates one.
-- `traceparent` (W3C Trace Context) is optional and is added to core logs.
-- `POST /answer` and `POST /retrieve` are read-only. They do not need an `Idempotency-Key`.
-- Recommended client timeout for `/answer`: 60 seconds. Streaming is not supported.
+- `POST /answer` and `POST /retrieve` are read-only.
+- Streaming is not supported.
 
 ---
 
