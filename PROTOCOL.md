@@ -56,7 +56,7 @@ curl https://core.example/v1/messages \
 | ------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
 | `x-api-key`               | yes (or Bearer)    | neuxus service token. Never forwarded upstream. `Authorization: Bearer` is accepted instead.                                 |
 | `anthropic-version`       | for `/v1/messages` | Validated and passed through, for example `2023-06-01`.                                                                      |
-| `X-Neuxus-Knowledge-Base` | no                 | Knowledge-base id. Falls back to the token's default; required when enrichment is on and there is no default.                |
+| `X-Neuxus-Knowledge-Base` | yes                | Knowledge-base id. Required on every `POST /v1/messages` request.                                                            |
 | `X-Neuxus-Enrich`         | no                 | `on` (default), `off`, or `fail-closed`.                                                                                     |
 | `X-Neuxus-Extensions`     | no                 | `sources` (default) or `none`.                                                                                               |
 | `X-Request-Id`            | no                 | Echoed as the `X-Request-Id` response header and, when extensions are enabled, as `neuxus.requestId`; generated when absent. |
@@ -107,13 +107,15 @@ Only these differ from Anthropic:
 
 - `model` is a value from `GET /v1/models`: a neuxus model id such as `deepseek::deepseek-flash`, or an alias that resolves to one. An unknown model is `404 model_not_found`; a model with no provider connection is `503 model_not_configured`.
 - `x-api-key` is a neuxus service token, not an Anthropic key.
-- The knowledge base is selected with `X-Neuxus-Knowledge-Base` (or the token's default), not a body field.
+- The knowledge base is selected with the required `X-Neuxus-Knowledge-Base` header, not a body field.
 
 Tools are opaque to the core. When the client sends `tools`, with or without `tool_choice`, the core forwards them and returns the model's `tool_use` blocks unchanged. The client executes tools and sends the new turn, including `tool_result` blocks, like any Anthropic client.
 
 ### Enrichment
 
-1. If the last message is `role: "user"`, has at least one `text` block, and has no `tool_result` block, select it. Otherwise forward the request unenriched. A string `content` counts as one `text` block.
+A **turn** is one entry in `messages`. A **human turn** is a `role: "user"` entry with at least one `text` block and no `tool_result` block; a string `content` counts as one `text` block. It is the current message, not the whole history.
+
+1. If the last message is a human turn, select it. Otherwise forward the request unenriched.
 2. Build the retrieval query from the text blocks of that message. The core may include recent user turns to resolve references such as "it" or "that one"; it never rewrites those turns.
 3. Retrieve parents and images from the selected knowledge base.
 4. If there are hits, prepend one `text` content block to the selected message. The user's original blocks are unchanged; if `content` was a string, convert it to one `text` block first.
@@ -131,7 +133,7 @@ Tools are opaque to the core. When the client sends `tools`, with or without `to
 6. Cap the injected text by the core's character budget and set `enrichment.truncated` when shortened.
 7. If there are no hits, do not inject an empty block. Forward the request unenriched; no hits is not an error.
 8. If retrieval fails, forward unenriched by default: `enriched: false` and `enrichment.reason: "retrieval_error"`. With `X-Neuxus-Enrich: fail-closed`, return `503 enrichment_failed`.
-9. `X-Neuxus-Enrich: off` skips retrieval and injection; the request is forwarded unchanged and no knowledge base is required.
+9. `X-Neuxus-Enrich: off` skips retrieval and injection; the request is forwarded unchanged. `X-Neuxus-Knowledge-Base` is still required.
 
 Notes:
 
@@ -194,8 +196,8 @@ type NeuxusSignals = {
 type NeuxusExtension = {
   protocolVersion: "1";
   requestId: string;
-  /** The knowledge base selected for this request, or null when none was selected. */
-  knowledgeBaseId: string | null;
+  /** The knowledge base for this request. */
+  knowledgeBaseId: string;
   enriched: boolean;
   enrichment: {
     /** Index of the enriched message in `messages`, or null. */
