@@ -79,6 +79,6 @@ Without seed, the **first** created account becomes `admin`; later accounts are 
 
 ## Docs
 
-- [PROTOCOL.md](PROTOCOL.md) — stateless core / downstream protocol
+- [PROTOCOL.md](PROTOCOL.md) — stateless core / client app protocol
 - [OpenAPI (Scalar)](http://localhost:3001/openapi) — interactive HTTP API reference, generated from each route's TypeBox schema
 - [`docs/modern-knowledge-base-design/`](docs/modern-knowledge-base-design/) — KB pipeline (corpus → ingest → chunkify → embed; query → synthesis)
