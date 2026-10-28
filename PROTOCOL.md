@@ -2,9 +2,9 @@
 
 This document defines how client apps talk to the stateless neuxus core.
 
-The **request** is the Anthropic Messages API. A client uses an Anthropic SDK, changes the base URL and API key, and sends a neuxus model id. neuxus selects the current human turn, enriches it with knowledge-base context, forwards the request to the configured model, and returns the model's response.
+For `POST /v1/messages`, the **request** is the Anthropic Messages API. A client sends a plain HTTP/JSON request with a neuxus model id or alias. An Anthropic SDK pointed at the core also works. neuxus selects the current human turn, enriches it with knowledge-base context, forwards the request to the configured model, and returns the model's response.
 
-The **response** is a superset of Anthropic's response. Every Anthropic field is preserved, and a top-level `neuxus` object carries provenance: request id, the knowledge base used, the evidence supplied, retrieval signals, and the upstream model. Clients can therefore rely on Anthropic's shape and, when they want provenance, read `neuxus`.
+The **response** for that endpoint is a superset of Anthropic's response. Every Anthropic field is preserved, and a top-level `neuxus` object carries provenance: request id, the knowledge base used, the evidence supplied, retrieval signals, and the upstream model. Clients can rely on Anthropic's shape and, when they want provenance, read `neuxus`.
 
 The core does not store sessions, messages, memory, or user accounts. The client owns the transcript and sends it on every request. The core never executes a tool; tool calls belong to the model and are executed by the client.
 
@@ -12,18 +12,24 @@ The core does not store sessions, messages, memory, or user accounts. The client
 
 ## Client setup
 
-Point an Anthropic client at the core and use a neuxus service token as the API key:
+Send a normal HTTP `POST` to the core. Any HTTP client works; an Anthropic SDK pointed at the core also works because the body is the Anthropic Messages API.
 
-```python
-from anthropic import Anthropic
-
-client = Anthropic(
-    base_url="https://core.example",
-    api_key="<neuxus-service-token>",
-)
+```bash
+curl https://core.example/v1/messages \
+  -H "x-api-key: $NEUXUS_TOKEN" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "content-type: application/json" \
+  -H "X-Neuxus-Knowledge-Base: docs-chitubox-com" \
+  -d '{
+    "model": "deepseek::deepseek-flash",
+    "max_tokens": 1024,
+    "messages": [
+      { "role": "user", "content": "Which profiles support layer height 0.2 mm?" }
+    ]
+  }'
 ```
 
-Then call `client.messages.create(...)` as usual. The request shape is unchanged; `model` is a neuxus model id and the knowledge base is selected with a header, not a body field.
+`model` is a neuxus model id or alias; the knowledge base is selected with a header, not a body field.
 
 ---
 
@@ -36,31 +42,30 @@ Then call `client.messages.create(...)` as usual. The request shape is unchanged
 
 ### Endpoints
 
-| Method | Path               | Purpose                                      | Scope            |
-| ------ | ------------------ | -------------------------------------------- | ---------------- |
-| `POST` | `/v1/messages`     | Anthropic-compatible, enriched message       | `messages:write` |
-| `POST` | `/retrieve`        | Evidence only, no LLM call                   | `retrieve:read`  |
-| `GET`  | `/v1/models`       | List model ids and aliases                   | `models:read`    |
-| `GET`  | `/knowledge-bases` | List knowledge bases                         | `knowledge:read` |
-| `GET`  | `/health`          | Health check                                 | none             |
+| Method | Path               | Purpose                                | Scope            |
+| ------ | ------------------ | -------------------------------------- | ---------------- |
+| `POST` | `/v1/messages`     | Anthropic-compatible, enriched message | `messages:write` |
+| `POST` | `/retrieve`        | Evidence only, no LLM call             | `retrieve:read`  |
+| `GET`  | `/v1/models`       | List model ids and aliases             | `models:read`    |
+| `GET`  | `/knowledge-bases` | List knowledge bases                   | `knowledge:read` |
+| `GET`  | `/health`          | Health check                           | none             |
 
 ### Request headers
 
-| Header                   | Required | Meaning                                                                 |
-| ------------------------ | -------- | ----------------------------------------------------------------------- |
-| `x-api-key`              | yes      | neuxus service token. It is never forwarded upstream.                    |
-| `anthropic-version`      | yes      | Validated and passed through, for example `2023-06-01`.                  |
-| `X-Neuxus-Knowledge-Base`| no       | Knowledge-base id. Falls back to the token's default.                    |
-| `X-Neuxus-Enrich`        | no       | `on` (default), `off`, or `fail-closed`.                                 |
-| `X-Neuxus-Extensions`    | no       | `sources` (default) or `none`.                                           |
-| `X-Request-Id`           | no       | Echoed as `neuxus.requestId`; generated when absent.                     |
-| `anthropic-beta`         | no       | Passed through.                                                          |
+| Header                    | Required           | Meaning                                                                                                                      |
+| ------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `x-api-key`               | yes (or Bearer)    | neuxus service token. Never forwarded upstream. `Authorization: Bearer` is accepted instead.                                 |
+| `anthropic-version`       | for `/v1/messages` | Validated and passed through, for example `2023-06-01`.                                                                      |
+| `X-Neuxus-Knowledge-Base` | no                 | Knowledge-base id. Falls back to the token's default; required when enrichment is on and there is no default.                |
+| `X-Neuxus-Enrich`         | no                 | `on` (default), `off`, or `fail-closed`.                                                                                     |
+| `X-Neuxus-Extensions`     | no                 | `sources` (default) or `none`.                                                                                               |
+| `X-Request-Id`            | no                 | Echoed as the `X-Request-Id` response header and, when extensions are enabled, as `neuxus.requestId`; generated when absent. |
+| `anthropic-beta`          | no                 | Passed through.                                                                                                              |
 
 Notes:
 
-- The request body is the Anthropic Messages API. This document does not redefine `model`, `messages`, `system`, `tools`, `tool_choice`, `max_tokens`, `temperature`, `top_p`, `stop_sequences`, `stream`, or `metadata`. See Anthropic's Messages API reference.
-- `metadata.user_id` is used only for log attribution. It is not authentication and is not stored.
-- `X-Neuxus-Knowledge-Base` and `X-Neuxus-Enrich` are the only neuxus-specific request controls. They are headers, so the JSON body stays compatible.
+- The request body is the Anthropic Messages API. This document does not redefine the schema of `model`, `messages`, `system`, `tools`, `tool_choice`, `max_tokens`, `temperature`, `top_p`, `stop_sequences`, `stream`, or `metadata`. See Anthropic's Messages API reference.
+- The neuxus controls (`X-Neuxus-Knowledge-Base`, `X-Neuxus-Enrich`, `X-Neuxus-Extensions`, `X-Request-Id`) are headers, so the JSON body stays Anthropic-shaped.
 
 ---
 
@@ -74,16 +79,9 @@ x-api-key: <service-token>
 
 `Authorization: Bearer <service-token>` is also accepted for non-Anthropic clients.
 
-A service token belongs to a client app, not to an end user. Each token has scopes:
+A service token belongs to a client app, not to an end user. Its scopes are listed in the Endpoints table.
 
-| Scope            | Grants                 |
-| ---------------- | ---------------------- |
-| `messages:write` | `POST /v1/messages`    |
-| `retrieve:read`  | `POST /retrieve`       |
-| `models:read`    | `GET /v1/models`       |
-| `knowledge:read` | `GET /knowledge-bases` |
-
-The client app verifies its own users. It calls the core with its service token and sends the user id in `metadata.user_id`:
+The client app verifies its own users. It calls the core with its service token. For `POST /v1/messages`, it may send the user id in `metadata.user_id`; `POST /retrieve` uses `principal` instead:
 
 ```json
 {
@@ -93,8 +91,8 @@ The client app verifies its own users. It calls the core with its service token 
 }
 ```
 
-- The core uses `metadata.user_id` only for logs.
-- The core does not use it for authentication, lookup, or permissions, and it does not store users.
+- The core uses the user id only for logs.
+- It is not used for authentication, lookup, or permissions, and the core does not store users.
 - Do not send an end-user API key or a provider API key to the core. Provider keys stay server-side.
 
 ---
@@ -103,22 +101,22 @@ The client app verifies its own users. It calls the core with its service token 
 
 ### Request
 
-The body is the Anthropic Messages API. `messages`, `system`, `tools`, `tool_choice`, and every generation parameter are passed through unchanged.
+The body is the Anthropic Messages API. `system`, `tools`, `tool_choice`, and every generation parameter are passed through unchanged. `messages` are passed through except for the enrichment described below.
 
 Only these differ from Anthropic:
 
-- `model` is a neuxus model id from `GET /v1/models`, for example `deepseek::deepseek-flash`, or a configured alias. An unknown model is `404 not_found_error`; a model with no provider connection is `503`.
+- `model` is a value from `GET /v1/models`: a neuxus model id such as `deepseek::deepseek-flash`, or an alias that resolves to one. An unknown model is `404 model_not_found`; a model with no provider connection is `503 model_not_configured`.
 - `x-api-key` is a neuxus service token, not an Anthropic key.
-- The knowledge base is selected with `X-Neuxus-Knowledge-Base`, not a body field.
+- The knowledge base is selected with `X-Neuxus-Knowledge-Base` (or the token's default), not a body field.
 
-Tools are opaque to the core. When the client sends `tools` and `tool_choice`, the core forwards them and returns the model's `tool_use` blocks unchanged. The client executes tools and sends the new turn, including `tool_result` blocks, like any Anthropic client.
+Tools are opaque to the core. When the client sends `tools`, with or without `tool_choice`, the core forwards them and returns the model's `tool_use` blocks unchanged. The client executes tools and sends the new turn, including `tool_result` blocks, like any Anthropic client.
 
 ### Enrichment
 
-1. Select the last message with `role: "user"` that has at least one `text` block and no `tool_result` block. If there is none, forward the request unenriched.
+1. If the last message is `role: "user"`, has at least one `text` block, and has no `tool_result` block, select it. Otherwise forward the request unenriched. A string `content` counts as one `text` block.
 2. Build the retrieval query from the text blocks of that message. The core may include recent user turns to resolve references such as "it" or "that one"; it never rewrites those turns.
 3. Retrieve parents and images from the selected knowledge base.
-4. If there are hits, prepend one `text` content block to the selected message. The user's original blocks are unchanged.
+4. If there are hits, prepend one `text` content block to the selected message. The user's original blocks are unchanged; if `content` was a string, convert it to one `text` block first.
 
    ```text
    <knowledge base="docs-chitubox-com">
@@ -129,17 +127,16 @@ Tools are opaque to the core. When the client sends `tools` and `tool_choice`, t
    </knowledge>
    ```
 
-5. Leave `system`, `tools`, `tool_choice`, `max_tokens`, `temperature`, and every other authorization or generation field untouched.
+5. Leave `system`, `tools`, `tool_choice`, and every other tool or generation field untouched.
 6. Cap the injected text by the core's character budget and set `enrichment.truncated` when shortened.
-7. If there are no hits, do not inject an empty block. Forward the request unenriched.
-8. If retrieval fails, forward unenriched by default: `enriched: false` and `enrichment.reason: "retrieval_error"`. With `X-Neuxus-Enrich: fail-closed`, return `503`.
-9. `X-Neuxus-Enrich: off` skips retrieval and injection; the request is forwarded unchanged.
+7. If there are no hits, do not inject an empty block. Forward the request unenriched; no hits is not an error.
+8. If retrieval fails, forward unenriched by default: `enriched: false` and `enrichment.reason: "retrieval_error"`. With `X-Neuxus-Enrich: fail-closed`, return `503 enrichment_failed`.
+9. `X-Neuxus-Enrich: off` skips retrieval and injection; the request is forwarded unchanged and no knowledge base is required.
 
 Notes:
 
 - The core enriches only the current turn. Earlier turns are never rewritten, which keeps prompt prefix caching intact.
 - The `<knowledge>` block is deliberately delimited. The core treats knowledge-base text as data, not instructions. A malicious page must not override the client's instructions or the client's tool policy.
-- The core does not run a tool loop. If the model returns `tool_use`, it is forwarded as-is.
 
 ### Response
 
@@ -192,14 +189,12 @@ type NeuxusSignals = {
   topScore: number | null;
   /** topScore minus the second parent score, or null with fewer than two parents. */
   margin: number | null;
-  /** The injected context was shortened to fit the budget. */
-  truncated: boolean;
 };
 
 type NeuxusExtension = {
   protocolVersion: "1";
   requestId: string;
-  /** The knowledge base used, or null when the request was not enriched. */
+  /** The knowledge base selected for this request, or null when none was selected. */
   knowledgeBaseId: string | null;
   enriched: boolean;
   enrichment: {
@@ -208,36 +203,28 @@ type NeuxusExtension = {
     /** Characters added to the request. */
     injectedChars: number;
     /** Why enrichment did not run, when it did not. */
-    reason?:
-      | "no_human_turn"
-      | "no_hits"
-      | "retrieval_error"
-      | "disabled"
-      | "no_knowledge_base";
+    reason?: "no_human_turn" | "no_hits" | "retrieval_error" | "disabled";
     truncated: boolean;
   };
   upstream: {
     provider: string;
     model: string;
   };
-  /**
-   * Evidence supplied to the model. This is not a claim that the model used it.
-   * neuxus does not verify which claims the answer relied on.
-   */
+  /** Parent evidence supplied to the model. */
   sources: NeuxusSource[];
   signals: NeuxusSignals;
 };
 ```
 
-`sources` are the evidence neuxus supplied. They are not verified citations. neuxus does not run a claim-checking pass in this protocol, so a client must not render `sources` as "the model cited this". A future extension may add claim-level citations; do not assume it exists.
+`sources` are the parent evidence neuxus supplied. Image descriptions injected into the context are not listed here. They are not verified citations: neuxus does not run a claim-checking pass in this protocol, so a client must not render `sources` as "the model cited this". A future extension may add claim-level citations; do not assume it exists.
+
+When enrichment runs, `sources.length` equals `signals.usedParents`. When enrichment does not run, `sources` is empty and `signals` is zeroed: `hits: 0`, `usedParents: 0`, `topScore: null`, `margin: null`.
 
 `X-Neuxus-Extensions: none` omits the `neuxus` object for clients with strict response validators.
 
 ### Streaming
 
-When `stream: true`, neuxus proxies Anthropic SSE events unchanged: `message_start`, `content_block_start`, `content_block_delta`, `content_block_stop`, `message_delta`, `message_stop`, `ping`, and `error`.
-
-One addition: `message_start.message` includes `neuxus` when extensions are enabled. Retrieval happens before the upstream call, so `neuxus.sources` and `neuxus.signals` are known when the stream starts.
+When `stream: true`, neuxus proxies Anthropic SSE events: `message_start`, `content_block_start`, `content_block_delta`, `content_block_stop`, `message_delta`, `message_stop`, `ping`, and `error`. The only change is that `message_start.message` includes `neuxus` when extensions are enabled. Retrieval happens before the upstream call, so `neuxus.sources` and `neuxus.signals` are known when the stream starts.
 
 - neuxus does not rewrite `content_block_delta` events.
 - If the upstream does not emit Anthropic SSE events, streaming is not proxied and the core returns `502`.
@@ -307,10 +294,9 @@ Response:
     ],
     "signals": {
       "hits": 24,
-      "usedParents": 3,
+      "usedParents": 1,
       "topScore": 0.87,
-      "margin": 0.14,
-      "truncated": false
+      "margin": null
     }
   }
 }
@@ -322,7 +308,7 @@ Response:
 
 Returns evidence only. It does not call an LLM. Use it when a client wants to build its own prompt or answer.
 
-`POST /retrieve` is neuxus-native, so it uses `principal` for log attribution instead of `metadata.user_id`.
+`POST /retrieve` is neuxus-native: it takes `knowledgeBaseId` in the body and uses `principal` for log attribution, instead of the `/v1/messages` header and `metadata.user_id`.
 
 ### Request
 
@@ -403,7 +389,7 @@ type RetrieveResponse = {
 
 ## `GET /v1/models`
 
-Lists the model ids a client may send to `POST /v1/messages`. It mirrors Anthropic's model-list shape:
+Lists the model ids and aliases a client may send to `POST /v1/messages`. It mirrors Anthropic's model-list shape:
 
 ```json
 {
@@ -421,7 +407,7 @@ Lists the model ids a client may send to `POST /v1/messages`. It mirrors Anthrop
 }
 ```
 
-Model ids are neuxus ids, not Anthropic ids. The id echoed in a response is the id the client sent; the upstream provider and model are in `neuxus.upstream`.
+Model ids are neuxus ids, not Anthropic ids. Each `id` is a value a client may send: a canonical id or an alias. The `id` echoed in a response is the value the client sent; when extensions are enabled, the upstream provider and model are in `neuxus.upstream`.
 
 ---
 
@@ -460,39 +446,30 @@ HTTP and request failures use Anthropic's error envelope:
 }
 ```
 
-`X-Request-Id` carries the request id on every response, including errors. A stable machine code is available in `X-Neuxus-Code`.
+The `X-Request-Id` response header carries the request id on every response, including errors. A stable machine code is available in `X-Neuxus-Code`.
 
 ### Status codes
 
-| Status | `error.type`             | `X-Neuxus-Code`                              | Retry      |
-| ------ | ------------------------ | -------------------------------------------- | ---------- |
-| `400`  | `invalid_request_error`  | `invalid_request`, `missing_knowledge_base`  | no         |
-| `401`  | `authentication_error`   | `invalid_token`                              | no         |
-| `403`  | `permission_error`       | `insufficient_scope`                         | no         |
-| `404`  | `not_found_error`        | `knowledge_base_not_found`, `model_not_found`| no         |
-| `413`  | `request_too_large`      | `request_too_large`                          | no         |
-| `429`  | `rate_limit_error`       | `rate_limited`                               | after `Retry-After` |
-| `500`  | `api_error`              | `internal_error`                             | no         |
-| `502`  | `api_error`              | `upstream_error`, `non_anthropic_upstream`   | yes        |
-| `503`  | `overloaded_error`       | `model_not_configured`, `enrichment_failed`  | yes        |
-| `504`  | `api_error`              | `upstream_timeout`                           | yes        |
-
-### Key rules
-
-- An empty knowledge base or a query with no relevant evidence is not an error. The request is forwarded unenriched with `neuxus.enriched: false` and `enrichment.reason: "no_hits"`.
-- An unknown knowledge base is `404`. A token without a default and no `X-Neuxus-Knowledge-Base` header is `400 missing_knowledge_base`.
-- A provider failure is `502` or `504`. It is not an empty answer.
-- Retrieval failure is fail-open by default. Use `X-Neuxus-Enrich: fail-closed` to return `503 enrichment_failed` instead.
-- Retry `429`, `502`, `503`, and `504` after waiting.
+| Status | `error.type`            | `X-Neuxus-Code`                               | Retry               |
+| ------ | ----------------------- | --------------------------------------------- | ------------------- |
+| `400`  | `invalid_request_error` | `invalid_request`, `missing_knowledge_base`   | no                  |
+| `401`  | `authentication_error`  | `invalid_token`                               | no                  |
+| `403`  | `permission_error`      | `insufficient_scope`                          | no                  |
+| `404`  | `not_found_error`       | `knowledge_base_not_found`, `model_not_found` | no                  |
+| `413`  | `request_too_large`     | `request_too_large`                           | no                  |
+| `429`  | `rate_limit_error`      | `rate_limited`                                | after `Retry-After` |
+| `500`  | `api_error`             | `internal_error`                              | no                  |
+| `502`  | `api_error`             | `upstream_error`                              | yes                 |
+| `502`  | `api_error`             | `non_anthropic_upstream`                      | no                  |
+| `503`  | `api_error`             | `model_not_configured`                        | no                  |
+| `503`  | `api_error`             | `enrichment_failed`                           | yes                 |
+| `504`  | `api_error`             | `upstream_timeout`                            | yes                 |
 
 ---
 
 ## Compatibility notes
 
-- **Request:** Anthropic Messages API shape. `model` uses a neuxus id; the knowledge base and enrichment controls are headers.
-- **Response:** Anthropic-compatible plus a top-level `neuxus` object. Clients with strict validators should send `X-Neuxus-Extensions: none`.
-- **Model ids:** neuxus ids from `GET /v1/models`, not Anthropic ids.
-- **Auth:** a neuxus service token in `x-api-key`. Provider keys never leave the core.
-- **Citations:** `neuxus.sources` is evidence supplied to the model, not verified claim-level citations.
-- **Tools:** forwarded untouched. The core never executes a tool and never authorizes an operation; the client decides.
-- **Streaming:** Anthropic SSE is proxied unchanged, with `neuxus` added to `message_start`.
+- The request is Anthropic Messages API shape. `model` is a neuxus id or alias; the knowledge base and enrichment controls are headers.
+- The response preserves Anthropic's fields and adds `neuxus`. Clients with strict response validators should send `X-Neuxus-Extensions: none`.
+- `neuxus.sources` is parent evidence supplied to the model, not verified claim-level citations.
+- Tools are forwarded untouched. The core never executes a tool; the client decides.
