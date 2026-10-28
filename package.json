@@ -13,7 +13,7 @@
     "dev:api": "turbo run dev --filter=@neuxus/api",
     "dev:api-chat": "turbo run dev --filter=@neuxus/api-chat",
     "dev:web": "turbo run dev --filter=@neuxus/web",
-    "seed": "bun --env-file=.env run --filter @neuxus/api seed",
+    "seed": "turbo run seed --filter=@neuxus/api",
     "check-types": "turbo run check-types",
     "prepare": "lefthook install"
   },
