@@ -66,3 +66,46 @@ model Message {
   @@index([sessionId, createdAt], map: "app_messages_session_id_idx")
   @@map("app_messages")
 }
+
+/// Generic structured app log row (`app_log`). One row per log record.
+/// `meta` carries the timestamp, pid, hostname, context tree, and any
+/// app bindings. `level`, `msg`, and `name` are top-level for cheap
+/// filtering. No FK to `app_users`; logging must never block a request
+/// on referential checks.
+model AppLog {
+  id        BigInt   @id @default(autoincrement())
+  /// `trace` | `debug` | `info` | `warn` | `error` | `fatal`
+  level     String
+  msg       String
+  /// Child logger name (e.g. `"synthesis"`, `"auth"`). Null for root.
+  name      String?
+  /// Full log record minus the columns above.
+  meta      Json
+  /// Optional owner. Null when the log is not user-scoped. No FK.
+  userId    String?  @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([createdAt(sort: Desc)], map: "app_log_created_at_idx")
+  @@index([level, createdAt(sort: Desc)], map: "app_log_level_created_at_idx")
+  @@index([name, createdAt(sort: Desc)], map: "app_log_name_created_at_idx")
+  @@index([userId, createdAt(sort: Desc)], map: "app_log_user_id_created_at_idx")
+  @@map("app_log")
+}
+
+/// Logger runtime config (`app_log_settings`). Single row, id = `"default"`.
+/// Nullable columns; app defaults live in code, not SQL DEFAULT. Mirrors the
+/// other single-row config tables.
+model AppLogSettings {
+  id String @id @default("default")
+
+  /// Any combination of `console` and `postgres`. Empty means app defaults.
+  sinks          String[] @default([])
+  /// Bounded queue capacity for the postgres sink. Null falls back.
+  queueSize      Int?     @map("queue_size")
+  /// Drain budget (ms) for the worker on shutdown.
+  drainTimeoutMs Int?     @map("drain_timeout_ms")
+  /// Pretty-print stdout. Null falls back.
+  pretty         Boolean?
+
+  @@map("app_log_settings")
+}

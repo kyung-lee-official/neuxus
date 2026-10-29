@@ -21,7 +21,7 @@ neuxus/
 | Postgres (`neuxus`)      | Knowledge, model providers, logs, settings           |
 | Postgres (`neuxus-chat`) | Users, memories, sessions, messages                  |
 | `apps/api`               | Service-token API: knowledge, models, logs, settings |
-| `apps/api-chat`          | User API keys, sessions, memory, chat adapter        |
+| `apps/api-chat`          | User API keys, sessions, memory, logs, chat adapter  |
 | `apps/web`               | `/neuxus` settings UI and `/chat` UI                 |
 | Model providers          | Embedding and synthesis models, configured in the UI |
 
