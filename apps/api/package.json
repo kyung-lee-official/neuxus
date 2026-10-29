@@ -4,7 +4,6 @@
   "type": "module",
   "scripts": {
     "dev": "bun --env-file=.env --watch run src/index.ts",
-    "seed": "bun --env-file=.env run scripts/seed.ts",
     "test": "bun test",
     "prisma": "bun --env-file=.env ./node_modules/prisma/build/index.js",
     "prisma:generate": "bun --env-file=.env ./node_modules/prisma/build/index.js generate",

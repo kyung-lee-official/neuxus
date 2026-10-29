@@ -13,8 +13,6 @@
     "dev:api": "turbo run dev --filter=@neuxus/api",
     "dev:api-chat": "turbo run dev --filter=@neuxus/api-chat",
     "dev:web": "turbo run dev --filter=@neuxus/web",
-    "seed": "turbo run seed",
-    "seed:api": "turbo run seed --filter=@neuxus/api",
     "seed:api-chat": "turbo run seed --filter=@neuxus/api-chat",
     "check-types": "turbo run check-types",
     "prepare": "lefthook install"
