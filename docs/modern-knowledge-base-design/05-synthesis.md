@@ -1,13 +1,5 @@
 # Synthesis (context enrichment before the model call)
 
-neuxus is client-agnostic: it does not know the client's tools, policy, persona,
-or goal. Synthesis is therefore a deterministic context-enrichment step, not an
-agent planner. The client owns the agent loop; neuxus supplies knowledge-base
-evidence and returns the model response plus provenance.
-
-The endpoint and full request/response shape are in
-[Appendix B](./appendix-b-protocol.md).
-
 **Does** - selects the current human turn, retrieves knowledge-base evidence,
 assembles a `<knowledge>` block, prepends it to that turn, forwards the enriched
 Anthropic request to the provider, and returns the response plus `neuxus`.
@@ -23,6 +15,63 @@ results, and model/provider configuration.
 
 **Never touches** - earlier turns, `system`, `tools`, `tool_choice`, or
 generation parameters. It never executes a tool.
+
+neuxus is client-agnostic: it does not know the client's tools, policy, persona,
+or goal. Synthesis is therefore a deterministic context-enrichment step, not an
+agent planner. The client owns the agent loop; neuxus supplies knowledge-base
+evidence and returns the model response plus provenance.
+
+The endpoint and full request/response shape are in
+[Appendix B](./appendix-b-protocol.md).
+
+## Flowchart
+
+```mermaid
+---
+theme: neo-dark
+---
+flowchart TD
+  REQUEST["Client sends Anthropic Messages request<br/>+ X-Neuxus-Knowledge-Base"] --> HUMAN{"Last message is a human turn?"}
+  HUMAN -- "no" --> NO_TURN["Forward unenriched<br/>reason: no_human_turn"]
+  HUMAN -- "yes" --> QUERY["Build retrieval query<br/>current human text + recent user turns"]
+  QUERY --> RETRIEVE["Retrieve knowledge-base evidence<br/>parents + image descriptions"]
+  RETRIEVE -. "retrieval error" .-> RETRIEVAL_ERROR["Forward unenriched<br/>reason: retrieval_error"]
+  RETRIEVE --> HITS{"Any hits?"}
+  HITS -- "no" --> NO_HITS["Forward unenriched<br/>reason: no_hits"]
+  HITS -- "yes" --> SELECT["Select evidence<br/>rank, dedupe, cap budget"]
+  SELECT --> ASSEMBLE["Assemble knowledge block<br/>source lines + image folding"]
+  ASSEMBLE --> INJECT["Prepend block to the human turn<br/>preserve system, tools, tool_choice, history"]
+  INJECT --> FORWARD["Forward enriched request<br/>provider /v1/messages"]
+  NO_TURN --> FORWARD
+  NO_HITS --> FORWARD
+  RETRIEVAL_ERROR --> FORWARD
+  FORWARD --> RESPONSE["Anthropic response + neuxus<br/>sources, signals, enrichment, upstream"]
+  RESPONSE --> CLIENT_LOOP["Client owns the agent loop<br/>tools, policy, session, memory"]
+
+  subgraph neuxus["neuxus boundary: evidence enrichment only"]
+    HUMAN
+    QUERY
+    RETRIEVE
+    HITS
+    SELECT
+    ASSEMBLE
+    INJECT
+    FORWARD
+    RESPONSE
+    NO_TURN
+    NO_HITS
+    RETRIEVAL_ERROR
+  end
+
+  subgraph client["client / agent"]
+    REQUEST
+    CLIENT_LOOP
+  end
+```
+
+The solid path is the enrichment flow; the dashed path is retrieval failure.
+Intent classification, tool choice/execution, sessions, memory, and user
+identity stay on the client side.
 
 ## Pipeline
 
