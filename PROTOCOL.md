@@ -1,21 +1,21 @@
-# neuxus Core Protocol
+# neuxus Protocol
 
-This document defines how client apps talk to the stateless neuxus core.
+This document defines how client apps talk to the stateless neuxus.
 
-For `POST /v1/messages`, the **request** is the Anthropic Messages API. A client sends a plain HTTP/JSON request with a neuxus model id or alias. An Anthropic SDK pointed at the core also works. neuxus selects the current human turn, enriches it with knowledge-base context, forwards the request to the configured model, and returns the model's response.
+For `POST /v1/messages`, the **request** is the Anthropic Messages API. A client sends a plain HTTP/JSON request with a neuxus model id or alias. An Anthropic SDK pointed at neuxus also works. neuxus selects the current human turn, enriches it with knowledge-base context, forwards the request to the configured model, and returns the model's response.
 
 The **response** for that endpoint is a superset of Anthropic's response. Every Anthropic field is preserved, and a top-level `neuxus` object carries provenance: request id, the knowledge base used, the evidence supplied, retrieval signals, and the upstream model. Clients can rely on Anthropic's shape and, when they want provenance, read `neuxus`.
 
-The core does not store sessions, messages, memory, or user accounts. The client owns the transcript and sends it on every request. The core never executes a tool; tool calls belong to the model and are executed by the client.
+neuxus does not store sessions, messages, memory, or user accounts. The client owns the transcript and sends it on every request. neuxus never executes a tool; tool calls belong to the model and are executed by the client.
 
 ---
 
 ## Client setup
 
-Send a normal HTTP `POST` to the core. Any HTTP client works; an Anthropic SDK pointed at the core also works because the body is the Anthropic Messages API.
+Send a normal HTTP `POST` to neuxus. Any HTTP client works; an Anthropic SDK pointed at neuxus also works because the body is the Anthropic Messages API.
 
 ```bash
-curl https://core.example/v1/messages \
+curl https://neuxus.example/v1/messages \
   -H "x-api-key: $NEUXUS_TOKEN" \
   -H "anthropic-version: 2023-06-01" \
   -H "content-type: application/json" \
@@ -35,7 +35,7 @@ curl https://core.example/v1/messages \
 
 ## HTTP
 
-- Base URL: `https://<core-host>`
+- Base URL: `https://<neuxus-host>`
 - Request content type: `application/json; charset=utf-8`
 - Streaming: `text/event-stream` (Anthropic SSE events)
 - `GET /health` does not require a token.
@@ -80,7 +80,7 @@ x-api-key: <service-token>
 
 A service token belongs to a client app, not to an end user. Its scopes are listed in the Endpoints table.
 
-The client app verifies its own users. It calls the core with its service token. `POST /v1/messages` may carry the end-user id in Anthropic's `metadata.user_id` for log attribution:
+The client app verifies its own users. It calls neuxus with its service token. `POST /v1/messages` may carry the end-user id in Anthropic's `metadata.user_id` for log attribution:
 
 ```json
 {
@@ -92,9 +92,9 @@ The client app verifies its own users. It calls the core with its service token.
 
 `POST /retrieve` does not carry a user id. Its logs record the timestamp and retrieval details.
 
-- The core uses the user id only for logs.
-- It is not used for authentication, lookup, or permissions, and the core does not store users.
-- Do not send an end-user API key or a provider API key to the core. Provider keys stay server-side.
+- neuxus uses the user id only for logs.
+- It is not used for authentication, lookup, or permissions, and neuxus does not store users.
+- Do not send an end-user API key or a provider API key to neuxus. Provider keys stay server-side.
 
 ---
 
@@ -110,14 +110,14 @@ Only these differ from Anthropic:
 - `x-api-key` is a neuxus service token, not an Anthropic key.
 - The knowledge base is selected with the required `X-Neuxus-Knowledge-Base` header, not a body field.
 
-Tools are opaque to the core. When the client sends `tools`, with or without `tool_choice`, the core forwards them and returns the model's `tool_use` blocks unchanged. The client executes tools and sends the new turn, including `tool_result` blocks, like any Anthropic client.
+Tools are opaque to neuxus. When the client sends `tools`, with or without `tool_choice`, neuxus forwards them and returns the model's `tool_use` blocks unchanged. The client executes tools and sends the new turn, including `tool_result` blocks, like any Anthropic client.
 
 ### Enrichment
 
 A **turn** is one entry in `messages`. A **human turn** is a `role: "user"` entry with at least one `text` block and no `tool_result` block; a string `content` counts as one `text` block. It is the current message, not the whole history.
 
 1. If the last message is a human turn, select it. Otherwise forward the request unenriched.
-2. Build the retrieval query from the text blocks of that message. The core may include recent user turns to resolve references such as "it" or "that one"; it never rewrites those turns.
+2. Build the retrieval query from the text blocks of that message. neuxus may include recent user turns to resolve references such as "it" or "that one"; it never rewrites those turns.
 3. Retrieve parents and images from the selected knowledge base.
 4. If there are hits, prepend one `text` content block to the selected message. The user's original blocks are unchanged; if `content` was a string, convert it to one `text` block first.
 
@@ -130,14 +130,14 @@ A **turn** is one entry in `messages`. A **human turn** is a `role: "user"` entr
    </knowledge>
    ```
 
-5. Cap the injected text by the core's character budget and set `enrichment.truncated` when shortened.
+5. Cap the injected text by neuxus's character budget and set `enrichment.truncated` when shortened.
 6. If there are no hits, do not inject an empty block. Forward the request unenriched; no hits is not an error.
 7. If retrieval fails, forward unenriched: `enriched: false` and `enrichment.reason: "retrieval_error"`.
 
 Notes:
 
-- The core enriches only the current turn. Earlier turns are never rewritten, which keeps prompt prefix caching intact.
-- The `<knowledge>` block is deliberately delimited. The core treats knowledge-base text as data, not instructions. A malicious page must not override the client's instructions or the client's tool policy.
+- neuxus enriches only the current turn. Earlier turns are never rewritten, which keeps prompt prefix caching intact.
+- The `<knowledge>` block is deliberately delimited. neuxus treats knowledge-base text as data, not instructions. A malicious page must not override the client's instructions or the client's tool policy.
 
 ### Response
 
@@ -229,7 +229,7 @@ When context is injected, `sources.length` equals `signals.usedParents`. When no
 When `stream: true`, neuxus proxies Anthropic SSE events: `message_start`, `content_block_start`, `content_block_delta`, `content_block_stop`, `message_delta`, `message_stop`, `ping`, and `error`. The only change is that `message_start.message` includes `neuxus` when extensions are enabled. Retrieval happens before the upstream call, so `neuxus.sources` and `neuxus.signals` are known when the stream starts.
 
 - neuxus does not rewrite `content_block_delta` events.
-- If the upstream does not emit Anthropic SSE events, streaming is not proxied and the core returns `502`.
+- If the upstream does not emit Anthropic SSE events, streaming is not proxied and neuxus returns `502`.
 
 ### Example
 
@@ -237,7 +237,7 @@ Request:
 
 ```http
 POST /v1/messages HTTP/1.1
-Host: core.example
+Host: neuxus.example
 x-api-key: <service-token>
 anthropic-version: 2023-06-01
 content-type: application/json
@@ -469,4 +469,4 @@ The `X-Request-Id` response header carries the request id on every response, inc
 - The request is Anthropic Messages API shape. `model` is a neuxus id or alias; the knowledge base and response-extension controls are headers.
 - The response preserves Anthropic's fields and adds `neuxus`. Clients with strict response validators should send `X-Neuxus-Extensions: none`.
 - `neuxus.sources` is parent evidence supplied to the model, not verified claim-level citations.
-- Tools are forwarded untouched. The core never executes a tool; the client decides.
+- Tools are forwarded untouched. neuxus never executes a tool; the client decides.
