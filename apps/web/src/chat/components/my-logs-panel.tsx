@@ -1,0 +1,443 @@
+"use client";
+
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { useActiveUserStore } from "@/chat/lib/active-user-store";
+import {
+  ApiError,
+  getMyLogs,
+  listUsers,
+  type MyLogItem,
+  UserQueryKey,
+} from "@/chat/lib/api";
+import { Modal } from "@/shared/components/modal";
+import { formatDateTime } from "@/shared/lib/date-time";
+import { displayName } from "@/shared/lib/display-name";
+
+function errorMessage(err: unknown): string {
+  if (err instanceof ApiError) return err.message;
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
+function levelClass(level: string): string {
+  if (level === "error" || level === "fatal") {
+    return "rounded border border-danger px-1.5 py-0.5 font-mono text-danger text-xs";
+  }
+  if (level === "warn" || level === "warning") {
+    return "rounded border border-line px-1.5 py-0.5 font-mono text-ink text-xs";
+  }
+  return "rounded border border-line px-1.5 py-0.5 font-mono text-muted text-xs";
+}
+
+function shortId(id: string): string {
+  return id.length > 10 ? `${id.slice(0, 4)}…${id.slice(-4)}` : id;
+}
+
+function formatMeta(value: unknown): string {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+type TopKHit = {
+  childId: string;
+  parentId: string;
+  pageId: string;
+  score: number;
+  text: string;
+};
+
+function extractTopK(item: MyLogItem): TopKHit[] | null {
+  if (item.name !== "retrieve") return null;
+  const meta = item.meta;
+  if (!meta || typeof meta !== "object") return null;
+  const topK = (meta as { topK?: unknown }).topK;
+  if (!Array.isArray(topK)) return null;
+  const hits: TopKHit[] = [];
+  for (const raw of topK) {
+    if (!raw || typeof raw !== "object") continue;
+    const h = raw as Partial<TopKHit>;
+    if (
+      typeof h.childId === "string" &&
+      typeof h.parentId === "string" &&
+      typeof h.pageId === "string" &&
+      typeof h.score === "number" &&
+      typeof h.text === "string"
+    ) {
+      hits.push({
+        childId: h.childId,
+        parentId: h.parentId,
+        pageId: h.pageId,
+        score: h.score,
+        text: h.text,
+      });
+    }
+  }
+  return hits;
+}
+
+type SynthesisContent = {
+  system: string | null;
+  prompt: string | null;
+  response: string | null;
+  error: string | null;
+};
+
+function extractSynthesisContent(item: MyLogItem): SynthesisContent | null {
+  if (item.name !== "synthesis") return null;
+  const meta = item.meta;
+  if (!meta || typeof meta !== "object") return null;
+  const m = meta as {
+    system?: unknown;
+    prompt?: unknown;
+    response?: unknown;
+    error?: unknown;
+  };
+  const system = typeof m.system === "string" ? m.system : null;
+  const prompt = typeof m.prompt === "string" ? m.prompt : null;
+  const response = typeof m.response === "string" ? m.response : null;
+  const error = typeof m.error === "string" ? m.error : null;
+  if (!system && !prompt && !response && !error) return null;
+  return { system, prompt, response, error };
+}
+
+type PreviewKind = "topk" | "synthesis";
+
+function previewKind(item: MyLogItem): PreviewKind | null {
+  if (extractTopK(item) !== null) return "topk";
+  if (extractSynthesisContent(item) !== null) return "synthesis";
+  return null;
+}
+
+function previewButtonLabel(kind: PreviewKind): string {
+  return kind === "topk" ? "Preview top-k" : "Preview content";
+}
+
+function previewModalTitle(kind: PreviewKind): string {
+  return kind === "topk" ? "Top-K hits" : "Synthesis content";
+}
+
+export function MyLogsPanel() {
+  const activeUserId = useActiveUserStore((s) => s.activeUserId);
+  const [selected, setSelected] = useState<MyLogItem | null>(null);
+  const [previewItem, setPreviewItem] = useState<MyLogItem | null>(null);
+
+  const [storeReady, setStoreReady] = useState(false);
+  useEffect(() => {
+    setStoreReady(useActiveUserStore.persist.hasHydrated());
+    return useActiveUserStore.persist.onFinishHydration(() => {
+      setStoreReady(true);
+    });
+  }, []);
+
+  const usersQuery = useQuery({
+    queryKey: UserQueryKey.List,
+    queryFn: listUsers,
+    enabled: storeReady,
+  });
+
+  const active = useMemo(() => {
+    const users = usersQuery.data;
+    if (!users || !activeUserId) return null;
+    return users.find((u) => u.id === activeUserId) ?? null;
+  }, [usersQuery.data, activeUserId]);
+
+  if (!storeReady) {
+    return <p className="m-0 px-5 py-8 text-muted text-sm">Loading…</p>;
+  }
+  if (!activeUserId || !active) {
+    return (
+      <main className="flex min-h-dvh flex-col items-center px-5 pt-16 pb-10">
+        <p className="m-0 text-muted text-sm">
+          Sign in to review your own retrieve and synthesis logs.
+        </p>
+        <Link href="/chat/auth" className="mt-3 text-accent text-sm underline">
+          Go to sign in
+        </Link>
+      </main>
+    );
+  }
+
+  return (
+    <main className="flex min-h-dvh flex-col items-center px-5 pt-16 pb-16">
+      <div className="flex w-full max-w-4xl flex-col gap-4">
+        <header className="flex flex-col gap-2 rounded-md border border-line bg-surface p-6 shadow-sm">
+          <div className="flex items-center justify-between gap-2">
+            <h1 className="m-0 font-display text-2xl text-ink">My logs</h1>
+            <Link
+              href="/chat"
+              className="rounded border border-line bg-transparent px-2 py-0.5 text-muted text-xs no-underline hover:border-ink hover:text-ink"
+            >
+              Back to chat
+            </Link>
+          </div>
+          <p className="m-0 text-muted text-sm">
+            Retrieve and synthesis activity for {displayName(active.id)}. Newest
+            first.
+          </p>
+        </header>
+
+        {usersQuery.isError ? (
+          <section className="rounded-md border border-danger bg-surface p-5">
+            <p className="m-0 text-danger text-sm">
+              {errorMessage(usersQuery.error)}
+            </p>
+          </section>
+        ) : null}
+
+        <List
+          apiKey={active.apiKey}
+          userId={active.id}
+          onSelect={setSelected}
+          onPreview={setPreviewItem}
+        />
+      </div>
+
+      <Modal
+        open={selected !== null}
+        title={selected ? `${selected.name ?? "log"} — ${selected.msg}` : ""}
+        titleId="log-detail-title"
+        onClose={() => setSelected(null)}
+        widthClass="max-w-3xl"
+      >
+        {selected ? <LogDetail item={selected} /> : null}
+      </Modal>
+
+      <Modal
+        open={previewItem !== null}
+        title={
+          previewItem
+            ? previewModalTitle(previewKind(previewItem) ?? "synthesis")
+            : ""
+        }
+        titleId="log-preview-title"
+        onClose={() => setPreviewItem(null)}
+        widthClass="max-w-3xl"
+      >
+        {previewItem && previewKind(previewItem) === "topk" ? (
+          <TopKPreview item={previewItem} />
+        ) : null}
+        {previewItem && previewKind(previewItem) === "synthesis" ? (
+          <SynthesisPreview item={previewItem} />
+        ) : null}
+      </Modal>
+    </main>
+  );
+}
+
+function List({
+  apiKey,
+  userId,
+  onSelect,
+  onPreview,
+}: {
+  apiKey: string;
+  userId: string;
+  onSelect: (item: MyLogItem) => void;
+  onPreview: (item: MyLogItem) => void;
+}) {
+  const query = useInfiniteQuery({
+    queryKey: UserQueryKey.MyLogs(userId, null),
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam }) =>
+      getMyLogs({ apiKey, userId, cursor: pageParam, limit: 50 }),
+    getNextPageParam: (last) => last.nextCursor,
+  });
+
+  const items = query.data?.pages.flatMap((p) => p.items) ?? [];
+
+  if (query.isLoading) {
+    return (
+      <section className="rounded-md border border-line bg-surface p-5">
+        <p className="m-0 text-muted text-sm">Loading…</p>
+      </section>
+    );
+  }
+
+  if (query.isError) {
+    return (
+      <section className="rounded-md border border-danger bg-surface p-5">
+        <p className="m-0 text-danger text-sm">{errorMessage(query.error)}</p>
+      </section>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <section className="rounded-md border border-line bg-surface p-5">
+        <p className="m-0 text-muted text-sm">
+          No logs yet. Send an ask on the chat page to generate one.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <>
+      <section className="overflow-hidden rounded-md border border-line bg-surface">
+        <ul className="m-0 flex list-none flex-col divide-y divide-line p-0">
+          {items.map((it) => {
+            const kind = previewKind(it);
+            return (
+              <li
+                key={it.id}
+                className="grid grid-cols-[11rem_auto_5rem_minmax(0,1fr)_9rem_auto] items-center gap-3 px-4 py-2.5 hover:bg-canvas"
+              >
+                <button
+                  type="button"
+                  onClick={() => onSelect(it)}
+                  className="col-span-4 grid grid-cols-subgrid items-center gap-3 bg-transparent text-left"
+                >
+                  <span className="font-mono text-muted text-xs">
+                    {formatDateTime(it.createdAt)}
+                  </span>
+                  <span className={levelClass(it.level)}>{it.level}</span>
+                  <span className="font-mono text-ink text-xs">
+                    {it.name ?? "—"}
+                  </span>
+                  <span className="truncate text-ink text-sm">{it.msg}</span>
+                </button>
+                {kind ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onPreview(it);
+                    }}
+                    className="h-full w-36 border-line border-r border-l bg-surface px-3 text-accent text-xs hover:bg-canvas"
+                  >
+                    {previewButtonLabel(kind)}
+                  </button>
+                ) : null}
+                <span className="px-3 font-mono text-muted text-xs">
+                  #{shortId(it.id)}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
+      {query.hasNextPage ? (
+        <div className="flex justify-center">
+          <button
+            type="button"
+            className="rounded border border-line bg-surface px-3 py-1.5 text-ink text-sm hover:border-accent disabled:opacity-60"
+            disabled={query.isFetchingNextPage}
+            onClick={() => query.fetchNextPage()}
+          >
+            {query.isFetchingNextPage ? "Loading…" : "Load more"}
+          </button>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function LogDetail({ item }: { item: MyLogItem }) {
+  return (
+    <div className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto">
+      <dl className="m-0 grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1 text-sm">
+        <dt className="text-muted">id</dt>
+        <dd className="m-0 break-all font-mono text-ink text-xs">{item.id}</dd>
+        <dt className="text-muted">time</dt>
+        <dd className="m-0 font-mono text-ink text-xs">
+          {formatDateTime(item.createdAt)}
+        </dd>
+        <dt className="text-muted">level</dt>
+        <dd className="m-0 text-ink text-xs">{item.level}</dd>
+        <dt className="text-muted">name</dt>
+        <dd className="m-0 font-mono text-ink text-xs">{item.name ?? "—"}</dd>
+        <dt className="text-muted">msg</dt>
+        <dd className="m-0 break-words text-ink text-xs">{item.msg}</dd>
+      </dl>
+      <div>
+        <h3 className="m-0 mb-1 font-display text-ink text-sm">meta</h3>
+        <pre className="m-0 max-h-96 overflow-auto rounded border border-line bg-canvas p-2 font-mono text-ink text-xs">
+          {formatMeta(item.meta)}
+        </pre>
+      </div>
+    </div>
+  );
+}
+
+function TopKPreview({ item }: { item: MyLogItem }) {
+  const hits = extractTopK(item);
+  if (!hits || hits.length === 0) {
+    return <p className="m-0 text-muted text-sm">No top-K hits logged.</p>;
+  }
+  return (
+    <div className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto">
+      <p className="m-0 text-muted text-xs">
+        {hits.length} {hits.length === 1 ? "hit" : "hits"} from the cosine scan,
+        newest-first. Plain text, no JSON escaping.
+      </p>
+      {hits.map((hit, i) => (
+        <section key={hit.childId} className="flex flex-col gap-1.5">
+          <div className="font-mono text-muted text-xs">
+            # {i + 1} score={hit.score.toFixed(4)} childId={hit.childId}{" "}
+            parentId={hit.parentId} pageId={hit.pageId}
+          </div>
+          <pre className="m-0 whitespace-pre-wrap rounded border border-line bg-canvas p-2 font-mono text-ink text-xs">
+            {hit.text}
+          </pre>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function SynthesisPreview({ item }: { item: MyLogItem }) {
+  const content = extractSynthesisContent(item);
+  if (!content) {
+    return (
+      <p className="m-0 text-muted text-sm">No synthesis content logged.</p>
+    );
+  }
+  return (
+    <div className="flex max-h-[70vh] flex-col gap-4 overflow-y-auto">
+      <p className="m-0 text-muted text-xs">
+        Raw text from the synthesis call. Newlines preserved; no JSON escaping.
+      </p>
+      {content.system ? (
+        <PreviewSection title="System prompt" body={content.system} />
+      ) : null}
+      {content.prompt ? (
+        <PreviewSection title="Prompt" body={content.prompt} />
+      ) : null}
+      {content.response ? (
+        <PreviewSection title="Response" body={content.response} />
+      ) : null}
+      {content.error ? (
+        <PreviewSection title="Error" body={content.error} tone="danger" />
+      ) : null}
+    </div>
+  );
+}
+
+function PreviewSection({
+  title,
+  body,
+  tone = "default",
+}: {
+  title: string;
+  body: string;
+  tone?: "default" | "danger";
+}) {
+  return (
+    <section className="flex flex-col gap-1.5">
+      <h3
+        className={`m-0 font-display text-sm ${tone === "danger" ? "text-danger" : "text-ink"}`}
+      >
+        {title}
+      </h3>
+      <pre className="m-0 whitespace-pre-wrap rounded border border-line bg-canvas p-2 font-mono text-ink text-xs">
+        {body}
+      </pre>
+    </section>
+  );
+}

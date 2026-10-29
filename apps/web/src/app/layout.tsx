@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
+import { ModeSwitcher } from "@/shared/components/mode-switcher";
 import { Providers } from "./providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "neuxus",
-  description: "Next.js client for the neuxus API",
+  description: "Next.js client for neuxus",
 };
 
 export default function RootLayout({
@@ -15,7 +16,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <Providers>{children}</Providers>
+        <Providers>
+          <ModeSwitcher />
+          {children}
+        </Providers>
       </body>
     </html>
   );
