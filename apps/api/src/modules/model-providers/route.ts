@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import { API_TAGS, bearerSecurity } from "../../shared/openapi.ts";
-import { auth } from "../auth/index.ts";
+import { serviceAuth } from "../neuxus-auth/index.ts";
 import { ModelProvidersModel, providerIdParams } from "./model.ts";
 import { ModelProviders } from "./service.ts";
 
@@ -14,9 +14,9 @@ const modelProvidersDetail = {
  * per-model diagnostics. Task→model assignment lives in `/task-model-map`.
  */
 export const modelProviders = new Elysia({ prefix: "/model-providers" })
-  .use(auth)
+  .use(serviceAuth)
   .get("/providers", () => ModelProviders.getProviders(), {
-    requireAdmin: true,
+    requireService: true,
     response: ModelProvidersModel.providersResponse,
     detail: {
       ...modelProvidersDetail,
@@ -29,7 +29,7 @@ export const modelProviders = new Elysia({ prefix: "/model-providers" })
     "/providers/:providerId/connection",
     ({ params }) => ModelProviders.getConnection(params.providerId),
     {
-      requireAdmin: true,
+      requireService: true,
       params: providerIdParams,
       response: ModelProvidersModel.connectionResponse,
       detail: {
@@ -44,7 +44,7 @@ export const modelProviders = new Elysia({ prefix: "/model-providers" })
     "/providers/:providerId/connection",
     ({ params, body }) => ModelProviders.putConnection(params.providerId, body),
     {
-      requireAdmin: true,
+      requireService: true,
       params: providerIdParams,
       body: ModelProvidersModel.connectionBody,
       response: ModelProvidersModel.connectionResponse,
@@ -60,7 +60,7 @@ export const modelProviders = new Elysia({ prefix: "/model-providers" })
     "/providers/:providerId/connection",
     ({ params }) => ModelProviders.deleteConnection(params.providerId),
     {
-      requireAdmin: true,
+      requireService: true,
       params: providerIdParams,
       response: ModelProvidersModel.deleteResponse,
       detail: {
@@ -74,7 +74,7 @@ export const modelProviders = new Elysia({ prefix: "/model-providers" })
     "/providers/:providerId/test/embed",
     ({ params, body }) => ModelProviders.testEmbed(params.providerId, body),
     {
-      requireAdmin: true,
+      requireService: true,
       params: providerIdParams,
       body: ModelProvidersModel.embedTestBody,
       response: ModelProvidersModel.embedTestResponse,
@@ -90,7 +90,7 @@ export const modelProviders = new Elysia({ prefix: "/model-providers" })
     "/providers/:providerId/test/chat",
     ({ params, body }) => ModelProviders.testChat(params.providerId, body),
     {
-      requireAdmin: true,
+      requireService: true,
       params: providerIdParams,
       body: ModelProvidersModel.chatTestBody,
       response: ModelProvidersModel.textTestResponse,
@@ -106,7 +106,7 @@ export const modelProviders = new Elysia({ prefix: "/model-providers" })
     "/providers/:providerId/test/image",
     ({ params, body }) => ModelProviders.testImage(params.providerId, body),
     {
-      requireAdmin: true,
+      requireService: true,
       params: providerIdParams,
       body: ModelProvidersModel.imageTestBody,
       response: ModelProvidersModel.textTestResponse,

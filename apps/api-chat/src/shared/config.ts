@@ -19,17 +19,16 @@ export function requireDatabaseUrl(): string {
   return url;
 }
 
-/** Base URL of the stateless neuxus core. */
-export function coreApiUrl(): string {
-  return (process.env.CORE_API_URL?.trim() || "http://localhost:3001").replace(
-    /\/$/,
-    "",
-  );
+/** Base URL of the stateless neuxus API. */
+export function neuxusApiUrl(): string {
+  return (
+    process.env.NEUXUS_API_URL?.trim() || "http://localhost:3001"
+  ).replace(/\/$/, "");
 }
 
-/** Service token the chat app uses when calling the core. */
-export function coreServiceToken(): string {
-  return process.env.CORE_SERVICE_TOKEN?.trim() || "";
+/** Service token the chat app uses when calling neuxus. */
+export function neuxusServiceToken(): string {
+  return process.env.NEUXUS_SERVICE_TOKEN?.trim() || "";
 }
 
 /** Seeded into `app_users` by `bun run seed` (ids are lowercase; `haewon` is admin). */

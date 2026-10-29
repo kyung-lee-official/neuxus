@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import { API_TAGS, bearerSecurity } from "../../../../shared/openapi.ts";
-import { auth } from "../../../auth/index.ts";
+import { serviceAuth } from "../../../neuxus-auth/index.ts";
 import { RetrieverSettingsModel } from "./model.ts";
 import { RetrieverSettings } from "./service.ts";
 
@@ -14,9 +14,9 @@ const retrieveDetail = {
  * `/knowledge/retriever/settings`.
  */
 export const retrieverSettings = new Elysia({ prefix: "/retriever/settings" })
-  .use(auth)
+  .use(serviceAuth)
   .get("/", () => RetrieverSettings.loadAdmin(), {
-    requireAdmin: true,
+    requireService: true,
     response: RetrieverSettingsModel.retrieverResponse,
     detail: {
       ...retrieveDetail,
@@ -32,7 +32,7 @@ export const retrieverSettings = new Elysia({ prefix: "/retriever/settings" })
       return RetrieverSettings.loadAdmin();
     },
     {
-      requireAdmin: true,
+      requireService: true,
       body: RetrieverSettingsModel.retrieverBody,
       response: RetrieverSettingsModel.retrieverResponse,
       detail: {
@@ -44,7 +44,7 @@ export const retrieverSettings = new Elysia({ prefix: "/retriever/settings" })
     },
   )
   .post("/reset", () => RetrieverSettings.reset(), {
-    requireAdmin: true,
+    requireService: true,
     response: RetrieverSettingsModel.retrieverResponse,
     detail: {
       ...retrieveDetail,

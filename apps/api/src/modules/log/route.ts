@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import { API_TAGS, bearerSecurity } from "../../shared/openapi.ts";
-import { auth } from "../auth/index.ts";
+import { serviceAuth } from "../neuxus-auth/index.ts";
 import { deleteAllLogs } from "./dal.ts";
 import { LogModel } from "./model.ts";
 import { logSettings } from "./settings/route.ts";
@@ -16,10 +16,10 @@ const logDetail = {
  * exported from `index.ts`.
  */
 export const logRoutes = new Elysia({ prefix: "/log" })
-  .use(auth)
+  .use(serviceAuth)
   .use(logSettings)
   .post("/purge", async () => ({ deleted: await deleteAllLogs() }), {
-    requireAdmin: true,
+    requireService: true,
     response: LogModel.logPurgeResponse,
     detail: {
       ...logDetail,

@@ -17,19 +17,3 @@ export function serverPort(): number {
   if (!Number.isFinite(port) || port <= 0) return 3001;
   return port;
 }
-
-/** Seeded into `app_users` by `bun run seed` (ids are lowercase; `haewon` is admin). */
-export const SEED_USER_IDS = [
-  "lily",
-  "haewon",
-  "sullyoon",
-  "bae",
-  "jiwoo",
-  "kyujin",
-] as const;
-
-export type SeedUserId = (typeof SEED_USER_IDS)[number];
-
-export function apiKeyForSeedUser(id: string): string {
-  return `demo-key-${id}`;
-}

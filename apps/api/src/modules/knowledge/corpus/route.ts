@@ -1,6 +1,6 @@
 import { Elysia, status } from "elysia";
 import { API_TAGS, bearerSecurity } from "../../../shared/openapi.ts";
-import { auth } from "../../auth/index.ts";
+import { serviceAuth } from "../../neuxus-auth/index.ts";
 import { CorpusGitError } from "../errors.ts";
 import { CorpusModel } from "./model.ts";
 import { Corpus, CorpusLockedError } from "./service.ts";
@@ -17,14 +17,14 @@ const corpusDetail = {
  * `/knowledge-bases/:kbId/corpus/settings`.
  */
 export const corpus = new Elysia({ prefix: "/knowledge-bases/:kbId/corpus" })
-  .use(auth)
+  .use(serviceAuth)
   .onError(({ error }) => {
     if (error instanceof CorpusGitError || error instanceof CorpusLockedError) {
       return status(error.httpStatus, { error: error.message });
     }
   })
   .post("/clone", ({ params }) => Corpus.clone(params.kbId), {
-    requireAdmin: true,
+    requireService: true,
     response: CorpusSettingsModel.corpusResponse,
     detail: {
       ...corpusDetail,
@@ -34,7 +34,7 @@ export const corpus = new Elysia({ prefix: "/knowledge-bases/:kbId/corpus" })
     },
   })
   .post("/pull", ({ params }) => Corpus.pull(params.kbId), {
-    requireAdmin: true,
+    requireService: true,
     response: CorpusSettingsModel.corpusResponse,
     detail: {
       ...corpusDetail,
@@ -50,7 +50,7 @@ export const corpus = new Elysia({ prefix: "/knowledge-bases/:kbId/corpus" })
       ...(await Corpus.ingest(params.kbId)),
     }),
     {
-      requireAdmin: true,
+      requireService: true,
       response: CorpusModel.corpusIngestResponse,
       detail: {
         ...corpusDetail,
@@ -67,7 +67,7 @@ export const corpus = new Elysia({ prefix: "/knowledge-bases/:kbId/corpus" })
       return status(202, { ok: true as const });
     },
     {
-      requireAdmin: true,
+      requireService: true,
       response: {
         202: CorpusModel.corpusAcceptedResponse,
       },
@@ -86,7 +86,7 @@ export const corpus = new Elysia({ prefix: "/knowledge-bases/:kbId/corpus" })
       return status(202, { ok: true as const });
     },
     {
-      requireAdmin: true,
+      requireService: true,
       response: {
         202: CorpusModel.corpusAcceptedResponse,
       },
@@ -99,7 +99,7 @@ export const corpus = new Elysia({ prefix: "/knowledge-bases/:kbId/corpus" })
     },
   )
   .get("/events", () => Corpus.events(), {
-    requireAdmin: true,
+    requireService: true,
     response: CorpusModel.corpusEvent,
     detail: {
       ...corpusDetail,

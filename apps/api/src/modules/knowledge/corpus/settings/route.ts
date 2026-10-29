@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import { API_TAGS, bearerSecurity } from "../../../../shared/openapi.ts";
-import { auth } from "../../../auth/index.ts";
+import { serviceAuth } from "../../../neuxus-auth/index.ts";
 import { CorpusSettingsModel } from "./model.ts";
 import { CorpusSettings } from "./service.ts";
 
@@ -16,9 +16,9 @@ const corpusSettingsDetail = {
 export const corpusSettings = new Elysia({
   prefix: "/knowledge-bases/:kbId/corpus/settings",
 })
-  .use(auth)
+  .use(serviceAuth)
   .get("/", ({ params }) => CorpusSettings.load(params.kbId), {
-    requireAdmin: true,
+    requireService: true,
     response: CorpusSettingsModel.corpusResponse,
     detail: {
       ...corpusSettingsDetail,
@@ -28,7 +28,7 @@ export const corpusSettings = new Elysia({
     },
   })
   .put("/", ({ params, body }) => CorpusSettings.save(params.kbId, body), {
-    requireAdmin: true,
+    requireService: true,
     body: CorpusSettingsModel.corpusBody,
     response: CorpusSettingsModel.corpusResponse,
     detail: {

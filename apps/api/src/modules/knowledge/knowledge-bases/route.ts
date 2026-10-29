@@ -1,6 +1,6 @@
 import { Elysia, status } from "elysia";
 import { API_TAGS, bearerSecurity } from "../../../shared/openapi.ts";
-import { auth } from "../../auth/index.ts";
+import { serviceAuth } from "../../neuxus-auth/index.ts";
 import { KnowledgeBases } from "./index.ts";
 import { KnowledgeBasesModel } from "./model.ts";
 
@@ -15,9 +15,9 @@ const knowledgeBaseDetail = {
  * (`writable: false`) or written directly (`writable: true`).
  */
 export const knowledgeBases = new Elysia({ prefix: "/knowledge-bases" })
-  .use(auth)
+  .use(serviceAuth)
   .get("/", async () => ({ knowledgeBases: await KnowledgeBases.list() }), {
-    requireAdmin: true,
+    requireService: true,
     response: KnowledgeBasesModel.listResponse,
     detail: {
       ...knowledgeBaseDetail,
@@ -26,7 +26,7 @@ export const knowledgeBases = new Elysia({ prefix: "/knowledge-bases" })
     },
   })
   .post("/", ({ body }) => KnowledgeBases.create(body), {
-    requireAdmin: true,
+    requireService: true,
     body: KnowledgeBasesModel.createBody,
     response: KnowledgeBasesModel.knowledgeBaseResponse,
     detail: {
@@ -44,7 +44,7 @@ export const knowledgeBases = new Elysia({ prefix: "/knowledge-bases" })
       return kb;
     },
     {
-      requireAdmin: true,
+      requireService: true,
       response: KnowledgeBasesModel.knowledgeBaseResponse,
       detail: {
         ...knowledgeBaseDetail,
@@ -57,7 +57,7 @@ export const knowledgeBases = new Elysia({ prefix: "/knowledge-bases" })
     "/:kbId",
     ({ params, body }) => KnowledgeBases.update(params.kbId, body),
     {
-      requireAdmin: true,
+      requireService: true,
       body: KnowledgeBasesModel.updateBody,
       response: KnowledgeBasesModel.knowledgeBaseResponse,
       detail: {
@@ -74,7 +74,7 @@ export const knowledgeBases = new Elysia({ prefix: "/knowledge-bases" })
       return { deleted: true as const, id: params.kbId };
     },
     {
-      requireAdmin: true,
+      requireService: true,
       response: KnowledgeBasesModel.deletedResponse,
       detail: {
         ...knowledgeBaseDetail,

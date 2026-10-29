@@ -169,7 +169,7 @@ export abstract class Users {
   }
 
   /**
-   * A user's `app_log` entries. The chat app does not own the core's log
+   * A user's `app_log` entries. The chat app does not own the neuxus log
    * tables yet, so this is an empty stub until the log proxy is added.
    */
   static async listLogs(

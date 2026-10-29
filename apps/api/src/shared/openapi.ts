@@ -7,9 +7,6 @@
  */
 export const API_TAGS = {
   health: "health",
-  users: "users",
-  sessions: "sessions",
-  query: "query",
   knowledge: "knowledge",
   knowledgeCorpus: "knowledge/corpus",
   knowledgeRetriever: "knowledge/retriever",
@@ -25,41 +22,34 @@ export type ApiTag = (typeof API_TAGS)[keyof typeof API_TAGS];
 export const apiTagList: { name: string; description: string }[] = [
   { name: API_TAGS.health, description: "Liveness probes" },
   {
-    name: API_TAGS.users,
-    description: "User CRUD, personal data, and my-logs",
-  },
-  { name: API_TAGS.sessions, description: "Chat session lifecycle" },
-  { name: API_TAGS.query, description: "Ask-mode synthesis and remember" },
-  {
     name: API_TAGS.knowledge,
-    description: "Knowledge base inspection (admin)",
+    description: "Knowledge base inspection",
   },
   {
     name: API_TAGS.knowledgeCorpus,
     description:
-      "Admin corpus checkout: remote settings, clone, pull, ingest, chunkify, caption, SSE events",
+      "Corpus checkout: remote settings, clone, pull, ingest, chunkify, caption, SSE events",
   },
   {
     name: API_TAGS.knowledgeRetriever,
-    description: "Admin knowledge-base retrieve settings",
+    description: "Knowledge-base retrieve settings",
   },
   {
     name: API_TAGS.modelProviders,
     description:
-      "Admin model providers: saved connections + catalog + per-model diagnostics",
+      "Model providers: saved connections + catalog + per-model diagnostics",
   },
   {
     name: API_TAGS.log,
-    description: "Admin log sink settings and `app_log` purge",
+    description: "Log sink settings and `app_log` purge",
   },
   {
     name: API_TAGS.serverSettingTaskModelMap,
-    description:
-      "Admin task-model map: which catalog model serves each app task",
+    description: "Task-model map: which catalog model serves each app task",
   },
   {
     name: API_TAGS.serverSettingNuke,
-    description: "Admin danger zone: hard-wipe app tables",
+    description: "Danger zone: hard-wipe app tables",
   },
 ];
 
@@ -67,7 +57,7 @@ export const apiTagList: { name: string; description: string }[] = [
 export const bearerSecurityScheme = {
   type: "http" as const,
   scheme: "bearer" as const,
-  description: "Authorization: Bearer <api-key>",
+  description: "Authorization: Bearer <neuxus-service-token>",
 };
 
 /** Convenience: the security requirement applied to protected routes. */

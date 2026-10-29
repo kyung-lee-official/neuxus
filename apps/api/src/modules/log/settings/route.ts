@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import { API_TAGS, bearerSecurity } from "../../../shared/openapi.ts";
-import { auth } from "../../auth/index.ts";
+import { serviceAuth } from "../../neuxus-auth/index.ts";
 import { LogSettingsModel } from "./model.ts";
 import { LogSettings } from "./service.ts";
 
@@ -14,9 +14,9 @@ const logDetail = {
  * `/log/settings`.
  */
 export const logSettings = new Elysia({ prefix: "/settings" })
-  .use(auth)
+  .use(serviceAuth)
   .get("/", () => LogSettings.admin(), {
-    requireAdmin: true,
+    requireService: true,
     detail: {
       ...logDetail,
       summary: "Get log settings",
@@ -31,7 +31,7 @@ export const logSettings = new Elysia({ prefix: "/settings" })
       return LogSettings.admin();
     },
     {
-      requireAdmin: true,
+      requireService: true,
       body: LogSettingsModel.logBody,
       detail: {
         ...logDetail,
@@ -42,7 +42,7 @@ export const logSettings = new Elysia({ prefix: "/settings" })
     },
   )
   .post("/reset", () => LogSettings.reset(), {
-    requireAdmin: true,
+    requireService: true,
     detail: {
       ...logDetail,
       summary: "Reset log settings to defaults",

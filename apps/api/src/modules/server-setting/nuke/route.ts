@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import { API_TAGS, bearerSecurity } from "../../../shared/openapi.ts";
-import { auth } from "../../auth/index.ts";
+import { serviceAuth } from "../../neuxus-auth/index.ts";
 import { NukeModel } from "./model.ts";
 import { Nuke } from "./service.ts";
 
@@ -10,9 +10,9 @@ const nukeDetail = {
 };
 
 export const nuke = new Elysia()
-  .use(auth)
+  .use(serviceAuth)
   .post("/nuke", ({ body }) => Nuke.wipe(body), {
-    requireAdmin: true,
+    requireService: true,
     body: NukeModel.nukeBody,
     response: NukeModel.nukeResponse,
     detail: {

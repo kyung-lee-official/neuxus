@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import { API_TAGS, bearerSecurity } from "../../../shared/openapi.ts";
-import { auth } from "../../auth/index.ts";
+import { serviceAuth } from "../../neuxus-auth/index.ts";
 import { TaskModelMapModel } from "./model.ts";
 import { TaskModelMap } from "./service.ts";
 
@@ -16,9 +16,9 @@ const taskModelMapDetail = {
  * tests live at model level under `/model-providers`.
  */
 export const taskModelMap = new Elysia({ prefix: "/task-model-map" })
-  .use(auth)
+  .use(serviceAuth)
   .get("/", () => TaskModelMap.get(), {
-    requireAdmin: true,
+    requireService: true,
     response: TaskModelMapModel.response,
     detail: {
       ...taskModelMapDetail,
@@ -28,7 +28,7 @@ export const taskModelMap = new Elysia({ prefix: "/task-model-map" })
     },
   })
   .put("/", ({ body }) => TaskModelMap.put(body), {
-    requireAdmin: true,
+    requireService: true,
     body: TaskModelMapModel.putBody,
     response: TaskModelMapModel.response,
     detail: {

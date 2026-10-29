@@ -49,7 +49,7 @@ export type NukeTarget = "app";
 async function wipePublicSchema(connectionString: string): Promise<void> {
   const s = new SQL({ url: connectionString, max: 1 });
   try {
-    // Drop non-core extensions first (e.g. vector), then the whole public schema.
+    // Drop non-essential extensions first (e.g. vector), then the whole public schema.
     await s.unsafe(`
       DO $wipe$
       DECLARE
