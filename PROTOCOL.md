@@ -57,7 +57,6 @@ curl https://core.example/v1/messages \
 | `x-api-key`               | yes (or Bearer)    | neuxus service token. Never forwarded upstream. `Authorization: Bearer` is accepted instead.                                 |
 | `anthropic-version`       | for `/v1/messages` | Validated and passed through, for example `2023-06-01`.                                                                      |
 | `X-Neuxus-Knowledge-Base` | yes                | Knowledge-base id. Required on every `POST /v1/messages` request.                                                            |
-| `X-Neuxus-Enrich`         | no                 | `on` (default), `off`, or `fail-closed`.                                                                                     |
 | `X-Neuxus-Extensions`     | no                 | `sources` (default) or `none`.                                                                                               |
 | `X-Request-Id`            | no                 | Echoed as the `X-Request-Id` response header and, when extensions are enabled, as `neuxus.requestId`; generated when absent. |
 | `anthropic-beta`          | no                 | Passed through.                                                                                                              |
@@ -65,7 +64,7 @@ curl https://core.example/v1/messages \
 Notes:
 
 - The request body is the Anthropic Messages API. This document does not redefine the schema of `model`, `messages`, `system`, `tools`, `tool_choice`, `max_tokens`, `temperature`, `top_p`, `stop_sequences`, `stream`, or `metadata`. See Anthropic's Messages API reference.
-- The neuxus controls (`X-Neuxus-Knowledge-Base`, `X-Neuxus-Enrich`, `X-Neuxus-Extensions`, `X-Request-Id`) are headers, so the JSON body stays Anthropic-shaped.
+- The neuxus controls (`X-Neuxus-Knowledge-Base`, `X-Neuxus-Extensions`, `X-Request-Id`) are headers, so the JSON body stays Anthropic-shaped.
 
 ---
 
@@ -132,8 +131,7 @@ A **turn** is one entry in `messages`. A **human turn** is a `role: "user"` entr
 5. Leave `system`, `tools`, `tool_choice`, and every other tool or generation field untouched.
 6. Cap the injected text by the core's character budget and set `enrichment.truncated` when shortened.
 7. If there are no hits, do not inject an empty block. Forward the request unenriched; no hits is not an error.
-8. If retrieval fails, forward unenriched by default: `enriched: false` and `enrichment.reason: "retrieval_error"`. With `X-Neuxus-Enrich: fail-closed`, return `503 enrichment_failed`.
-9. `X-Neuxus-Enrich: off` skips retrieval and injection; the request is forwarded unchanged. `X-Neuxus-Knowledge-Base` is still required.
+8. If retrieval fails, forward unenriched: `enriched: false` and `enrichment.reason: "retrieval_error"`.
 
 Notes:
 
@@ -198,14 +196,15 @@ type NeuxusExtension = {
   requestId: string;
   /** The knowledge base for this request. */
   knowledgeBaseId: string;
+  /** True when a knowledge block was injected. */
   enriched: boolean;
   enrichment: {
     /** Index of the enriched message in `messages`, or null. */
     turnIndex: number | null;
     /** Characters added to the request. */
     injectedChars: number;
-    /** Why enrichment did not run, when it did not. */
-    reason?: "no_human_turn" | "no_hits" | "retrieval_error" | "disabled";
+    /** Why context was not injected, when it was not. */
+    reason?: "no_human_turn" | "no_hits" | "retrieval_error";
     truncated: boolean;
   };
   upstream: {
@@ -220,7 +219,7 @@ type NeuxusExtension = {
 
 `sources` are the parent evidence neuxus supplied. Image descriptions injected into the context are not listed here. They are not verified citations: neuxus does not run a claim-checking pass in this protocol, so a client must not render `sources` as "the model cited this". A future extension may add claim-level citations; do not assume it exists.
 
-When enrichment runs, `sources.length` equals `signals.usedParents`. When enrichment does not run, `sources` is empty and `signals` is zeroed: `hits: 0`, `usedParents: 0`, `topScore: null`, `margin: null`.
+When context is injected, `sources.length` equals `signals.usedParents`. When no context is injected, `sources` is empty and `signals` is zeroed: `hits: 0`, `usedParents: 0`, `topScore: null`, `margin: null`.
 
 `X-Neuxus-Extensions: none` omits the `neuxus` object for clients with strict response validators.
 
@@ -464,14 +463,13 @@ The `X-Request-Id` response header carries the request id on every response, inc
 | `502`  | `api_error`             | `upstream_error`                              | yes                 |
 | `502`  | `api_error`             | `non_anthropic_upstream`                      | no                  |
 | `503`  | `api_error`             | `model_not_configured`                        | no                  |
-| `503`  | `api_error`             | `enrichment_failed`                           | yes                 |
 | `504`  | `api_error`             | `upstream_timeout`                            | yes                 |
 
 ---
 
 ## Compatibility notes
 
-- The request is Anthropic Messages API shape. `model` is a neuxus id or alias; the knowledge base and enrichment controls are headers.
+- The request is Anthropic Messages API shape. `model` is a neuxus id or alias; the knowledge base and response-extension controls are headers.
 - The response preserves Anthropic's fields and adds `neuxus`. Clients with strict response validators should send `X-Neuxus-Extensions: none`.
 - `neuxus.sources` is parent evidence supplied to the model, not verified claim-level citations.
 - Tools are forwarded untouched. The core never executes a tool; the client decides.
