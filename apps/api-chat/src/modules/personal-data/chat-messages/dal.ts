@@ -6,7 +6,6 @@
  */
 
 import { getPrisma } from "../../../shared/db.ts";
-import { ChatSession } from "../chat-sessions/service.ts";
 
 export type AppMessage = {
   id: number;
@@ -32,7 +31,7 @@ function mapMessage(row: {
   };
 }
 
-/** Append a message to a session and bump the session's `updatedAt`. */
+/** Append a message to a session. */
 export async function insertMessage(
   sessionId: string,
   role: "user" | "assistant",
@@ -41,7 +40,6 @@ export async function insertMessage(
   await getPrisma().message.create({
     data: { sessionId, role, content },
   });
-  await ChatSession.touch(sessionId);
 }
 
 /** Most recent messages in a session, oldest first. */

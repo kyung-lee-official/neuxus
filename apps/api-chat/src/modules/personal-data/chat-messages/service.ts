@@ -3,6 +3,7 @@
  * import `ChatMessage` from here, never from `dal.ts`.
  */
 
+import { ChatSession } from "../chat-sessions/service.ts";
 import {
   type AppMessage,
   countMessagesByUser,
@@ -36,13 +37,14 @@ function clampPageSize(raw: number | undefined): number {
 }
 
 export abstract class ChatMessage {
-  /** Append a message to a session. */
-  static insert(
+  /** Append a message to a session and bump the session's `updatedAt`. */
+  static async insert(
     sessionId: string,
     role: "user" | "assistant",
     content: string,
   ): Promise<void> {
-    return insertMessage(sessionId, role, content);
+    await insertMessage(sessionId, role, content);
+    await ChatSession.touch(sessionId);
   }
 
   /** Most recent messages in a session, oldest first. */
