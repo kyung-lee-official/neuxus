@@ -1,11 +1,13 @@
 # neuxus
 
-Turborepo monorepo: Bun HTTP API (`apps/api`) with personal memory and chat sessions in Postgres, plus a Next.js UI (`apps/web`).
+Turborepo monorepo for the stateless neuxus API, the stateful chat adapter, and
+the Next.js UI.
 
 ```text
 neuxus/
 ├── apps/
-│   ├── api/                 # Bun + Elysia API (@neuxus/api) :3001
+│   ├── api/                 # stateless neuxus API (@neuxus/api) :3001
+│   ├── api-chat/            # stateful chat adapter (@neuxus/api-chat) :3002
 │   └── web/                 # Next.js UI (@neuxus/web) :3000
 ├── packages/
 │   └── typescript-config/
@@ -14,34 +16,35 @@ neuxus/
 
 ## Stack
 
-| Piece               | Role                                |
-| ------------------- | ----------------------------------- |
-| Postgres (`neuxus`) | Users, memories, sessions, messages |
-| Bun API             | Auth (API keys), chat ask, CRUD     |
-| MiniMax             | Ask-mode LLM synthesis              |
-| Next.js             | Sign-in, chat UI, settings          |
+| Piece                    | Role                                                 |
+| ------------------------ | ---------------------------------------------------- |
+| Postgres (`neuxus`)      | Knowledge, model providers, logs, settings           |
+| Postgres (`neuxus-chat`) | Users, memories, sessions, messages                  |
+| `apps/api`               | Service-token API: knowledge, models, logs, settings |
+| `apps/api-chat`          | User API keys, sessions, memory, chat adapter        |
+| `apps/web`               | `/neuxus` settings UI and `/chat` UI                 |
+| Model providers          | Embedding and synthesis models, configured in the UI |
 
-Ask mode retrieves knowledge-base parents, then synthesizes with the model linked to the `text-synthesis` task (`app_model_task_config`).
+The chat dialog is being refactored; `/query` currently returns `501`. See
+[apps/api-chat/README.md](apps/api-chat/README.md).
 
 ## Setup
 
-1. Create the databases:
+1. Create the neuxus database:
 
 ```sql
 CREATE DATABASE neuxus;
-CREATE DATABASE "neuxus-chat";
 ```
 
-2. Create per-app env files:
+2. Create the env files for the neuxus API and web UI:
 
 ```powershell
 Copy-Item apps/api/.env.example apps/api/.env
-Copy-Item apps/api-chat/.env.example apps/api-chat/.env
 Copy-Item apps/web/.env.example apps/web/.env.local
-# edit the DATABASE_URLs if your local Postgres differs
+# edit DATABASE_URL if your local Postgres differs
 ```
 
-3. Install and migrate (from `apps/api`):
+3. Install and migrate the neuxus API:
 
 ```powershell
 bun install
@@ -49,11 +52,11 @@ cd apps/api
 bun run prisma:generate
 bun run prisma -- migrate dev --name init
 cd ../..
-bun run seed
 ```
 
-`apps/api-chat` is a stub and has no Prisma schema/migrations yet; its database is
-created now for the upcoming chat layer.
+The neuxus core has no seed data; configure it through its settings and corpus
+ingestion. For the chat database, migrations, seed users, and API surface, see
+[apps/api-chat/README.md](apps/api-chat/README.md).
 
 4. Dev:
 
@@ -61,24 +64,16 @@ created now for the upcoming chat layer.
 bun run dev
 ```
 
-- API: http://localhost:3001
+- neuxus API: http://localhost:3001
 - Chat API: http://localhost:3002
 - Web: http://localhost:3000
-- OpenAPI docs (Scalar): http://localhost:3001/openapi
-- Chat OpenAPI docs: http://localhost:3002/openapi
-- OpenAPI spec (JSON): http://localhost:3001/openapi/json
-
-## Seed users
-
-| User id                                      | Role   | Default API key   |
-| -------------------------------------------- | ------ | ----------------- |
-| `haewon`                                     | admin  | `demo-key-haewon` |
-| `lily`, `sullyoon`, `bae`, `jiwoo`, `kyujin` | member | `demo-key-<id>`   |
-
-Without seed, the **first** created account becomes `admin`; later accounts are `member`.
+- OpenAPI (neuxus): http://localhost:3001/openapi
+- OpenAPI (chat): http://localhost:3002/openapi
+- OpenAPI spec (neuxus): http://localhost:3001/openapi/json
 
 ## Docs
 
-- [PROTOCOL.md](PROTOCOL.md) — stateless core / client app protocol
+- [PROTOCOL.md](PROTOCOL.md) — stateless neuxus / client app protocol
+- [apps/api-chat/README.md](apps/api-chat/README.md) — chat adapter setup, seed users, API
 - [OpenAPI (Scalar)](http://localhost:3001/openapi) — interactive HTTP API reference, generated from each route's TypeBox schema
 - [`docs/modern-knowledge-base-design/`](docs/modern-knowledge-base-design/) — KB pipeline (corpus → ingest → chunkify → embed; query → synthesis)
