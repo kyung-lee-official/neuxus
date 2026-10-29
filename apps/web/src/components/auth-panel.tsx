@@ -14,7 +14,7 @@ import {
   listUsers,
   regenerateUserKey,
   UserQueryKey,
-} from "@/lib/api";
+} from "@/lib/chat-api";
 import { displayName } from "@/lib/display-name";
 import { AdminBadge } from "./admin-badge";
 

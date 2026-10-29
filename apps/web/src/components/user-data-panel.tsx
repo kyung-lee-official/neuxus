@@ -2,7 +2,12 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { ApiError, type ApiUser, getUserData, UserQueryKey } from "@/lib/api";
+import {
+  ApiError,
+  type ApiUser,
+  getUserData,
+  UserQueryKey,
+} from "@/lib/chat-api";
 import { formatDateTime } from "@/lib/date-time";
 import { CopyButton } from "./copy-button";
 import { MarkdownBubble } from "./markdown-bubble";

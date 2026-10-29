@@ -2,6 +2,9 @@ import { openapi } from "@elysia/openapi";
 import { cors } from "@elysiajs/cors";
 import { Elysia, status } from "elysia";
 import { health } from "./modules/health/route.ts";
+import { chatSessions } from "./modules/personal-data/chat-sessions/route.ts";
+import { query } from "./modules/query/route.ts";
+import { users } from "./modules/users/route.ts";
 import { serverPort } from "./shared/config.ts";
 import { apiTagList, bearerSecurityScheme } from "./shared/openapi.ts";
 
@@ -13,7 +16,7 @@ const app = new Elysia()
           title: "neuxus chat API",
           version: "0.0.1",
           description:
-            "Stateful chat adapter for neuxus. Owns sessions, messages, memory, and end-user identity; calls the stateless neuxus core.",
+            "Stateful chat adapter for neuxus. Owns users, sessions, messages, and personal memory. Chat synthesis is being refactored; `/query` currently returns 501.",
         },
         tags: apiTagList,
         components: {
@@ -52,6 +55,9 @@ const app = new Elysia()
     }
   })
   .use(health)
+  .use(query)
+  .use(chatSessions)
+  .use(users)
   .listen(serverPort());
 
 console.log(
@@ -59,6 +65,12 @@ console.log(
 );
 console.log(`OpenAPI docs: http://localhost:${app.server?.port}/openapi`);
 console.log(`OpenAPI spec: http://localhost:${app.server?.port}/openapi/json`);
+console.log(
+  "Users: GET/POST /users, GET/PATCH/DELETE /users/:id, GET /users/:id/data, GET /users/:id/logs, DELETE /users/:id/memories/:memoryId",
+);
+console.log("Sessions: GET/POST /sessions, PATCH/DELETE /sessions/:id");
+console.log("Memory: POST /remember");
+console.log("Query: POST /query (stub, 501 until the chat refactor lands)");
 
 export type App = typeof app;
 export default app;

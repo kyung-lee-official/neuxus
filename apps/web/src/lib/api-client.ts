@@ -9,12 +9,21 @@ export class ApiError extends Error {
 }
 
 const DEFAULT_API_URL = "http://localhost:3001";
+const DEFAULT_CHAT_API_URL = "http://localhost:3002";
 
 export function apiBaseUrl(): string {
   return (
     process.env.NEXT_PUBLIC_API_URL?.trim() ||
     process.env.API_URL?.trim() ||
     DEFAULT_API_URL
+  ).replace(/\/$/, "");
+}
+
+export function chatApiBaseUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_CHAT_API_URL?.trim() ||
+    process.env.CHAT_API_URL?.trim() ||
+    DEFAULT_CHAT_API_URL
   ).replace(/\/$/, "");
 }
 
@@ -28,7 +37,8 @@ async function parseJson(res: Response): Promise<unknown> {
   }
 }
 
-export async function apiFetch<T>(
+async function requestJson<T>(
+  baseUrl: string,
   path: string,
   init?: RequestInit & { apiKey?: string },
 ): Promise<T> {
@@ -43,7 +53,7 @@ export async function apiFetch<T>(
     }
   }
 
-  const res = await fetch(`${apiBaseUrl()}${path}`, {
+  const res = await fetch(`${baseUrl}${path}`, {
     ...rest,
     headers,
     cache: "no-store",
@@ -60,4 +70,18 @@ export async function apiFetch<T>(
     throw new ApiError(message, res.status);
   }
   return data as T;
+}
+
+export function apiFetch<T>(
+  path: string,
+  init?: RequestInit & { apiKey?: string },
+): Promise<T> {
+  return requestJson<T>(apiBaseUrl(), path, init);
+}
+
+export function chatFetch<T>(
+  path: string,
+  init?: RequestInit & { apiKey?: string },
+): Promise<T> {
+  return requestJson<T>(chatApiBaseUrl(), path, init);
 }

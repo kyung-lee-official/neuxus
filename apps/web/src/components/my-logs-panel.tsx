@@ -10,7 +10,7 @@ import {
   listUsers,
   type MyLogItem,
   UserQueryKey,
-} from "@/lib/api";
+} from "@/lib/chat-api";
 import { formatDateTime } from "@/lib/date-time";
 import { displayName } from "@/lib/display-name";
 import { Modal } from "./modal";

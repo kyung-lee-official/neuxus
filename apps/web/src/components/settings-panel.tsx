@@ -17,7 +17,7 @@ import {
   regenerateUserKey,
   type UserDataDump,
   UserQueryKey,
-} from "@/lib/api";
+} from "@/lib/chat-api";
 import { formatDateTime } from "@/lib/date-time";
 import { displayName } from "@/lib/display-name";
 

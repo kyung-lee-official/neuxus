@@ -1,5 +1,5 @@
-import { DemoPanel } from "@/components/demo-panel";
+import { ChatStubPanel } from "@/components/chat-stub-panel";
 
 export default function AskPage() {
-  return <DemoPanel />;
+  return <ChatStubPanel />;
 }

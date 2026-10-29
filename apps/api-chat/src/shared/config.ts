@@ -18,3 +18,32 @@ export function requireDatabaseUrl(): string {
   }
   return url;
 }
+
+/** Base URL of the stateless neuxus core. */
+export function coreApiUrl(): string {
+  return (process.env.CORE_API_URL?.trim() || "http://localhost:3001").replace(
+    /\/$/,
+    "",
+  );
+}
+
+/** Service token the chat app uses when calling the core. */
+export function coreServiceToken(): string {
+  return process.env.CORE_SERVICE_TOKEN?.trim() || "";
+}
+
+/** Seeded into `app_users` by `bun run seed` (ids are lowercase; `haewon` is admin). */
+export const SEED_USER_IDS = [
+  "lily",
+  "haewon",
+  "sullyoon",
+  "bae",
+  "jiwoo",
+  "kyujin",
+] as const;
+
+export type SeedUserId = (typeof SEED_USER_IDS)[number];
+
+export function apiKeyForSeedUser(id: string): string {
+  return `demo-key-${id}`;
+}

@@ -14,7 +14,7 @@ import {
   patchSessionTitle,
   UserQueryKey,
   type UserSessionRow,
-} from "@/lib/api";
+} from "@/lib/chat-api";
 import { formatDateTime } from "@/lib/date-time";
 import { displayName } from "@/lib/display-name";
 import { AdminBadge } from "./admin-badge";
