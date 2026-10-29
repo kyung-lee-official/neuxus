@@ -13,7 +13,7 @@ The stages are independent: each can run on its own, and its staleness gate deci
 
 The read path is the stateless neuxus core. Clients own their own sessions, memory, and end users; `apps/api-chat` is one such client. The client is the agent; neuxus supplies evidence, not intent or tool decisions. The HTTP contract is [Appendix B](./appendix-b-protocol.md).
 
-Content lives in **knowledge bases**: each is either **read-only** (pages ingested from a corpus and written only by the ingest stage) or **writable** (pages updated directly, not by ingest). `writable` is fixed at creation. Every write targets one knowledge base; a search query targets a set of one or more, specified by the request. The backend persists no grouping.
+Content lives in **knowledge bases**: each is either **read-only** (pages ingested from a corpus and written only by the ingest stage) or **writable** (pages updated directly, not by ingest). `writable` is fixed at creation. Every write and search targets one knowledge base, specified by the request. A search query names one knowledge base; clients discover ids via [`GET /knowledge-bases`](./appendix-b-protocol.md#get-knowledge-bases).
 
 ```mermaid
 ---
@@ -38,7 +38,7 @@ flowchart LR
 | [02-ingest.md](./02-ingest.md)                             | Walk the checkout; markdown file becomes a `kb_pages` row (frontmatter, staleness gate); validate images against `*.meta.yaml` and record each image's policy in `kb_image_descriptions` |
 | [03.1-chunkify.md](./03.1-chunkify.md)                     | Derive parents / children from `kb_pages.body`                                                                                                                                           |
 | [03.2-image-descriptions.md](./03.2-image-descriptions.md) | Image captions + description vectors (policy from `*.meta.yaml`)                                                                                                                         |
-| [04-retrieval.md](./04-retrieval.md)                       | Question in, ranked parents out (+ ranked image descriptions)                                                                                                                            |
+| [04-retrieval.md](./04-retrieval.md)                       | Query in, ranked parents out (+ ranked image descriptions)                                                                                                                               |
 | [05-synthesis.md](./05-synthesis.md)                       | Deterministic, capability-neutral context enrichment: Anthropic request in, enriched answer + `neuxus` out                                                                                |
 | [appendix-a-data-model.md](./appendix-a-data-model.md)     | Tables                                                                                                                                                                                   |
 | [appendix-b-protocol.md](./appendix-b-protocol.md)         | HTTP protocol: Anthropic-compatible request, neuxus-extended response                                                                                                                    |

@@ -1,6 +1,6 @@
-# Retrieval (question to ranked parents + image descriptions)
+# Retrieval (query to ranked parents + image descriptions)
 
-**Does** — embed the question once, then per knowledge base similarity-search `kb_children.embedding` and `kb_image_descriptions.embedding`, expand child hits to parents, and return two capped lists (parents + image-description hits).
+**Does** — embed the retrieval query once, then similarity-search `kb_children.embedding` and `kb_image_descriptions.embedding` in the selected knowledge base, expand child hits to parents, and return two capped lists (parents + image-description hits).
 
 **Reads** — `kb_children`, `kb_parents`, `kb_pages.title`, `kb_image_descriptions`, `kb_knowledge_bases`; the global cap knobs ([`kb_retrieve_settings`](./appendix-a-data-model.md#retrieval-knobs-table)).
 
@@ -12,27 +12,25 @@
 
 ## Flow
 
-1. Embed the question once (same model as children)
-2. Similarity-search children in each knowledge base in the set
-3. Resolve parents per knowledge base (+ page title)
-4. Dedupe by `(knowledgeBaseId, parentId)`; keep best child score per parent
-5. Cap the merged set by max parents / max characters
-6. Similarity-search [image descriptions](#image-description-search) in each knowledge base, independent of step 2
-7. LLM gets parent texts (+ title) and image-description hits — not child windows alone ([05-synthesis.md](./05-synthesis.md))
+1. Embed the retrieval query once (same model as children; recent user turns may be included to resolve references)
+2. Similarity-search children in the selected knowledge base
+3. Resolve parents (+ page title)
+4. Dedupe by `parentId`; keep best child score per parent
+5. Cap the set by max parents / max characters
+6. Similarity-search [image descriptions](#image-description-search) in the same knowledge base, independent of step 2
+7. The enriched request gets parent texts (+ title) and image-description hits — not child windows alone ([05-synthesis.md](./05-synthesis.md))
 
-Cap knobs (`child_limit`, `max_parents`, `max_characters`) are **global** ([`kb_retrieve_settings`](./appendix-a-data-model.md#retrieval-knobs-table), one row `id = "default"`) — they apply to a query's merged result, not one knowledge base. App defaults when null.
+Cap knobs (`child_limit`, `max_parents`, `max_characters`) are **global** ([`kb_retrieve_settings`](./appendix-a-data-model.md#retrieval-knobs-table), one row `id = "default"`) — they apply to the selected knowledge base's result. App defaults when null.
 
-## Multiple knowledge bases
+## Knowledge base selection
 
-A request carries the knowledge-base ids it wants to query. The backend persists no grouping between them: a "domain" is an application-level concept, and a client that needs to discover valid ids reads the [`kb_knowledge_bases`](./appendix-a-data-model.md) registry.
+A request names one knowledge base: `X-Neuxus-Knowledge-Base` on `/v1/messages`, or `knowledgeBaseId` on `/retrieve` ([Appendix B](./appendix-b-protocol.md)). The service validates that the id exists and queries exactly it. Clients discover valid ids from the [`kb_knowledge_bases`](./appendix-a-data-model.md) registry.
 
-The service validates the set — non-empty, every id exists — then queries exactly it. No caller-access restriction is applied for now; a future one belongs in the service or controller layer.
+The selected knowledge base uses the current embedding model ([appendix A](./appendix-a-data-model.md)), so scores are comparable within it. Page and parent ids are scoped to the knowledge base. Multi-KB retrieval is not part of this contract; it would be an additive change.
 
-Every knowledge base shares the one embedding model ([appendix A](./appendix-a-data-model.md)), so scores are comparable across them: the child hits merge and re-rank by score, keeping the global top `child_limit` before parent dedupe. Page and parent ids are unique only within one knowledge base, so merge and expand on `(knowledgeBaseId, parentId)` and `(knowledgeBaseId, pageId)`, then cap once with `max_parents` / `max_characters` ([Flow](#flow)). Image hits merge the same way; a writable knowledge base is text-only ([appendix A](./appendix-a-data-model.md)), so it contributes no images.
+## Query embed
 
-## Question embed
-
-Embed the question with the current **embedding** model — the same model the children were embedded with — so the question and children share one vector space.
+Embed the retrieval query with the current **embedding** model — the same model the children were embedded with — so the query and children share one vector space.
 
 ## Similarity SQL (cosine)
 
@@ -69,7 +67,7 @@ WHERE p.knowledge_base_id = $kb
 
 ## Image-description search
 
-The same embedded question drives a **second vector search**, over `kb_image_descriptions.embedding`, independent of the child search. The description vectors are produced by [03.2-image-descriptions.md](./03.2-image-descriptions.md):
+The same embedded retrieval query drives a **second vector search**, over `kb_image_descriptions.embedding`, independent of the child search. The description vectors are produced by [03.2-image-descriptions.md](./03.2-image-descriptions.md):
 
 ```sql
 SELECT

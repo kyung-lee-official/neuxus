@@ -1,19 +1,19 @@
 # Synthesis (context enrichment before the model call)
 
-**Does** - selects the current human turn, retrieves knowledge-base evidence,
+**Does** — selects the current human turn, retrieves knowledge-base evidence,
 assembles a `<knowledge>` block, prepends it to that turn, forwards the enriched
 Anthropic request to the provider, and returns the response plus `neuxus`.
 
-**Reads** - the client request (`model`, `messages`, `system`, `tools`,
+**Reads** — the client request (`model`, `messages`, `system`, `tools`,
 `tool_choice`, generation fields), `X-Neuxus-Knowledge-Base`, retrieval
 results, and model/provider configuration.
 
-**Owns** - nothing persistent. No sessions, messages, memory, or users.
+**Owns** — nothing persistent. No sessions, messages, memory, or users.
 
-**Staleness** - none; retrieval freshness is bounded by the index stages
+**Staleness** — none; retrieval freshness is bounded by the index stages
 ([README](./README.md#staleness)).
 
-**Never touches** - earlier turns, `system`, `tools`, `tool_choice`, or
+**Never touches** — earlier turns, `system`, `tools`, `tool_choice`, or
 generation parameters. It never executes a tool.
 
 neuxus is client-agnostic: it does not know the client's tools, policy, persona,
@@ -96,9 +96,10 @@ capability-neutral.
 5. **Assemble the context block.** Format one `<knowledge base="...">` text
    block: reference-data preamble, then parents under source lines, with image
    descriptions folded in ([Image handling](#image-handling)).
-6. **Inject context.** Prepend that one block to the selected human turn. Leave
-   the user's original blocks, `system`, `tools`, `tool_choice`, and all
-   generation fields unchanged.
+6. **Inject context.** Prepend that one block to the selected human turn. If
+   `content` is a string, convert it to one `text` block first. Leave the
+   user's original blocks, `system`, `tools`, `tool_choice`, and all generation
+   fields unchanged.
 7. **Call the model.** Forward the enriched Anthropic Messages request to the
    selected provider's Anthropic-compatible `/v1/messages`. Tools pass through;
    the client runs the tool loop.
@@ -263,5 +264,7 @@ The response is Anthropic Messages plus the `neuxus` object
   why context was not injected.
 - `neuxus.upstream` reports the provider/model actually used.
 
-`sources` is evidence supplied, not verified claim-level citations. The core
-does not run a claim-checking pass. Streaming is proxied per the protocol.
+`sources` lists parent evidence only; image descriptions injected into the
+context are not listed. It is evidence supplied, not verified claim-level
+citations. The core does not run a claim-checking pass. Streaming is proxied per
+the protocol.
