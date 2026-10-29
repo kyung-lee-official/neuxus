@@ -6,8 +6,8 @@
 import { ChatSession } from "../chat-sessions/service.ts";
 import {
   type AppMessage,
-  countMessagesByUser,
-  findMessagesByUser,
+  countMessagesBySessionIds,
+  findMessagesBySessionIds,
   insertMessage,
   listRecentMessages,
 } from "./dal.ts";
@@ -64,9 +64,11 @@ export abstract class ChatMessage {
     const page = clampPage(rawPage);
     const pageSize = clampPageSize(rawPageSize);
     const skip = (page - 1) * pageSize;
+    const sessions = await ChatSession.listByUser(userId);
+    const sessionIds = sessions.map((session) => session.id);
     const [total, items] = await Promise.all([
-      countMessagesByUser(userId),
-      findMessagesByUser(userId, skip, pageSize),
+      countMessagesBySessionIds(sessionIds),
+      findMessagesBySessionIds(sessionIds, skip, pageSize),
     ]);
     return { items, total, page, pageSize };
   }

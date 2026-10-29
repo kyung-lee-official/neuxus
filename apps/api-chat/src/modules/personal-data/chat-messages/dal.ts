@@ -55,24 +55,28 @@ export async function listRecentMessages(
   return rows.map(mapMessage).reverse();
 }
 
-/** Count chat messages across all sessions for one user. */
-export async function countMessagesByUser(userId: string): Promise<number> {
+/** Count messages across the given sessions. */
+export async function countMessagesBySessionIds(
+  sessionIds: string[],
+): Promise<number> {
+  if (sessionIds.length === 0) return 0;
   return getPrisma().message.count({
-    where: { session: { userId } },
+    where: { sessionId: { in: sessionIds } },
   });
 }
 
 /**
- * Page of chat messages for one user (newest first). Pagination is the
+ * Page of messages for the given sessions (newest first). Pagination is the
  * caller's concern — `skip`/`take` in. Order: `createdAt DESC, id DESC`.
  */
-export async function findMessagesByUser(
-  userId: string,
+export async function findMessagesBySessionIds(
+  sessionIds: string[],
   skip: number,
   take: number,
 ): Promise<AppMessage[]> {
+  if (sessionIds.length === 0) return [];
   const rows = await getPrisma().message.findMany({
-    where: { session: { userId } },
+    where: { sessionId: { in: sessionIds } },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     skip,
     take,
