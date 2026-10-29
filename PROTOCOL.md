@@ -62,7 +62,7 @@ curl https://core.example/v1/messages \
 
 Notes:
 
-- The request body is the Anthropic Messages API. This document does not redefine the schema of `model`, `messages`, `system`, `tools`, `tool_choice`, `max_tokens`, `temperature`, `top_p`, `stop_sequences`, `stream`, or `metadata`. See Anthropic's Messages API reference.
+- The request body is the Anthropic Messages API. This document only describes the neuxus-specific deltas; the full request schema is the [Anthropic Messages API reference](https://docs.anthropic.com/en/api/messages).
 - The neuxus controls (`X-Neuxus-Knowledge-Base`, `X-Neuxus-Extensions`, `X-Request-Id`) are headers, so the JSON body stays Anthropic-shaped.
 - Other `anthropic-*` headers (for example `anthropic-beta`) are forwarded best-effort; support depends on the upstream provider.
 
@@ -102,7 +102,7 @@ The client app verifies its own users. It calls the core with its service token.
 
 ### Request
 
-The body is the Anthropic Messages API. `system`, `tools`, `tool_choice`, and every generation parameter are passed through unchanged. `messages` are passed through except for the enrichment described below.
+The body is the Anthropic Messages API. Only `messages` are modified, by the enrichment described below; everything else is passed through unchanged.
 
 Only these differ from Anthropic:
 
@@ -130,7 +130,7 @@ A **turn** is one entry in `messages`. A **human turn** is a `role: "user"` entr
    </knowledge>
    ```
 
-5. Leave `system`, `tools`, `tool_choice`, and every other tool or generation field untouched.
+5. Change nothing else.
 6. Cap the injected text by the core's character budget and set `enrichment.truncated` when shortened.
 7. If there are no hits, do not inject an empty block. Forward the request unenriched; no hits is not an error.
 8. If retrieval fails, forward unenriched: `enriched: false` and `enrichment.reason: "retrieval_error"`.
