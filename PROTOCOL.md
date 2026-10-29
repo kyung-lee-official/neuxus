@@ -59,12 +59,12 @@ curl https://core.example/v1/messages \
 | `X-Neuxus-Knowledge-Base` | yes                | Knowledge-base id. Required on every `POST /v1/messages` request.                                                            |
 | `X-Neuxus-Extensions`     | no                 | `sources` (default) or `none`.                                                                                               |
 | `X-Request-Id`            | no                 | Echoed as the `X-Request-Id` response header and, when extensions are enabled, as `neuxus.requestId`; generated when absent. |
-| `anthropic-beta`          | no                 | Passed through.                                                                                                              |
 
 Notes:
 
 - The request body is the Anthropic Messages API. This document does not redefine the schema of `model`, `messages`, `system`, `tools`, `tool_choice`, `max_tokens`, `temperature`, `top_p`, `stop_sequences`, `stream`, or `metadata`. See Anthropic's Messages API reference.
 - The neuxus controls (`X-Neuxus-Knowledge-Base`, `X-Neuxus-Extensions`, `X-Request-Id`) are headers, so the JSON body stays Anthropic-shaped.
+- Other `anthropic-*` headers (for example `anthropic-beta`) are forwarded best-effort; support depends on the upstream provider.
 
 ---
 
