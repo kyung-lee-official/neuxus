@@ -41,7 +41,17 @@ const app = new Elysia()
     cors({
       origin: true,
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-      allowedHeaders: ["Content-Type", "Authorization"],
+      allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "x-api-key",
+        "anthropic-version",
+        "anthropic-beta",
+        "X-Neuxus-Knowledge-Base",
+        "X-Neuxus-Extensions",
+        "X-Request-Id",
+      ],
+      exposeHeaders: ["X-Request-Id", "X-Neuxus-Code"],
     }),
   )
   .onError(({ code, error, request }) => {
