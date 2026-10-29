@@ -80,7 +80,7 @@ x-api-key: <service-token>
 
 A service token belongs to a client app, not to an end user. Its scopes are listed in the Endpoints table.
 
-The client app verifies its own users. It calls the core with its service token. For `POST /v1/messages`, it may send the user id in `metadata.user_id`; `POST /retrieve` uses `principal` instead:
+The client app verifies its own users. It calls the core with its service token. `POST /v1/messages` may carry the end-user id in Anthropic's `metadata.user_id` for log attribution:
 
 ```json
 {
@@ -89,6 +89,8 @@ The client app verifies its own users. It calls the core with its service token.
   }
 }
 ```
+
+`POST /retrieve` does not carry a user id. Its logs record the timestamp and retrieval details.
 
 - The core uses the user id only for logs.
 - It is not used for authentication, lookup, or permissions, and the core does not store users.
@@ -309,7 +311,7 @@ Response:
 
 Returns evidence only. It does not call an LLM. Use it when a client wants to build its own prompt or answer.
 
-`POST /retrieve` is neuxus-native: it takes `knowledgeBaseId` in the body and uses `principal` for log attribution, instead of the `/v1/messages` header and `metadata.user_id`.
+`POST /retrieve` is neuxus-native: it takes `knowledgeBaseId` in the body, not as a header. It does not carry a user id.
 
 ### Request
 
@@ -317,10 +319,6 @@ Returns evidence only. It does not call an LLM. Use it when a client wants to bu
 type RetrieveRequest = {
   knowledgeBaseId: string;
   question: string;
-  /** User id for logs only. Not used for auth or lookup. */
-  principal: {
-    userId: string;
-  };
   options?: {
     /** Include raw top-K child hits. Default: false. */
     includeChildren?: boolean;
