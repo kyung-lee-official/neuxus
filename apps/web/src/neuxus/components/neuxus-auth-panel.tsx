@@ -10,9 +10,9 @@ export function NeuxusAuthPanel({ error }: { error?: string }) {
   return (
     <section className="w-full max-w-md rounded-md border border-line bg-surface p-6 shadow-sm">
       <div className="mb-4 flex items-center justify-between gap-2">
-        <h1 className="m-0 font-display text-2xl text-ink">neuxus sign in</h1>
+        <h1 className="m-0 font-display text-2xl text-ink">NEUXUS sign in</h1>
         <span className="rounded border border-line px-2 py-0.5 font-mono text-muted text-xs">
-          neuxus
+          NEUXUS
         </span>
       </div>
       <p className="mt-0 mb-4 text-muted text-sm">

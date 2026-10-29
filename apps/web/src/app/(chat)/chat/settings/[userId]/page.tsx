@@ -10,7 +10,7 @@ export default async function SettingsPage({ params }: Props) {
   return (
     <main className="flex min-h-dvh flex-col items-center px-5 pt-16 pb-16">
       <p className="mb-6 font-display text-muted text-sm uppercase tracking-wide">
-        neuxus
+        CHAT
       </p>
       <SettingsPanel userId={decodeURIComponent(userId)} />
     </main>

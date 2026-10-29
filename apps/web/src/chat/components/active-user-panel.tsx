@@ -220,7 +220,7 @@ export function ActiveUserPanel({ active }: { active: ApiUser | null }) {
           href="/chat"
           className="m-0 font-display text-ink text-xl uppercase no-underline hover:text-accent"
         >
-          neuxus
+          CHAT
         </Link>
       </div>
       <div className="shrink-0 border-line border-t" />
@@ -251,9 +251,6 @@ export function ActiveUserPanel({ active }: { active: ApiUser | null }) {
                 New chat
               </button>
             </div>
-            <p className="m-0 shrink-0 text-muted text-xs">
-              Sorted by latest message. Ask mode uses the selected chat.
-            </p>
             {sessionsQuery.isLoading ? (
               <p className="m-0 text-muted text-xs">Loading chats…</p>
             ) : sessions.length === 0 ? (

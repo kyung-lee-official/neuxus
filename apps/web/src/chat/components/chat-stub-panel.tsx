@@ -96,7 +96,7 @@ export function ChatStubPanel() {
         <main className="flex min-h-0 flex-1 items-center justify-center px-5 py-10">
           <section className="w-full max-w-xl rounded-md border border-line bg-surface p-6 text-center shadow-sm">
             <p className="m-0 font-display text-muted text-xs uppercase tracking-wide">
-              neuxus chat
+              CHAT
             </p>
             <h1 className="mt-2 mb-0 font-display text-2xl text-ink">
               Chat is being refactored

@@ -42,16 +42,12 @@ export function NeuxusNavPanel({ onSignOut }: { onSignOut: () => void }) {
           href="/neuxus/server-settings"
           className="m-0 font-display text-ink text-xl uppercase no-underline hover:text-accent"
         >
-          neuxus
+          NEUXUS
         </Link>
       </div>
       <div className="shrink-0 border-line border-t" />
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pt-1">
-        <h3 className="m-0 font-display text-base text-ink">neuxus</h3>
-        <p className="m-0 shrink-0 text-muted text-xs">
-          Knowledge, models, and server settings.
-        </p>
         <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
           {NAV_ITEMS.map((item) => {
             const selected = !item.external && item.href === activeHref;
@@ -79,10 +75,6 @@ export function NeuxusNavPanel({ onSignOut }: { onSignOut: () => void }) {
       </div>
 
       <div className="flex shrink-0 flex-col gap-1.5 border-line border-t pt-3">
-        <h2 className="m-0 font-display text-ink text-lg">neuxus</h2>
-        <p className="m-0 text-muted text-xs">
-          Authenticated by service token.
-        </p>
         <button
           type="button"
           className="rounded border border-line bg-transparent px-2 py-1.5 text-center text-muted text-xs hover:border-ink hover:text-ink"
