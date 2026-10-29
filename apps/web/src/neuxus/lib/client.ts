@@ -13,5 +13,8 @@ export function apiBaseUrl(): string {
 }
 
 export function apiFetch<T>(path: string, init?: ApiInit): Promise<T> {
-  return requestJson<T>(apiBaseUrl(), path, init);
+  return requestJson<T>(apiBaseUrl(), path, {
+    ...init,
+    authHeader: "x-api-key",
+  });
 }

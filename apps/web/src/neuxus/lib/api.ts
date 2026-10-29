@@ -668,7 +668,7 @@ export async function subscribeCorpusEvents(
   const res = await fetch(
     `${apiBaseUrl()}/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/corpus/events`,
     {
-      headers: { Authorization: `Bearer ${apiKey}` },
+      headers: { "x-api-key": apiKey },
       signal,
       cache: "no-store",
     },

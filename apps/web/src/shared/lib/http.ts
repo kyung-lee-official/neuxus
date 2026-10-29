@@ -8,7 +8,11 @@ export class ApiError extends Error {
   }
 }
 
-export type ApiInit = RequestInit & { apiKey?: string };
+export type ApiInit = RequestInit & {
+  apiKey?: string;
+  /** `x-api-key` is the neuxus protocol header; chat uses Bearer. */
+  authHeader?: "bearer" | "x-api-key";
+};
 
 async function parseJson(res: Response): Promise<unknown> {
   const text = await res.text();
@@ -25,9 +29,20 @@ export async function requestJson<T>(
   path: string,
   init?: ApiInit,
 ): Promise<T> {
-  const { apiKey, headers: initHeaders, ...rest } = init ?? {};
+  const {
+    apiKey,
+    authHeader = "bearer",
+    headers: initHeaders,
+    ...rest
+  } = init ?? {};
   const headers = new Headers(initHeaders);
-  if (apiKey) headers.set("Authorization", `Bearer ${apiKey}`);
+  if (apiKey) {
+    if (authHeader === "x-api-key") {
+      headers.set("x-api-key", apiKey);
+    } else {
+      headers.set("Authorization", `Bearer ${apiKey}`);
+    }
+  }
   if (rest.body && !headers.has("Content-Type")) {
     if (rest.body instanceof FormData) {
       // FormData sets its own multipart Content-Type with boundary.
