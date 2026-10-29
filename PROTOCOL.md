@@ -130,10 +130,9 @@ A **turn** is one entry in `messages`. A **human turn** is a `role: "user"` entr
    </knowledge>
    ```
 
-5. Change nothing else.
-6. Cap the injected text by the core's character budget and set `enrichment.truncated` when shortened.
-7. If there are no hits, do not inject an empty block. Forward the request unenriched; no hits is not an error.
-8. If retrieval fails, forward unenriched: `enriched: false` and `enrichment.reason: "retrieval_error"`.
+5. Cap the injected text by the core's character budget and set `enrichment.truncated` when shortened.
+6. If there are no hits, do not inject an empty block. Forward the request unenriched; no hits is not an error.
+7. If retrieval fails, forward unenriched: `enriched: false` and `enrichment.reason: "retrieval_error"`.
 
 Notes:
 
