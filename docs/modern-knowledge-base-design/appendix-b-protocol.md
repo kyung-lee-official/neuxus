@@ -1,6 +1,7 @@
-# neuxus Protocol
+# Appendix B - neuxus Protocol
 
-This document defines how client apps talk to the stateless neuxus.
+This is the HTTP contract for the stateless neuxus core described in the
+[knowledge-base design](./README.md). It defines how client apps talk to neuxus.
 
 For `POST /v1/messages`, the **request** is the Anthropic Messages API. A client sends a plain HTTP/JSON request with a neuxus model id or alias. An Anthropic SDK pointed at neuxus also works. neuxus selects the current human turn, enriches it with knowledge-base context, forwards the request to the configured model, and returns the model's response.
 
@@ -138,6 +139,10 @@ Notes:
 
 - neuxus enriches only the current turn. Earlier turns are never rewritten, which keeps prompt prefix caching intact.
 - The `<knowledge>` block is deliberately delimited. neuxus treats knowledge-base text as data, not instructions. A malicious page must not override the client's instructions or the client's tool policy.
+
+### Synthesis boundary
+
+Synthesis is evidence enrichment, not agentic planning. neuxus does not know the client's tools, policy, or persona: it does not classify intent, choose or execute tools, rewrite the request, or inject instructions. The client owns the agent loop. See [05-synthesis.md](./05-synthesis.md).
 
 ### Response
 

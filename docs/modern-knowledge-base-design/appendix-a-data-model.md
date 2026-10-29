@@ -161,4 +161,4 @@ CREATE TABLE kb_retrieve_settings (
 
 ## Model config tables
 
-Model and provider wiring is application-level, not `kb_*`: `app_model_task_config` maps each app task to a catalog model, and `app_model_provider_config` holds provider connections. No `kb_*` table holds a model id.
+Model and provider wiring is application-level, not `kb_*`: `app_model_task_config` maps embedding and captioning tasks to catalog models, and `app_model_provider_config` holds provider connections. Synthesis models are requested per call via `model` ([Appendix B](./appendix-b-protocol.md)); no `kb_*` table holds a model id.

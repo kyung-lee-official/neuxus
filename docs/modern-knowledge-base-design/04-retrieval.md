@@ -102,7 +102,7 @@ Retrieval returns two independent lists:
 | Parents                | `{ knowledgeBaseId, parentId, pageId, title, text, score }`         |
 | Image-description hits | `{ knowledgeBaseId, pageId, title, imagePath, description, score }` |
 
-`05-synthesis.md` folds both into the prompt ([05-synthesis.md](./05-synthesis.md#image-handling)).
+`05-synthesis.md` folds both into the `<knowledge>` block ([05-synthesis.md](./05-synthesis.md#image-handling)).
 
 ## Stale vectors
 

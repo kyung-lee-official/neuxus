@@ -4,11 +4,14 @@
   - read-only knowledge bases flow from `corpus` through `ingest` to `chunkify` / image descriptions
   - writable ones flow from direct write to `chunkify`.
 
-- Read path: retrieval, then synthesis.
+- Read path: retrieval, then synthesis over the HTTP contract in
+  [Appendix B](./appendix-b-protocol.md).
 
 Vectors are produced and consumed through a shared embed utility, not a flow step. Embedding is not a stage: a stage that produces embeddable content calls the utility as part of its own write.
 
 The stages are independent: each can run on its own, and its staleness gate decides whether it does any work. This app triggers every stage manually; wiring them together (an application-level job, a "sync") is optional and would live at the application layer.
+
+The read path is the stateless neuxus core. Clients own their own sessions, memory, and end users; `apps/api-chat` is one such client. The client is the agent; neuxus supplies evidence, not intent or tool decisions. The HTTP contract is [Appendix B](./appendix-b-protocol.md).
 
 Content lives in **knowledge bases**: each is either **read-only** (pages ingested from a corpus and written only by the ingest stage) or **writable** (pages updated directly, not by ingest). `writable` is fixed at creation. Every write targets one knowledge base; a search query targets a set of one or more, specified by the request. The backend persists no grouping.
 
@@ -36,8 +39,9 @@ flowchart LR
 | [03.1-chunkify.md](./03.1-chunkify.md)                     | Derive parents / children from `kb_pages.body`                                                                                                                                           |
 | [03.2-image-descriptions.md](./03.2-image-descriptions.md) | Image captions + description vectors (policy from `*.meta.yaml`)                                                                                                                         |
 | [04-retrieval.md](./04-retrieval.md)                       | Question in, ranked parents out (+ ranked image descriptions)                                                                                                                            |
-| [05-synthesis.md](./05-synthesis.md)                       | Prompt in, answer out (image descriptions folded into the prompt)                                                                                                                        |
+| [05-synthesis.md](./05-synthesis.md)                       | Deterministic, capability-neutral context enrichment: Anthropic request in, enriched answer + `neuxus` out                                                                                |
 | [appendix-a-data-model.md](./appendix-a-data-model.md)     | Tables                                                                                                                                                                                   |
+| [appendix-b-protocol.md](./appendix-b-protocol.md)         | HTTP protocol: Anthropic-compatible request, neuxus-extended response                                                                                                                    |
 
 ## Staleness
 
@@ -54,4 +58,4 @@ flowchart LR
 
 A changed embedding model does not trigger a run by itself; the owning stage re-embeds on its next run.
 
-Model choice is application wiring: [`app_model_task_config`](./appendix-a-data-model.md#model-config-tables) links each app task (embedding, captioning, synthesis) to a model, with provider connections in `app_model_provider_config`. No `kb_*` settings table holds a model id.
+Model choice is application wiring: [`GET /v1/models`](./appendix-b-protocol.md#get-v1models) lists requestable models for synthesis, while embedding and captioning tasks are linked in [`app_model_task_config`](./appendix-a-data-model.md#model-config-tables). Provider connections live in `app_model_provider_config`; no `kb_*` settings table holds a model id.

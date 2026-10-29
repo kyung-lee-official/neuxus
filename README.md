@@ -73,7 +73,7 @@ bun run dev
 
 ## Docs
 
-- [PROTOCOL.md](PROTOCOL.md) — stateless neuxus / client app protocol
+- [docs/modern-knowledge-base-design/appendix-b-protocol.md](docs/modern-knowledge-base-design/appendix-b-protocol.md) — stateless neuxus / client app protocol
 - [apps/api-chat/README.md](apps/api-chat/README.md) — chat adapter setup, seed users, API
 - [OpenAPI (Scalar)](http://localhost:3001/openapi) — interactive HTTP API reference, generated from each route's TypeBox schema
 - [`docs/modern-knowledge-base-design/`](docs/modern-knowledge-base-design/) — KB pipeline (corpus → ingest → chunkify → embed; query → synthesis)
