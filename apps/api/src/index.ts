@@ -6,10 +6,7 @@ import { knowledge } from "./modules/knowledge/route.ts";
 import { Logger, LogSettings, PostgresTransport } from "./modules/log/index.ts";
 import { logRoutes } from "./modules/log/route.ts";
 import { modelProviders } from "./modules/model-providers/route.ts";
-import { chatSessions } from "./modules/personal-data/chat-sessions/route.ts";
-import { query } from "./modules/query/route.ts";
 import { serverSetting } from "./modules/server-setting/route.ts";
-import { users } from "./modules/users/route.ts";
 import { serverPort } from "./shared/config.ts";
 import { apiTagList, bearerSecurityScheme } from "./shared/openapi.ts";
 
@@ -29,7 +26,7 @@ const app = new Elysia()
           title: "neuxus API",
           version: "0.0.1",
           description:
-            "Bun + Elysia HTTP API for neuxus: users, sessions, ask-mode chat, knowledge base, and admin server settings.",
+            "Bun + Elysia HTTP API for the neuxus: knowledge base, model providers, logs, and server settings. neuxus routes authenticate with a service token.",
         },
         tags: apiTagList,
         components: {
@@ -72,9 +69,6 @@ const app = new Elysia()
   .use(modelProviders)
   .use(logRoutes)
   .use(serverSetting)
-  .use(query)
-  .use(chatSessions)
-  .use(users)
   .listen(serverPort());
 
 if (usePostgres) {
@@ -85,12 +79,7 @@ if (usePostgres) {
 console.log(`neuxus API listening on http://localhost:${app.server?.port}`);
 console.log(`OpenAPI docs: http://localhost:${app.server?.port}/openapi`);
 console.log(`OpenAPI spec: http://localhost:${app.server?.port}/openapi/json`);
-console.log(
-  "User CRUD: GET/POST /users, GET/PATCH/DELETE /users/:id, GET /users/:id/data, GET /users/:id/logs, DELETE /users/:id/memories/:memoryId",
-);
-console.log(
-  "Sessions: GET/POST /sessions, PATCH /sessions/:id; POST /query accepts body.sessionId",
-);
+console.log("neuxus routes require NEUXUS_SERVICE_TOKEN.");
 console.log("Knowledge: GET /knowledge/pages, GET /knowledge/pages/*");
 console.log(
   "Corpus: GET/PUT /knowledge/corpus/settings; POST /knowledge/corpus/clone, /knowledge/corpus/pull, /knowledge/corpus/chunkify, /knowledge/corpus/embed; GET /knowledge/corpus/events",

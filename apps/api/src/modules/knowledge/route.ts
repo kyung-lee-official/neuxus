@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import { API_TAGS, bearerSecurity } from "../../shared/openapi.ts";
-import { auth } from "../auth/index.ts";
+import { serviceAuth } from "../neuxus-auth/index.ts";
 import { corpus } from "./corpus/route.ts";
 import { corpusSettings } from "./corpus/settings/route.ts";
 import { knowledgeBases } from "./knowledge-bases/route.ts";
@@ -15,9 +15,9 @@ const pageDetail = {
 
 /** Page inspection routes, scoped to one knowledge base. */
 const knowledgePages = new Elysia({ prefix: "/knowledge-bases/:kbId" })
-  .use(auth)
+  .use(serviceAuth)
   .get("/pages", ({ params }) => Knowledge.listPages(params.kbId), {
-    requireAdmin: true,
+    requireService: true,
     response: KnowledgeModel.pageListResponse,
     detail: {
       ...pageDetail,
@@ -30,7 +30,7 @@ const knowledgePages = new Elysia({ prefix: "/knowledge-bases/:kbId" })
     "/pages/*",
     ({ params }) => Knowledge.getPage(params.kbId, params["*"]),
     {
-      requireAdmin: true,
+      requireService: true,
       response: KnowledgeModel.pageDetailResponse,
       detail: {
         ...pageDetail,
@@ -48,7 +48,7 @@ const knowledgePages = new Elysia({ prefix: "/knowledge-bases/:kbId" })
         policy: query.policy,
       }),
     {
-      requireAdmin: true,
+      requireService: true,
       response: KnowledgeModel.imageListResponse,
       detail: {
         ...pageDetail,
@@ -65,7 +65,7 @@ const knowledgePages = new Elysia({ prefix: "/knowledge-bases/:kbId" })
  * retriever knobs (`/retriever/settings`).
  */
 export const knowledge = new Elysia()
-  .use(auth)
+  .use(serviceAuth)
   .use(knowledgeBases)
   .use(knowledgePages)
   .use(corpus)
