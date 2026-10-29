@@ -142,7 +142,7 @@ Notes:
 
 ### Synthesis boundary
 
-Synthesis is evidence enrichment, not agentic planning. neuxus does not know the client's tools, policy, or persona: it does not classify intent, choose or execute tools, rewrite the request, or inject instructions. The client owns the agent loop. See [05-synthesis.md](./05-synthesis.md).
+Synthesis is evidence enrichment, not agentic planning. neuxus does not know the client's tools, policy, or persona: it does not classify intent, choose or execute tools, rewrite the request, or inject agent/system instructions. The only fixed text it adds is the reference-data preamble and `<knowledge>` delimiters. The client owns the agent loop. See [05-synthesis.md](./05-synthesis.md#context-layout-and-ordering) for the block layout and ordering.
 
 ### Response
 
