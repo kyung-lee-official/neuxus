@@ -7,6 +7,7 @@ export const API_TAGS = {
   users: "users",
   sessions: "sessions",
   query: "query",
+  log: "log",
 } as const;
 
 export type ApiTag = (typeof API_TAGS)[keyof typeof API_TAGS];
@@ -20,6 +21,10 @@ export const apiTagList: { name: string; description: string }[] = [
   },
   { name: API_TAGS.sessions, description: "Chat session lifecycle" },
   { name: API_TAGS.query, description: "Ask-mode synthesis and remember" },
+  {
+    name: API_TAGS.log,
+    description: "Log sink settings and `app_log` purge",
+  },
 ];
 
 /** HTTP Bearer security scheme used by authenticated routes. */

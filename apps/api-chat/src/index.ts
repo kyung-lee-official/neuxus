@@ -2,11 +2,21 @@ import { openapi } from "@elysia/openapi";
 import { cors } from "@elysiajs/cors";
 import { Elysia, status } from "elysia";
 import { health } from "./modules/health/route.ts";
+import { Logger, LogSettings, PostgresTransport } from "./modules/log/index.ts";
+import { logRoutes } from "./modules/log/route.ts";
 import { chatSessions } from "./modules/personal-data/chat-sessions/route.ts";
 import { query } from "./modules/query/route.ts";
 import { users } from "./modules/users/route.ts";
 import { serverPort } from "./shared/config.ts";
 import { apiTagList, bearerSecurityScheme } from "./shared/openapi.ts";
+
+const logSettings = await LogSettings.load();
+const usePostgres = logSettings.sinks.includes("postgres");
+if (usePostgres) {
+  Logger.setTransport(
+    new PostgresTransport({ capacity: logSettings.queueSize }),
+  );
+}
 
 const app = new Elysia()
   .use(
@@ -58,7 +68,13 @@ const app = new Elysia()
   .use(query)
   .use(chatSessions)
   .use(users)
+  .use(logRoutes)
   .listen(serverPort());
+
+if (usePostgres) {
+  Logger.startWorker();
+  Logger.installShutdownHandlers(logSettings.drainTimeoutMs);
+}
 
 console.log(
   `neuxus chat API listening on http://localhost:${app.server?.port}`,
@@ -71,6 +87,7 @@ console.log(
 console.log("Sessions: GET/POST /sessions, PATCH/DELETE /sessions/:id");
 console.log("Memory: POST /remember");
 console.log("Query: POST /query (stub, 501 until the chat refactor lands)");
+console.log("Log: GET/PUT /log/settings; POST /log/settings/reset, /log/purge");
 
 export type App = typeof app;
 export default app;

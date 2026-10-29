@@ -1,0 +1,94 @@
+/**
+ * App-log DAL. Owns the `app_log` table: the sink's inserts and the admin
+ * purge.
+ *
+ * Internal to the log module: `sinks/postgres-transport.ts` imports it.
+ * `deleteAllLogs` is re-exported from the module barrel for the admin purge
+ * route.
+ */
+
+import { hostname } from "node:os";
+import { getPrisma } from "../../shared/db.ts";
+
+export type LogRecord = {
+  level: string;
+  msg: string;
+  name: string | null;
+  /** Optional owner. Set by the retrieve and synthesis domains only. */
+  userId: string | null;
+  meta: Record<string, unknown>;
+  /** Stamped at enqueue time (sync path). */
+  time: string;
+};
+
+/** Insert one `app_log` row; returns false on a failed write (best-effort). */
+export async function insertLog(record: LogRecord): Promise<boolean> {
+  const meta = {
+    ...record.meta,
+    time: record.time,
+    pid: process.pid,
+    hostname: hostname(),
+  };
+  try {
+    await getPrisma().appLog.create({
+      data: {
+        level: record.level,
+        msg: record.msg,
+        name: record.name,
+        userId: record.userId,
+        meta,
+      },
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Delete every `app_log` row; returns the count removed. */
+export async function deleteAllLogs(): Promise<number> {
+  const { count } = await getPrisma().appLog.deleteMany({});
+  return count;
+}
+
+/** Raw `app_log` row for inspection. */
+export type LogRow = {
+  id: bigint;
+  level: string;
+  name: string | null;
+  msg: string;
+  meta: unknown;
+  createdAt: Date;
+};
+
+/** One `app_log` row by id, or null. */
+export async function findLogById(id: bigint): Promise<LogRow | null> {
+  return getPrisma().appLog.findUnique({ where: { id } });
+}
+
+/** Raw `app_log` row scoped to one user. */
+export type AppLogRow = {
+  id: bigint;
+  level: string;
+  msg: string;
+  name: string | null;
+  userId: string | null;
+  meta: unknown;
+  createdAt: Date;
+};
+
+/** A page of a user's `app_log` rows (newest first), filtered by logger name. */
+export async function findLogsByUser(
+  userId: string,
+  options: { names: string[]; take: number; cursor: bigint | null },
+): Promise<AppLogRow[]> {
+  return getPrisma().appLog.findMany({
+    where: {
+      userId,
+      name: { in: options.names },
+      ...(options.cursor ? { id: { lt: options.cursor } } : {}),
+    },
+    orderBy: { id: "desc" },
+    take: options.take,
+  });
+}

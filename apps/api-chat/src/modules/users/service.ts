@@ -1,5 +1,6 @@
 import { status } from "elysia";
 import { isoFromDate } from "../../shared/serialize.ts";
+import { type AppLogRow, findLogsByUser } from "../log/index.ts";
 import { ChatMessage } from "../personal-data/chat-messages/service.ts";
 import {
   ChatSession,
@@ -17,7 +18,13 @@ import {
   updateUserApiKey,
   upsertUser,
 } from "./dal.ts";
-import { type LogItem, type LogsModel, type UsersModel } from "./model.ts";
+import {
+  clampLogLimit,
+  type LogItem,
+  type LogsModel,
+  resolveLogNames,
+  type UsersModel,
+} from "./model.ts";
 
 export type { AppUser, AppUserRole } from "./dal.ts";
 
@@ -45,6 +52,29 @@ export type LogListResult = {
   items: LogItem[];
   nextCursor: string | null;
 };
+
+function rowToLogItem(row: AppLogRow): LogItem {
+  return {
+    id: row.id.toString(),
+    level: row.level,
+    msg: row.msg,
+    name: row.name,
+    userId: row.userId,
+    meta: row.meta,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+function parseLogCursor(raw: string | undefined): bigint | null {
+  if (!raw) return null;
+  try {
+    const n = BigInt(raw);
+    if (n <= 0n) return null;
+    return n;
+  } catch {
+    throw status(400, { error: "Invalid cursor" });
+  }
+}
 
 export abstract class Users {
   static async list() {
@@ -168,15 +198,30 @@ export abstract class Users {
     return { deleted: true as const, id: memoryId };
   }
 
-  /**
-   * A user's `app_log` entries. The chat app does not own the neuxus log
-   * tables yet, so this is an empty stub until the log proxy is added.
-   */
+  /** A page of a user's `app_log` entries (newest first). */
   static async listLogs(
-    _idParam: string,
-    _query: LogsModel["listQuery"],
+    idParam: string,
+    query: LogsModel["listQuery"],
   ): Promise<LogListResult> {
-    return { items: [], nextCursor: null };
+    const id = normalizeUserId(idParam);
+    if (!id) throw status(400, { error: "Invalid user id" });
+
+    const names = resolveLogNames(query.names);
+    const limit = clampLogLimit(query.limit);
+    const cursor = parseLogCursor(query.cursor);
+
+    const rows = await findLogsByUser(id, {
+      names,
+      take: limit + 1,
+      cursor,
+    });
+    const hasMore = rows.length > limit;
+    const pageRows = hasMore ? rows.slice(0, limit) : rows;
+    const lastRow = pageRows[pageRows.length - 1];
+    return {
+      items: pageRows.map(rowToLogItem),
+      nextCursor: hasMore && lastRow ? lastRow.id.toString() : null,
+    };
   }
 
   /** Resolve a user by API key (auth). */
