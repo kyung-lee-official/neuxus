@@ -15,20 +15,20 @@ and persists both messages.
 - Durable agent runs (`agent_runs`, `agent_events`) with retry and event replay
 - Chat dialog: calls `POST /v1/messages` on the neuxus API
   (`NEUXUS_API_URL`, `NEUXUS_SERVICE_TOKEN`) and runs chat-owned tools such as
-  `fetch_url` (`DEEPSEEK_API_KEY`)
+  `fetch_url`; tool credentials and budgets are configured in the admin UI
 
 It does not own knowledge, model providers, logs, or server settings. Those
 belong to `apps/api`.
 
 ## Stack
 
-| Piece                    | Role                                      |
-| ------------------------ | ----------------------------------------- |
-| Bun + Elysia             | HTTP API on `:3002`                       |
-| Postgres (`neuxus-chat`) | Users, memories, sessions, messages, runs, logs |
-| Prisma                   | Schema and migrations                     |
-| User API keys            | `Authorization: Bearer <api-key>`         |
-| `apps/web`               | Chat UI at `/chat`                        |
+| Piece                    | Role                                                      |
+| ------------------------ | --------------------------------------------------------- |
+| Bun + Elysia             | HTTP API on `:3002`                                       |
+| Postgres (`neuxus-chat`) | Users, memories, sessions, messages, runs, settings, logs |
+| Prisma                   | Schema and migrations                                     |
+| User API keys            | `Authorization: Bearer <api-key>`                         |
+| `apps/web`               | Chat UI at `/chat`                                        |
 
 The chat database is separate from the neuxus database. Do not import code from
 `apps/api`; call it over HTTP.
@@ -66,7 +66,8 @@ persistence, SSE event schemas, security, budgets, and open decisions is in
 
 Current summary:
 
-- `fetch_url` uses DeepSeek's Fetch API and requires `DEEPSEEK_API_KEY`.
+- `fetch_url` uses DeepSeek's Fetch API; configure its key in the admin agent
+  settings.
 - `/query` runs the same tool loop without a stream.
 - `/query/stream` emits `start`, `delta`, `tool_call`, `tool_result`, `done`,
   and `error`.
@@ -96,8 +97,11 @@ DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/neuxus-chat
 PORT=3002
 NEUXUS_API_URL=http://localhost:3001
 NEUXUS_SERVICE_TOKEN=<same value as apps/api/.env>
-DEEPSEEK_API_KEY=<DeepSeek API key for chat tools>
 ```
+
+Agent settings (DeepSeek API key, tool iterations, stream timeout, run attempts)
+are stored in the `agent_settings` table and configured by an admin at
+`/chat/settings/<admin-user>` after signing in.
 
 3. Install, generate, and migrate (from `apps/api-chat`):
 
@@ -110,7 +114,7 @@ bun run prisma -- migrate dev --name init
 For an existing database, apply the latest migration and restart the app:
 
 ```powershell
-bun run prisma -- migrate dev --name agent-runs
+bun run prisma -- migrate dev --name agent-runtime
 ```
 
 4. Seed chat users (optional; from `apps/api-chat`):
@@ -179,6 +183,8 @@ starting the app.
 | `PATCH`  | `/sessions/:sessionId`          | Bearer               | Rename or clear a title          |
 | `DELETE` | `/sessions/:sessionId`          | Bearer               | Delete a session                 |
 | `GET`    | `/knowledge-bases`              | Bearer               | Knowledge bases from neuxus      |
+| `GET`    | `/agent-settings`               | Bearer (admin)       | Read agent settings              |
+| `PUT`    | `/agent-settings`               | Bearer (admin)       | Update agent settings            |
 | `POST`   | `/remember`                     | Bearer               | Store a personal memory          |
 | `POST`   | `/query`                        | Bearer               | Ask via neuxus `/v1/messages`    |
 | `POST`   | `/query/stream`                 | Bearer               | Same, streamed as SSE events     |

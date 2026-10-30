@@ -112,6 +112,18 @@ model AppLogSettings {
   @@map("app_log_settings")
 }
 
+/// Admin-managed agent configuration. Single row, id = `"default"`.
+model AgentSettings {
+  id                String   @id @default("default")
+  deepseekApiKey    String?  @map("deepseek_api_key")
+  maxToolIterations Int?     @map("max_tool_iterations")
+  streamTimeoutMs   Int?     @map("stream_timeout_ms")
+  runMaxAttempts    Int?     @map("run_max_attempts")
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("agent_settings")
+}
+
 /// Durable agent run. `messages` is the last saved transcript checkpoint;
 /// `request` is the prepared model request without the changing messages.
 model AgentRun {
