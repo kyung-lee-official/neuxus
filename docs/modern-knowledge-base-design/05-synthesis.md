@@ -120,8 +120,9 @@ it. The chat adapter (`apps/api-chat`) is one such client.
 
 ### Response validation
 
-- The upstream body must be a well-formed Anthropic Messages response: `type`,
-  `role`, `content` blocks, `stop_reason`, and `usage`.
+- The upstream body must match the `MessageResponse` shape in
+  [Appendix B](./appendix-b-protocol.md): `type`, `role`, `content` blocks,
+  `stop_reason`, and `usage`.
 - Validate the envelope, not the prose; no claim checking.
 - A malformed or non-Anthropic upstream is `502` (`upstream_error` /
   `non_anthropic_upstream`); no `neuxus` object is attached.
