@@ -124,8 +124,10 @@ starting the app.
 | `DELETE` | `/users/:id/memories/:memoryId` | Bearer               | Delete a memory                  |
 | `GET`    | `/sessions`                     | Bearer               | List the current user's sessions |
 | `POST`   | `/sessions`                     | Bearer               | Create a session                 |
+| `GET`    | `/sessions/:sessionId/messages` | Bearer               | List messages in a session       |
 | `PATCH`  | `/sessions/:sessionId`          | Bearer               | Rename or clear a title          |
 | `DELETE` | `/sessions/:sessionId`          | Bearer               | Delete a session                 |
+| `GET`    | `/knowledge-bases`              | Bearer               | Knowledge bases from neuxus      |
 | `POST`   | `/remember`                     | Bearer               | Store a personal memory          |
 | `POST`   | `/query`                        | Bearer               | Ask via neuxus `/v1/messages`    |
 | `GET`    | `/log/settings`                 | Bearer (admin)       | Read log sink settings           |

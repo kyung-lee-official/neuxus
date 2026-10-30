@@ -2,6 +2,7 @@ import { openapi } from "@elysia/openapi";
 import { cors } from "@elysiajs/cors";
 import { Elysia, status } from "elysia";
 import { health } from "./modules/health/route.ts";
+import { knowledgeBases } from "./modules/knowledge-bases/route.ts";
 import { Logger, LogSettings, PostgresTransport } from "./modules/log/index.ts";
 import { logRoutes } from "./modules/log/route.ts";
 import { chatSessions } from "./modules/personal-data/chat-sessions/route.ts";
@@ -26,7 +27,7 @@ const app = new Elysia()
           title: "neuxus chat API",
           version: "0.0.1",
           description:
-            "Stateful chat adapter for neuxus. Owns users, sessions, messages, and personal memory. Chat synthesis is being refactored; `/query` currently returns 501.",
+            "Stateful chat adapter for neuxus. Owns users, sessions, messages, and personal memory, and calls the stateless neuxus API for knowledge-base-enriched synthesis.",
         },
         tags: apiTagList,
         components: {
@@ -66,6 +67,7 @@ const app = new Elysia()
   })
   .use(health)
   .use(query)
+  .use(knowledgeBases)
   .use(chatSessions)
   .use(users)
   .use(logRoutes)
@@ -85,8 +87,9 @@ console.log(
   "Users: GET/POST /users, GET/PATCH/DELETE /users/:id, GET /users/:id/data, GET /users/:id/logs, DELETE /users/:id/memories/:memoryId",
 );
 console.log("Sessions: GET/POST /sessions, PATCH/DELETE /sessions/:id");
+console.log("Knowledge bases: GET /knowledge-bases (proxied from neuxus)");
 console.log("Memory: POST /remember");
-console.log("Query: POST /query (stub, 501 until the chat refactor lands)");
+console.log("Query: POST /query (calls neuxus /v1/messages)");
 console.log("Log: GET/PUT /log/settings; POST /log/settings/reset, /log/purge");
 
 export type App = typeof app;

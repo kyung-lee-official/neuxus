@@ -58,13 +58,19 @@ export async function requestJson<T>(
   });
   const data = await parseJson(res);
   if (!res.ok) {
+    const error =
+      data && typeof data === "object"
+        ? (data as { error?: unknown }).error
+        : undefined;
     const message =
-      data &&
-      typeof data === "object" &&
-      "error" in data &&
-      typeof (data as { error: unknown }).error === "string"
-        ? (data as { error: string }).error
-        : `HTTP ${res.status}`;
+      typeof error === "string"
+        ? error
+        : error &&
+            typeof error === "object" &&
+            "message" in error &&
+            typeof (error as { message?: unknown }).message === "string"
+          ? (error as { message: string }).message
+          : `HTTP ${res.status}`;
     throw new ApiError(message, res.status);
   }
   return data as T;

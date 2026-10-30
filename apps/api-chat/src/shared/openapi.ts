@@ -6,6 +6,7 @@ export const API_TAGS = {
   health: "health",
   users: "users",
   sessions: "sessions",
+  knowledgeBases: "knowledge-bases",
   query: "query",
   log: "log",
 } as const;
@@ -20,6 +21,10 @@ export const apiTagList: { name: string; description: string }[] = [
     description: "User CRUD, personal data, and my-logs",
   },
   { name: API_TAGS.sessions, description: "Chat session lifecycle" },
+  {
+    name: API_TAGS.knowledgeBases,
+    description: "Knowledge bases proxied from the neuxus core",
+  },
   { name: API_TAGS.query, description: "Ask-mode synthesis and remember" },
   {
     name: API_TAGS.log,

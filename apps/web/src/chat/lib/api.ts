@@ -24,6 +24,20 @@ export type RememberResult = {
   saved?: boolean;
 };
 
+export type ChatKnowledgeBase = {
+  id: string;
+  name: string;
+  writable: boolean;
+  createdAt: string | null;
+};
+
+export type ChatMessageRow = {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: string | null;
+};
+
 export type UserMemoryRow = {
   id: number;
   slug: string;
@@ -91,6 +105,9 @@ export const UserQueryKey = {
   Data: (id: string, messagePage: number) =>
     ["users", id, "data", messagePage] as const,
   Sessions: (userId: string) => ["sessions", userId] as const,
+  SessionMessages: (sessionId: string) =>
+    ["sessions", sessionId, "messages"] as const,
+  KnowledgeBases: ["chat", "knowledge-bases"] as const,
   /** Page of the current user's own retrieve/synthesis logs. */
   MyLogs: (userId: string, cursor: string | null) =>
     ["users", userId, "logs", cursor] as const,
@@ -98,6 +115,27 @@ export const UserQueryKey = {
 
 export async function getHealth(): Promise<{ ok: boolean }> {
   return chatFetch<{ ok: boolean }>("/health");
+}
+
+export async function listChatKnowledgeBases(
+  apiKey: string,
+): Promise<ChatKnowledgeBase[]> {
+  const data = await chatFetch<{ knowledgeBases: ChatKnowledgeBase[] }>(
+    "/knowledge-bases",
+    { apiKey },
+  );
+  return data.knowledgeBases ?? [];
+}
+
+export async function listSessionMessages(input: {
+  apiKey: string;
+  sessionId: string;
+}): Promise<ChatMessageRow[]> {
+  const data = await chatFetch<{ messages: ChatMessageRow[] }>(
+    `/sessions/${encodeURIComponent(input.sessionId)}/messages`,
+    { apiKey: input.apiKey },
+  );
+  return data.messages ?? [];
 }
 
 export type MyLogItem = {

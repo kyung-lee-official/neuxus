@@ -1,5 +1,5 @@
-import { ChatStubPanel } from "@/chat/components/chat-stub-panel";
+import { ChatPanel } from "@/chat/components/chat-panel";
 
 export default function AskPage() {
-  return <ChatStubPanel />;
+  return <ChatPanel />;
 }
