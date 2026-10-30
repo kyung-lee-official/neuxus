@@ -318,6 +318,19 @@ export async function postQuery(input: {
 export type QueryStreamEvent =
   | { type: "start"; sessionId: string; userId: string }
   | { type: "delta"; text: string }
+  | {
+      type: "tool_call";
+      id: string;
+      name: string;
+      input: Record<string, unknown>;
+    }
+  | {
+      type: "tool_result";
+      id: string;
+      name: string;
+      isError: boolean;
+      preview: string;
+    }
   | { type: "done"; sessionId: string; userId: string }
   | { type: "error"; error: string };
 
@@ -356,6 +369,34 @@ function parseQueryEvent(block: string): QueryStreamEvent | null {
   }
   if (parsed.type === "error" && typeof parsed.error === "string") {
     return { type: "error", error: parsed.error };
+  }
+  if (
+    parsed.type === "tool_call" &&
+    typeof parsed.id === "string" &&
+    typeof parsed.name === "string" &&
+    isRecord(parsed.input)
+  ) {
+    return {
+      type: "tool_call",
+      id: parsed.id,
+      name: parsed.name,
+      input: parsed.input,
+    };
+  }
+  if (
+    parsed.type === "tool_result" &&
+    typeof parsed.id === "string" &&
+    typeof parsed.name === "string" &&
+    typeof parsed.isError === "boolean" &&
+    typeof parsed.preview === "string"
+  ) {
+    return {
+      type: "tool_result",
+      id: parsed.id,
+      name: parsed.name,
+      isError: parsed.isError,
+      preview: parsed.preview,
+    };
   }
   return null;
 }

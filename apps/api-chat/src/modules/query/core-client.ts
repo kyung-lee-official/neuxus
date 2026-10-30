@@ -17,6 +17,8 @@ export class NeuxusClientError extends Error {
 
 type ContentBlock = { type?: unknown; text?: unknown };
 
+export type NeuxusContentBlock = Record<string, unknown>;
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
 }
@@ -31,24 +33,35 @@ function errorMessage(value: unknown, fallback: string): string {
   return fallback;
 }
 
-function textFromContent(value: unknown): string {
+function contentFromMessage(value: unknown): NeuxusContentBlock[] {
   if (!isObject(value) || !Array.isArray(value.content)) {
     throw new NeuxusClientError(
       502,
       "neuxus returned a response without message content",
     );
   }
-  const parts = value.content
-    .filter(
-      (block): block is ContentBlock =>
-        isObject(block) && block.type === "text",
-    )
-    .map((block) => (typeof block.text === "string" ? block.text.trim() : ""))
-    .filter((text) => text !== "");
-  if (parts.length === 0) {
-    throw new NeuxusClientError(502, "neuxus returned an empty answer");
+  const content: NeuxusContentBlock[] = [];
+  for (const block of value.content) {
+    if (!isObject(block) || typeof block.type !== "string") {
+      throw new NeuxusClientError(
+        502,
+        "neuxus returned an invalid content block",
+      );
+    }
+    content.push(block);
   }
-  return parts.join("\n\n");
+  return content;
+}
+
+function textFromBlocks(content: NeuxusContentBlock[]): string {
+  return content
+    .filter(
+      (block): block is ContentBlock & { type: "text"; text: string } =>
+        block.type === "text" && typeof block.text === "string",
+    )
+    .map((block) => block.text.trim())
+    .filter((text) => text !== "")
+    .join("\n\n");
 }
 
 function isAbortError(error: unknown): boolean {
@@ -60,6 +73,8 @@ function isAbortError(error: unknown): boolean {
 export type NeuxusAnswer = {
   answer: string;
   requestId: string | null;
+  content: NeuxusContentBlock[];
+  stopReason: string | null;
 };
 
 export type CoreKnowledgeBase = {
@@ -129,6 +144,7 @@ export async function listCoreKnowledgeBases(): Promise<CoreKnowledgeBase[]> {
 export async function askNeuxus(input: {
   knowledgeBaseId: string;
   body: Record<string, unknown>;
+  signal?: AbortSignal;
 }): Promise<NeuxusAnswer> {
   const token = neuxusServiceToken();
   if (token === "") {
@@ -149,9 +165,10 @@ export async function askNeuxus(input: {
         "X-Neuxus-Knowledge-Base": input.knowledgeBaseId,
       },
       body: JSON.stringify(input.body),
-      signal: AbortSignal.timeout(120_000),
+      signal: input.signal ?? AbortSignal.timeout(120_000),
     });
-  } catch {
+  } catch (error) {
+    if (isAbortError(error)) throw error;
     throw new NeuxusClientError(502, "Could not reach the neuxus API");
   }
 
@@ -170,8 +187,17 @@ export async function askNeuxus(input: {
     );
   }
 
-  const requestId = res.headers.get("x-request-id");
-  return { answer: textFromContent(data), requestId };
+  const content = contentFromMessage(data);
+  const stopReason =
+    isObject(data) && typeof data.stop_reason === "string"
+      ? data.stop_reason
+      : null;
+  return {
+    answer: textFromBlocks(content),
+    requestId: res.headers.get("x-request-id"),
+    content,
+    stopReason,
+  };
 }
 
 function sseData(block: string): string | null {
@@ -238,7 +264,31 @@ export async function streamNeuxus(input: {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  let answer = "";
+  let stopReason: string | null = null;
+  const blocks = new Map<
+    number,
+    { block: NeuxusContentBlock; partialJson: string }
+  >();
+
+  const finalizeToolInput = (state: {
+    block: NeuxusContentBlock;
+    partialJson: string;
+  }) => {
+    if (state.block.type !== "tool_use" || state.partialJson.trim() === "") {
+      return;
+    }
+    let input: unknown;
+    try {
+      input = JSON.parse(state.partialJson) as unknown;
+    } catch {
+      throw new NeuxusClientError(502, "neuxus returned malformed tool input");
+    }
+    if (!isObject(input)) {
+      throw new NeuxusClientError(502, "neuxus returned malformed tool input");
+    }
+    state.block.input = input;
+    state.partialJson = "";
+  };
 
   const consume = (block: string) => {
     const data = sseData(block);
@@ -249,22 +299,59 @@ export async function streamNeuxus(input: {
     } catch {
       return;
     }
-    if (!isObject(parsed)) return;
+    if (!isObject(parsed) || typeof parsed.type !== "string") return;
     if (parsed.type === "error") {
       throw new NeuxusClientError(
         502,
         errorMessage(parsed, "neuxus stream returned an error"),
       );
     }
-    if (
-      parsed.type === "content_block_delta" &&
-      isObject(parsed.delta) &&
-      parsed.delta.type === "text_delta" &&
-      typeof parsed.delta.text === "string" &&
-      parsed.delta.text !== ""
-    ) {
-      answer += parsed.delta.text;
-      input.onText(parsed.delta.text);
+
+    if (parsed.type === "content_block_start") {
+      const index = parsed.index;
+      const contentBlock = parsed.content_block;
+      if (
+        typeof index !== "number" ||
+        !isObject(contentBlock) ||
+        typeof contentBlock.type !== "string"
+      ) {
+        return;
+      }
+      blocks.set(index, { block: { ...contentBlock }, partialJson: "" });
+      return;
+    }
+
+    if (parsed.type === "content_block_delta") {
+      const index = parsed.index;
+      const delta = parsed.delta;
+      if (typeof index !== "number" || !isObject(delta)) return;
+      const state = blocks.get(index);
+      if (!state) return;
+      if (delta.type === "text_delta" && typeof delta.text === "string") {
+        state.block.text =
+          (typeof state.block.text === "string" ? state.block.text : "") +
+          delta.text;
+        if (delta.text !== "") input.onText(delta.text);
+      } else if (
+        delta.type === "input_json_delta" &&
+        typeof delta.partial_json === "string"
+      ) {
+        state.partialJson += delta.partial_json;
+      }
+      return;
+    }
+
+    if (parsed.type === "content_block_stop") {
+      if (typeof parsed.index !== "number") return;
+      const state = blocks.get(parsed.index);
+      if (state) finalizeToolInput(state);
+      return;
+    }
+
+    if (parsed.type === "message_delta" && isObject(parsed.delta)) {
+      if (typeof parsed.delta.stop_reason === "string") {
+        stopReason = parsed.delta.stop_reason;
+      }
     }
   };
 
@@ -289,5 +376,15 @@ export async function streamNeuxus(input: {
     throw new NeuxusClientError(502, "neuxus stream failed");
   }
 
-  return { answer, requestId: res.headers.get("x-request-id") };
+  for (const state of blocks.values()) finalizeToolInput(state);
+  const content = [...blocks.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([, state]) => state.block);
+
+  return {
+    answer: textFromBlocks(content),
+    requestId: res.headers.get("x-request-id"),
+    content,
+    stopReason,
+  };
 }

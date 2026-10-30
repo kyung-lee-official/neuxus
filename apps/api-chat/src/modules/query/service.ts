@@ -3,8 +3,9 @@ import { ChatMessage } from "../personal-data/chat-messages/service.ts";
 import { ChatSession } from "../personal-data/chat-sessions/service.ts";
 import { PersonalMemory } from "../personal-data/personal-memory/service.ts";
 import { type AppUser } from "../users/service.ts";
+import { runAgent } from "./agent.ts";
 import { chatMessages, chatSystem } from "./context.ts";
-import { askNeuxus, NeuxusClientError, streamNeuxus } from "./core-client.ts";
+import { NeuxusClientError } from "./core-client.ts";
 import type { QueryModel } from "./model.ts";
 
 const CHAT_MODEL = "deepseek::deepseek-flash";
@@ -63,10 +64,16 @@ export abstract class Query {
   static async ask(user: AppUser, body: QueryModel["queryBody"]) {
     try {
       const prepared = await prepareAsk(user, body);
-      const result = await askNeuxus({
+      const result = await runAgent({
         knowledgeBaseId: prepared.knowledgeBaseId,
-        body: prepared.requestBody,
+        requestBody: prepared.requestBody,
+        userId: user.id,
+        sessionId: prepared.sessionId,
+        stream: false,
       });
+      if (result.answer.trim() === "") {
+        throw new NeuxusClientError(502, "neuxus returned an empty answer");
+      }
 
       await ChatMessage.insert(prepared.sessionId, "user", prepared.message);
       await ChatMessage.insert(prepared.sessionId, "assistant", result.answer);
@@ -141,15 +148,21 @@ export abstract class Query {
 
         let answer = "";
         try {
-          await streamNeuxus({
+          const result = await runAgent({
             knowledgeBaseId: prepared.knowledgeBaseId,
-            body: prepared.requestBody,
+            requestBody: prepared.requestBody,
+            userId: user.id,
+            sessionId: prepared.sessionId,
+            stream: true,
             signal: abort.signal,
             onText(text) {
-              answer += text;
               send("delta", { type: "delta", text });
             },
+            onTool(event) {
+              send(event.type, { ...event });
+            },
           });
+          answer = result.answer;
 
           if (abort.signal.aborted) {
             close();

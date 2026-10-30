@@ -31,6 +31,11 @@ export function neuxusServiceToken(): string {
   return process.env.NEUXUS_SERVICE_TOKEN?.trim() || "";
 }
 
+/** DeepSeek API key for chat-owned tools such as web fetch. */
+export function deepseekApiKey(): string {
+  return process.env.DEEPSEEK_API_KEY?.trim() || "";
+}
+
 /** Seeded into `app_users` by `bun run seed` (ids are lowercase; `haewon` is admin). */
 export const SEED_USER_IDS = [
   "lily",
