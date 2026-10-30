@@ -3,6 +3,8 @@ import { cors } from "@elysiajs/cors";
 import { Elysia, status } from "elysia";
 import { agentRuns } from "./modules/agent-runs/route.ts";
 import { startAgentRunWorker } from "./modules/agent-runs/worker.ts";
+import { agentSettings } from "./modules/agent-settings/route.ts";
+import { AgentSettings } from "./modules/agent-settings/service.ts";
 import { health } from "./modules/health/route.ts";
 import { knowledgeBases } from "./modules/knowledge-bases/route.ts";
 import { Logger, LogSettings, PostgresTransport } from "./modules/log/index.ts";
@@ -14,6 +16,14 @@ import { serverPort } from "./shared/config.ts";
 import { apiTagList, bearerSecurityScheme } from "./shared/openapi.ts";
 
 const logSettings = await LogSettings.load();
+try {
+  await AgentSettings.load();
+} catch (error) {
+  console.warn(
+    "agent settings defaults active: agent_settings is not ready",
+    error instanceof Error ? error.message : String(error),
+  );
+}
 const usePostgres = logSettings.sinks.includes("postgres");
 if (usePostgres) {
   Logger.setTransport(
@@ -70,6 +80,7 @@ const app = new Elysia()
   .use(health)
   .use(query)
   .use(agentRuns)
+  .use(agentSettings)
   .use(knowledgeBases)
   .use(chatSessions)
   .use(users)
@@ -98,6 +109,7 @@ console.log("Query: POST /query (JSON), POST /query/stream (SSE)");
 console.log(
   "Durable runs: POST /query/async; GET /query/runs/:id, /query/runs/:id/events",
 );
+console.log("Agent settings: GET/PUT /agent-settings (admin)");
 console.log("Log: GET/PUT /log/settings; POST /log/settings/reset, /log/purge");
 
 export type App = typeof app;

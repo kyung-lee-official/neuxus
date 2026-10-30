@@ -7,17 +7,19 @@ Scope: `/query`, `/query/stream`, `/query/async`, durable runs, chat-owned tools
 and chat-side persistence and SSE behavior. neuxus remains a stateless transport
 for the model call.
 
-Durable mode requires the `agent_runs` and `agent_events` migration. Without it,
-the worker disables itself and `/query/async` is unavailable; synchronous
-`/query` and `/query/stream` still work.
+Durable mode requires the `agent_runs` and `agent_events` migration. Agent
+settings require `agent_settings`. Without `agent_settings`, the app starts with
+code defaults and `fetch_url` unavailable; without the run tables, the worker
+disables itself and `/query/async` is unavailable. Synchronous `/query` and
+`/query/stream` still work.
 
 ## Execution modes
 
-| Mode              | Endpoint             | Durable | Resume | Event replay |
-| ----------------- | -------------------- | ------- | ------ | ------------ |
-| Synchronous JSON  | `POST /query`        | No      | No     | No           |
-| Synchronous SSE   | `POST /query/stream` | No      | No     | No           |
-| Durable run       | `POST /query/async`  | Yes     | Yes    | Yes          |
+| Mode             | Endpoint             | Durable | Resume | Event replay |
+| ---------------- | -------------------- | ------- | ------ | ------------ |
+| Synchronous JSON | `POST /query`        | No      | No     | No           |
+| Synchronous SSE  | `POST /query/stream` | No      | No     | No           |
+| Durable run      | `POST /query/async`  | Yes     | Yes    | Yes          |
 
 All three modes run the same `runAgent()` loop. Durable runs add a database
 record, an append-only event log, retries, and replay.
@@ -27,19 +29,19 @@ record, an append-only event log, retries, and replay.
 These phases apply to both synchronous and durable runs. In durable mode,
 `preparing` and each tool-batch checkpoint are stored.
 
-| Phase        | Current behavior                                                                 |
-| ------------ | -------------------------------------------------------------------------------- |
-| `preparing`  | Validate the request, resolve the session, load recent messages and memory, and build the initial `messages` array. |
-| `model_call` | Call neuxus `POST /v1/messages` with the current `messages` and the available tool list. |
-| `tool_batch` | If the response contains `tool_use` blocks, execute all of them in parallel. |
-| `finalizing` | If the response has no `tool_use` blocks, use its text as the final answer. |
-| `completed`  | Persist the messages and emit the JSON response or the SSE `done` event. |
-| `failed`     | Return an HTTP error or emit an SSE `error` event. |
+| Phase        | Current behavior                                                                                                      |
+| ------------ | --------------------------------------------------------------------------------------------------------------------- |
+| `preparing`  | Validate the request, resolve the session, load recent messages and memory, and build the initial `messages` array.   |
+| `model_call` | Call neuxus `POST /v1/messages` with the current `messages` and the available tool list.                              |
+| `tool_batch` | If the response contains `tool_use` blocks, execute all of them in parallel.                                          |
+| `finalizing` | If the response has no `tool_use` blocks, use its text as the final answer.                                           |
+| `completed`  | Persist the messages and emit the JSON response or the SSE `done` event.                                              |
+| `failed`     | Return an HTTP error or emit an SSE `error` event.                                                                    |
 | `aborted`    | A synchronous streaming client abort stops the run. A durable run is not cancelled by disconnecting its event stream. |
 
 Loop rules:
 
-- `CHAT_MAX_TOOL_ITERATIONS` defaults to 4.
+- `maxToolIterations` from `agent_settings` defaults to 4.
 - Every model call includes every currently available tool definition.
 - A response with `tool_use` blocks continues the loop even if `stop_reason` is
   missing or unexpected. `stop_reason` is parsed but not currently used as a
@@ -101,6 +103,23 @@ Worker behavior:
 - The worker assumes a single app instance. Multi-instance deployment needs a
   lease or external queue.
 
+## Agent settings
+
+Admin-managed singleton row `agent_settings` (`id = "default"`):
+
+- `deepseekApiKey`: optional tool credential.
+- `maxToolIterations`: default 4.
+- `streamTimeoutMs`: default 300,000.
+- `runMaxAttempts`: default 2.
+
+`GET /agent-settings` and `PUT /agent-settings` are admin-only. The API returns
+`hasDeepseekApiKey`, never the key itself. `PUT` omits a field to keep it, sends
+an empty string or `null` to clear the key, and `null` numeric fields fall back
+to code defaults.
+
+The app loads the row at startup and refreshes the in-process cache after a
+successful save. Tools and the worker read that cache.
+
 ## Tool contract
 
 Tool definitions and executors live in `src/modules/tools/`.
@@ -130,7 +149,7 @@ To add a tool:
 1. Implement a `Tool` under `src/modules/tools/`.
 2. Add it to the `TOOLS` array in `src/modules/tools/registry.ts`.
 3. Define an `input_schema` with required fields and `additionalProperties:
-   false` when appropriate.
+false` when appropriate.
 4. Add tests for success, invalid input, provider failure, timeout, and abort.
 
 ## Model call contract
@@ -238,7 +257,10 @@ tool result is sent to the model and stored in the durable transcript.
 ## Security and trust boundary
 
 - Chat users authenticate with `Authorization: Bearer <api-key>`.
-- `DEEPSEEK_API_KEY` is server-side and is never sent to the model.
+- The DeepSeek key is stored in `agent_settings`, is server-side, and is never
+  returned by the API or sent to the model. It is stored as plain text, like
+  the existing user API keys.
+- Only admins can read or change `agent_settings`.
 - `fetch_url` accepts absolute HTTP/HTTPS URLs without embedded credentials and
   limits URL length to 8,192 characters.
 - Fetched page content is untrusted. It is prefixed with a “treat as data, not
@@ -252,9 +274,9 @@ tool result is sent to the model and stored in the durable transcript.
 
 ## Budgets, retries, and cost
 
-- Maximum tool iterations: `CHAT_MAX_TOOL_ITERATIONS`, default 4.
-- Synchronous/durable run timeout: `CHAT_STREAM_TIMEOUT_MS`, default 5 minutes.
-- Durable attempts: `CHAT_RUN_MAX_ATTEMPTS`, default 2.
+- Maximum tool iterations: `maxToolIterations`, default 4.
+- Synchronous/durable run timeout: `streamTimeoutMs`, default 5 minutes.
+- Durable attempts: `runMaxAttempts`, default 2.
 - `fetch_url` timeout: 30 seconds.
 - `fetch_url` content cap: 30,000 characters.
 - Durable runs retry retryable `NeuxusClientError` failures (`429` and `5xx`).
@@ -276,7 +298,7 @@ A complete test matrix should cover:
 - Tool timeout and client abort.
 - Loop-limit failure.
 - Malformed streamed tool JSON.
-- Missing `DEEPSEEK_API_KEY`.
+- Missing DeepSeek key in `agent_settings`.
 - SSE event order and terminal event.
 - Sync persistence success and partial-write failure.
 - Durable checkpoint/resume.

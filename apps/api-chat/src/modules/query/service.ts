@@ -1,5 +1,5 @@
 import { ElysiaCustomStatusResponse, status } from "elysia";
-import { chatStreamTimeoutMs } from "../../shared/config.ts";
+import { AgentSettings } from "../agent-settings/service.ts";
 import { ChatMessage } from "../personal-data/chat-messages/service.ts";
 import { PersonalMemory } from "../personal-data/personal-memory/service.ts";
 import { type AppUser } from "../users/service.ts";
@@ -65,7 +65,7 @@ export abstract class Query {
     const timeout = setTimeout(() => {
       timedOut = true;
       abort.abort();
-    }, chatStreamTimeoutMs());
+    }, AgentSettings.current().streamTimeoutMs);
 
     return new ReadableStream<Uint8Array>({
       async start(controller) {

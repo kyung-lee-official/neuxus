@@ -1,21 +1,22 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import {
+  resetAgentSettingsForTests,
+  setAgentSettingsForTests,
+} from "../agent-settings/service.ts";
 import { executeToolUse, toolDefinitions } from "./registry.ts";
 
-const originalKey = process.env.DEEPSEEK_API_KEY;
-
 afterEach(() => {
-  if (originalKey === undefined) delete process.env.DEEPSEEK_API_KEY;
-  else process.env.DEEPSEEK_API_KEY = originalKey;
+  resetAgentSettingsForTests();
 });
 
 describe("toolDefinitions", () => {
-  test("omits fetch_url when DEEPSEEK_API_KEY is unset", () => {
-    delete process.env.DEEPSEEK_API_KEY;
+  test("omits fetch_url when no DeepSeek key is configured", () => {
+    setAgentSettingsForTests({ deepseekApiKey: "" });
     expect(toolDefinitions()).toEqual([]);
   });
 
-  test("includes fetch_url when DEEPSEEK_API_KEY is set", () => {
-    process.env.DEEPSEEK_API_KEY = "test-key";
+  test("includes fetch_url when a DeepSeek key is configured", () => {
+    setAgentSettingsForTests({ deepseekApiKey: "test-key" });
     expect(toolDefinitions().map((tool) => tool.name)).toContain("fetch_url");
   });
 });
@@ -31,7 +32,7 @@ describe("executeToolUse", () => {
   });
 
   test("refuses an unavailable tool without calling it", async () => {
-    delete process.env.DEEPSEEK_API_KEY;
+    setAgentSettingsForTests({ deepseekApiKey: "" });
     const result = await executeToolUse(
       {
         type: "tool_use",

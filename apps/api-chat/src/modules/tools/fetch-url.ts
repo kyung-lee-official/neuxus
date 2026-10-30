@@ -5,7 +5,7 @@
  * @see https://api-docs.deepseek.com/guides/search
  */
 
-import { deepseekApiKey } from "../../shared/config.ts";
+import { AgentSettings } from "../agent-settings/service.ts";
 import type { JsonObject, Tool } from "./types.ts";
 
 const FETCH_URL = "https://api.deepseek.com/v1/tools/fetch";
@@ -56,9 +56,9 @@ async function executeFetch(
   input: JsonObject,
   signal?: AbortSignal,
 ): Promise<string> {
-  const apiKey = deepseekApiKey();
+  const apiKey = AgentSettings.current().deepseekApiKey;
   if (apiKey === "") {
-    throw new Error("DEEPSEEK_API_KEY is not configured for chat tools");
+    throw new Error("DeepSeek API key is not configured in agent settings");
   }
   const url = urlFromInput(input);
 
@@ -116,7 +116,7 @@ export const fetchUrlTool: Tool = {
     },
   },
   available() {
-    return deepseekApiKey() !== "";
+    return AgentSettings.current().deepseekApiKey !== "";
   },
   execute(input, context) {
     return executeFetch(input, context.signal);

@@ -108,6 +108,7 @@ export const UserQueryKey = {
   SessionMessages: (sessionId: string) =>
     ["sessions", sessionId, "messages"] as const,
   KnowledgeBases: ["chat", "knowledge-bases"] as const,
+  AgentSettings: ["agent-settings"] as const,
   /** Page of the current user's own retrieve/synthesis logs. */
   MyLogs: (userId: string, cursor: string | null) =>
     ["users", userId, "logs", cursor] as const,
@@ -493,5 +494,39 @@ export async function postRemember(input: {
     method: "POST",
     apiKey: input.apiKey,
     body: JSON.stringify({ content: input.content }),
+  });
+}
+
+export type ChatAgentSettings = {
+  hasDeepseekApiKey: boolean;
+  maxToolIterations: number;
+  streamTimeoutMs: number;
+  runMaxAttempts: number;
+  defaults: {
+    maxToolIterations: number;
+    streamTimeoutMs: number;
+    runMaxAttempts: number;
+  };
+};
+
+export async function getChatAgentSettings(
+  apiKey: string,
+): Promise<ChatAgentSettings> {
+  return chatFetch<ChatAgentSettings>("/agent-settings", { apiKey });
+}
+
+export async function putChatAgentSettings(input: {
+  apiKey: string;
+  settings: {
+    deepseekApiKey?: string | null;
+    maxToolIterations?: number | null;
+    streamTimeoutMs?: number | null;
+    runMaxAttempts?: number | null;
+  };
+}): Promise<ChatAgentSettings> {
+  return chatFetch<ChatAgentSettings>("/agent-settings", {
+    method: "PUT",
+    apiKey: input.apiKey,
+    body: JSON.stringify(input.settings),
   });
 }

@@ -8,6 +8,7 @@ export const API_TAGS = {
   sessions: "sessions",
   knowledgeBases: "knowledge-bases",
   query: "query",
+  agentSettings: "agent-settings",
   log: "log",
 } as const;
 
@@ -26,6 +27,10 @@ export const apiTagList: { name: string; description: string }[] = [
     description: "Knowledge bases proxied from the neuxus core",
   },
   { name: API_TAGS.query, description: "Ask-mode synthesis and remember" },
+  {
+    name: API_TAGS.agentSettings,
+    description: "Admin-managed agent budgets and tool credentials",
+  },
   {
     name: API_TAGS.log,
     description: "Log sink settings and `app_log` purge",

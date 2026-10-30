@@ -4,7 +4,7 @@
  * text answer.
  */
 
-import { chatMaxToolIterations } from "../../shared/config.ts";
+import { AgentSettings } from "../agent-settings/service.ts";
 import {
   executeToolUse,
   type JsonObject,
@@ -81,7 +81,7 @@ export async function runAgent(input: {
   }) => Promise<void> | void;
 }): Promise<AgentResult> {
   const tools = toolDefinitions();
-  const maxIterations = chatMaxToolIterations();
+  const maxIterations = AgentSettings.current().maxToolIterations;
   let messages = Array.isArray(input.requestBody.messages)
     ? input.requestBody.messages
     : [];

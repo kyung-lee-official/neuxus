@@ -20,6 +20,7 @@ import {
 } from "@/chat/lib/api";
 import { formatDateTime } from "@/shared/lib/date-time";
 import { displayName } from "@/shared/lib/display-name";
+import { AgentSettingsBlock } from "./agent-settings-block";
 
 const rememberSchema = z.object({
   content: z.string().trim().min(1, "content is required"),
@@ -232,6 +233,10 @@ export function SettingsPanel({ userId }: { userId: string }) {
           New key
         </button>
       </section>
+
+      {user.role === "admin" ? (
+        <AgentSettingsBlock apiKey={user.apiKey} />
+      ) : null}
 
       <section className="flex flex-col gap-3.5 rounded-md border border-line bg-surface p-6">
         <div className="flex items-center justify-between gap-2">

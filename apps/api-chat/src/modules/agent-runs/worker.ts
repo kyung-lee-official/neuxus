@@ -6,10 +6,7 @@
  * batch when the run is resumed.
  */
 
-import {
-  chatRunMaxAttempts,
-  chatStreamTimeoutMs,
-} from "../../shared/config.ts";
+import { AgentSettings } from "../agent-settings/service.ts";
 import { runAgent } from "../query/agent.ts";
 import { NeuxusClientError } from "../query/core-client.ts";
 import {
@@ -67,7 +64,7 @@ async function executeRun(run: AgentRun): Promise<void> {
   const timeout = setTimeout(() => {
     timedOut = true;
     abort.abort();
-  }, chatStreamTimeoutMs());
+  }, AgentSettings.current().streamTimeoutMs);
 
   try {
     const result = await runAgent({
@@ -104,7 +101,11 @@ async function executeRun(run: AgentRun): Promise<void> {
     await writeChain.catch(() => undefined);
     const message = timedOut ? "Run timed out" : errorText(error);
     const attempts = run.attempts + 1;
-    if (!timedOut && isRetryable(error) && attempts < chatRunMaxAttempts()) {
+    if (
+      !timedOut &&
+      isRetryable(error) &&
+      attempts < AgentSettings.current().runMaxAttempts
+    ) {
       await retryRun({ run, seq: ++seq, error: message, attempts });
       return;
     }
