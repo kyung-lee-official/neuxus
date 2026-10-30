@@ -327,6 +327,14 @@ export function ActiveUserPanel({ active }: { active: ApiUser | null }) {
             >
               Settings
             </Link>
+            {live.role === "admin" ? (
+              <Link
+                href="/chat/settings"
+                className="rounded border border-line bg-transparent px-2 py-1.5 text-center text-muted text-xs no-underline hover:border-ink hover:text-ink"
+              >
+                Global settings
+              </Link>
+            ) : null}
             <a
               href={`${chatApiBaseUrl()}/openapi`}
               target="_blank"

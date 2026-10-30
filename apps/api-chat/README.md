@@ -101,7 +101,7 @@ NEUXUS_SERVICE_TOKEN=<same value as apps/api/.env>
 
 Agent settings (DeepSeek API key, tool iterations, stream timeout, run attempts)
 are stored in the `agent_settings` table and configured by an admin at
-`/chat/settings/<admin-user>` after signing in.
+`/chat/settings` after signing in.
 
 3. Install, generate, and migrate (from `apps/api-chat`):
 
