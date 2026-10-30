@@ -12,16 +12,16 @@ Knowledge base ──* Page ──* Image description (embedding)
 | Entity                | Role                                                                                                                                                                                               | `vector`? |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
 | **Knowledge base**    | Isolated knowledge set (e.g. one product); `writable` false = corpus-backed (ingest-written), true = directly written (fixed at creation). Every row and DAL query is scoped to one knowledge base | No        |
-| **Page**              | Markdown `body`: `id`, title, ingest-normalized [`body`](./02-ingest.md#body), `content_hash`, `meta_hash`                                                                                         | No        |
+| **Page**              | Markdown `body`: `id`, title, ingest-normalized `body`, `content_hash`, `meta_hash`                                                                                                                | No        |
 | **Parent**            | Generation slice of `body`; `source_page_hash` records the `kb_pages.content_hash` it was built from                                                                                               | No        |
 | **Child**             | Retrieval unit                                                                                                                                                                                     | Yes       |
 | **Image description** | Per-image caption vector; identity `(knowledge_base_id, page_id, image_path)`                                                                                                                      | Yes       |
 
-- Every content table carries `knowledge_base_id`; primary and foreign keys are scoped to it (`(knowledge_base_id, id)`), and every DAL query filters by a single `knowledge_base_id`. `kb_children` also denormalizes `page_id` for its scans. The service layer decides which knowledge bases to read and merges a set ([04-retrieval.md](./04-retrieval.md#multiple-knowledge-bases)).
+- Every content table carries `knowledge_base_id`; primary and foreign keys are scoped to it (`(knowledge_base_id, id)`), and every DAL query filters by a single `knowledge_base_id`. `kb_children` also denormalizes `page_id` for its scans. A request names one knowledge base; the service validates it and queries exactly it.
 - A **read-only** knowledge base (`kb_knowledge_bases.writable = false`) is written only by the **ingest** stage.
 - A **writable** knowledge base (`kb_knowledge_bases.writable = true`) is updated directly, never by the ingest stage, and is **text-only** (no `kb_image_descriptions`).
-- On page change: delete that page's parents/children, insert the new tree ([incremental updates](./02-ingest.md#incremental-updates)).
-- Each parent records `source_page_hash`, the `kb_pages.content_hash` the tree was built from; chunkify rebuilds a page's tree when it differs from the current `content_hash` ([chunk staleness](./README.md#staleness)).
+- On page change: delete that page's parents/children, insert the new tree.
+- Each parent records `source_page_hash`, the `kb_pages.content_hash` the tree was built from; chunkify rebuilds a page's tree when it differs from the current `content_hash`.
 
 Keep `kb_*` namespaced apart from application tables (same database is fine).
 
@@ -114,7 +114,7 @@ CREATE TABLE kb_image_descriptions (
 
 ## Corpus settings table
 
-Per knowledge base: git remote **and** which commit line to follow ([01-corpus.md](./01-corpus.md#source)). Not env. Nullable columns; **defaults live in application code**, not SQL `DEFAULT`. Missing row means **no remote** (`repo_url` null): do not clone; layout rules still apply to an explicit local checkout.
+Per knowledge base: git remote **and** which commit line to follow. Not env. Nullable columns; **defaults live in application code**, not SQL `DEFAULT`. Missing row means **no remote** (`repo_url` null): do not clone; layout rules still apply to an explicit local checkout.
 
 `repo_url` / `branch` are how we fetch. `last_synced_sha` is the last successful clone or pull (not vector identity). Changing the remote does not stale embeddings by itself; reading a different commit does. Do not log future credential columns.
 
@@ -131,7 +131,7 @@ CREATE TABLE kb_corpus_settings (
 
 ## Chunk knobs table
 
-Per knowledge base. Nullable columns; **defaults live in application code** ([03.1-chunkify.md](./03.1-chunkify.md#knobs)), not SQL `DEFAULT`.
+Per knowledge base. Nullable columns; **defaults live in application code**, not SQL `DEFAULT`.
 
 ```sql
 CREATE TABLE kb_chunk_settings (
@@ -161,4 +161,4 @@ CREATE TABLE kb_retrieve_settings (
 
 ## Model config tables
 
-Model and provider wiring is application-level, not `kb_*`: `app_model_task_config` maps embedding and captioning tasks to catalog models, and `app_model_provider_config` holds provider connections. Synthesis models are requested per call via `model` ([Appendix B](./appendix-b-protocol.md)); no `kb_*` table holds a model id.
+Model and provider wiring is application-level, not `kb_*`: `app_model_task_config` maps embedding and captioning tasks to catalog models, and `app_model_provider_config` holds provider connections. Synthesis models are requested per call via `model`; no `kb_*` table holds a model id.
