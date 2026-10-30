@@ -24,6 +24,14 @@ function errorMessage(err: unknown): string {
   return String(err);
 }
 
+function CenteredHint({ text }: { text: string }) {
+  return (
+    <main className="flex min-h-dvh items-center justify-center px-5 py-10">
+      <p className="m-0 text-muted text-sm">{text}</p>
+    </main>
+  );
+}
+
 export function ChatPanel() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -152,12 +160,46 @@ export function ChatPanel() {
     bottomRef.current?.scrollIntoView({ block: "end" });
   }, [messages.length, sending]);
 
-  if (!storeReady || !activeUserId || !active) {
+  if (!storeReady) {
+    return <CenteredHint text="Loading session…" />;
+  }
+
+  if (!activeUserId) {
+    return <CenteredHint text="Redirecting to sign in…" />;
+  }
+
+  if (usersQuery.isLoading) {
+    return <CenteredHint text="Loading user…" />;
+  }
+
+  if (usersQuery.isError) {
     return (
-      <p className="m-0 px-5 py-8 text-muted text-sm">
-        {!storeReady ? "Loading session…" : "Redirecting to sign in…"}
-      </p>
+      <main className="flex min-h-dvh items-center justify-center px-5 py-10">
+        <section className="flex w-full max-w-md flex-col gap-3 rounded-md border border-line bg-surface p-6">
+          <h1 className="m-0 font-display text-ink text-xl">
+            Cannot load chat users
+          </h1>
+          <p className="m-0 text-danger text-sm">
+            {errorMessage(usersQuery.error)}
+          </p>
+          <p className="m-0 text-muted text-sm">
+            Check that the chat API is running at{" "}
+            <code className="font-mono text-xs">{chatApiBaseUrl()}</code>.
+          </p>
+          <button
+            type="button"
+            className="self-start rounded border border-accent bg-accent px-3.5 py-2 text-sm text-white"
+            onClick={() => void usersQuery.refetch()}
+          >
+            Retry
+          </button>
+        </section>
+      </main>
     );
+  }
+
+  if (!active) {
+    return <CenteredHint text="Redirecting to sign in…" />;
   }
 
   const healthOk = healthQuery.data?.ok === true;
