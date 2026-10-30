@@ -7,6 +7,7 @@ import { useActiveUserStore } from "@/chat/lib/active-user-store";
 import {
   ApiError,
   type ApiUser,
+  chatApiBaseUrl,
   createSession,
   deleteSession,
   listSessions,
@@ -326,6 +327,14 @@ export function ActiveUserPanel({ active }: { active: ApiUser | null }) {
             >
               Settings
             </Link>
+            <a
+              href={`${chatApiBaseUrl()}/openapi`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded border border-line bg-transparent px-2 py-1.5 text-center text-muted text-xs no-underline hover:border-ink hover:text-ink"
+            >
+              OpenAPI
+            </a>
             <Link
               href="/chat/auth"
               className="rounded border border-line bg-transparent px-2 py-1.5 text-center text-muted text-xs no-underline hover:border-ink hover:text-ink"
