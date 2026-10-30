@@ -788,3 +788,74 @@ export async function listKnowledgeImages(
     { apiKey },
   );
 }
+
+export type RetrieveParentResult = {
+  knowledgeBaseId: string;
+  parentId: string;
+  pageId: string;
+  title: string;
+  text: string;
+  score: number;
+};
+
+export type RetrieveImageResult = {
+  knowledgeBaseId: string;
+  pageId: string;
+  title: string;
+  imagePath: string;
+  description: string;
+  score: number;
+};
+
+export type RetrieveChildResult = {
+  childId: string;
+  parentId: string;
+  pageId: string;
+  text: string;
+  score: number;
+};
+
+export type RetrieveSignalsResult = {
+  hits: number;
+  usedParents: number;
+  topScore: number | null;
+  margin: number | null;
+  truncated: boolean;
+};
+
+export type RetrieveResponse = {
+  requestId: string;
+  knowledgeBaseId: string;
+  embeddingModel: string;
+  latencyMs: number;
+  outcome:
+    | {
+        kind: "hits";
+        parents: RetrieveParentResult[];
+        images: RetrieveImageResult[];
+        children?: RetrieveChildResult[];
+        signals: RetrieveSignalsResult;
+      }
+    | {
+        kind: "no_hits";
+        reason: "no_hits";
+        signals: RetrieveSignalsResult;
+      };
+};
+
+export async function retrieveEvidence(input: {
+  apiKey: string;
+  knowledgeBaseId: string;
+  question: string;
+  includeChildren?: boolean;
+}): Promise<RetrieveResponse> {
+  return apiFetch<RetrieveResponse>("/retrieve", {
+    method: "POST",
+    apiKey: input.apiKey,
+    body: JSON.stringify({
+      knowledgeBaseId: input.knowledgeBaseId,
+      question: input.question,
+      ...(input.includeChildren ? { options: { includeChildren: true } } : {}),
+    }),
+  });
+}
