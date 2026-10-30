@@ -1,8 +1,9 @@
 # apps/api-chat
 
 Stateful chat adapter for neuxus. It owns end-user identity, chat sessions,
-messages, and personal memory. The chat dialog is being refactored: `/query` is
-a stub until the call to the stateless neuxus API is wired.
+messages, and personal memory. `/query` loads the session history and personal
+memory, calls the stateless neuxus API for knowledge-base-enriched synthesis,
+and persists both messages.
 
 ## Responsibilities
 
@@ -11,8 +12,7 @@ a stub until the call to the stateless neuxus API is wired.
 - Personal memory (`/remember`)
 - User data export
 - Structured app logging (`app_log`, `app_log_settings`)
-- Chat dialog (stub, `/query` returns `501`)
-- Calls the neuxus API over HTTP in a later phase
+- Chat dialog: calls `POST /v1/messages` on the neuxus API
   (`NEUXUS_API_URL`, `NEUXUS_SERVICE_TOKEN`)
 
 It does not own knowledge, model providers, logs, or server settings. Those
@@ -127,7 +127,7 @@ starting the app.
 | `PATCH`  | `/sessions/:sessionId`          | Bearer               | Rename or clear a title          |
 | `DELETE` | `/sessions/:sessionId`          | Bearer               | Delete a session                 |
 | `POST`   | `/remember`                     | Bearer               | Store a personal memory          |
-| `POST`   | `/query`                        | Bearer               | Chat stub, returns `501`         |
+| `POST`   | `/query`                        | Bearer               | Ask via neuxus `/v1/messages`    |
 | `GET`    | `/log/settings`                 | Bearer (admin)       | Read log sink settings           |
 | `PUT`    | `/log/settings`                 | Bearer (admin)       | Update log sink settings         |
 | `POST`   | `/log/settings/reset`           | Bearer (admin)       | Reset log settings               |
