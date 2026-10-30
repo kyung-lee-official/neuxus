@@ -12,21 +12,20 @@
 
 ## Flow
 
-1. Embed the retrieval query once (same model as children; recent user turns may be included to resolve references)
+1. Embed the retrieval query once (same model as children)
 2. Similarity-search children in the selected knowledge base
 3. Resolve parents (+ page title)
 4. Dedupe by `parentId`; keep best child score per parent
 5. Cap the set by max parents / max characters
 6. Similarity-search [image descriptions](#image-description-search) in the same knowledge base, independent of step 2
-7. The enriched request gets parent texts (+ title) and image-description hits — not child windows alone ([05-synthesis.md](./05-synthesis.md))
 
 Cap knobs (`child_limit`, `max_parents`, `max_characters`) are **global** ([`kb_retrieve_settings`](./appendix-a-data-model.md#retrieval-knobs-table), one row `id = "default"`) — they apply to the selected knowledge base's result. App defaults when null.
 
 ## Knowledge base selection
 
-A request names one knowledge base: `X-Neuxus-Knowledge-Base` on `/v1/messages`, or `knowledgeBaseId` on `/retrieve` ([Appendix B](./appendix-b-protocol.md)). The service validates that the id exists and queries exactly it. Clients discover valid ids from the [`kb_knowledge_bases`](./appendix-a-data-model.md) registry.
+A request names one knowledge base: `X-Neuxus-Knowledge-Base` on `/v1/messages`, or `knowledgeBaseId` on `/retrieve` ([Appendix B](./appendix-b-protocol.md)). The service queries exactly it. Clients discover valid ids from the [`kb_knowledge_bases`](./appendix-a-data-model.md) registry.
 
-The selected knowledge base uses the current embedding model ([appendix A](./appendix-a-data-model.md)), so scores are comparable within it. Page and parent ids are scoped to the knowledge base. Multi-KB retrieval is not part of this contract; it would be an additive change.
+Page and parent ids are scoped to the knowledge base. Multi-KB retrieval is not part of this contract; it would be an additive change.
 
 ## Query embed
 
@@ -89,7 +88,7 @@ ORDER BY d.embedding <=> $1::vector
 LIMIT 3;
 ```
 
-Its top **3** hits (a hardcoded cap, not a knob) are merged into the synthesis context ([05-synthesis.md](./05-synthesis.md#image-handling)); the row shape is defined under [Result](#result).
+Its top **3** hits (a hardcoded cap, not a knob) are the image-description list; the row shape is defined under [Result](#result).
 
 ## Result
 
