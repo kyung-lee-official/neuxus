@@ -39,7 +39,7 @@ flowchart LR
 | [03.1-chunkify.md](./03.1-chunkify.md)                     | Derive parents / children from `kb_pages.body`                                                                                                                                           |
 | [03.2-image-descriptions.md](./03.2-image-descriptions.md) | Image captions + description vectors (policy from `*.meta.yaml`)                                                                                                                         |
 | [04-retrieval.md](./04-retrieval.md)                       | Query in, ranked parents out (+ ranked image descriptions)                                                                                                                               |
-| [05-synthesis.md](./05-synthesis.md)                       | Deterministic, capability-neutral context enrichment with explicit layout/order: Anthropic request in, enriched answer + `neuxus` out                                                    |
+| [05-synthesis.md](./05-synthesis.md)                       | Deterministic, capability-neutral context enrichment with explicit layout/order and request/response validation: Anthropic request in, enriched answer + `neuxus` out                    |
 | [appendix-a-data-model.md](./appendix-a-data-model.md)     | Tables                                                                                                                                                                                   |
 | [appendix-b-protocol.md](./appendix-b-protocol.md)         | HTTP protocol: Anthropic-compatible request, neuxus-extended response                                                                                                                    |
 

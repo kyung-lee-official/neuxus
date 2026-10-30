@@ -31,7 +31,9 @@ The endpoint and full request/response shape are in
 theme: neo-dark
 ---
 flowchart TD
-  REQUEST["Client sends Anthropic Messages request<br/>+ X-Neuxus-Knowledge-Base"] --> HUMAN{"Last message is a human turn?"}
+  REQUEST["Client sends Anthropic Messages request<br/>+ X-Neuxus-Knowledge-Base"] --> VALIDATE_REQUEST{"Request valid?"}
+  VALIDATE_REQUEST -- "no" --> BAD_REQUEST["400 invalid_request"]
+  VALIDATE_REQUEST -- "yes" --> HUMAN{"Last message is a human turn?"}
   HUMAN -- "no" --> NO_TURN["Forward unenriched<br/>reason: no_human_turn"]
   HUMAN -- "yes" --> QUERY["Build retrieval query<br/>current human text + recent user turns"]
   QUERY --> RETRIEVE["Retrieve knowledge-base evidence<br/>parents + image descriptions"]
@@ -45,10 +47,15 @@ flowchart TD
   NO_TURN --> FORWARD
   NO_HITS --> FORWARD
   RETRIEVAL_ERROR --> FORWARD
-  FORWARD --> RESPONSE["Anthropic response + neuxus<br/>sources, signals, enrichment, upstream"]
+  FORWARD --> RECEIVED["Upstream response"]
+  RECEIVED --> VALIDATE_RESPONSE{"Well-formed Anthropic message?"}
+  VALIDATE_RESPONSE -- "no" --> UPSTREAM_ERROR["502 upstream_error"]
+  VALIDATE_RESPONSE -- "yes" --> RESPONSE["Anthropic response + neuxus<br/>sources, signals, enrichment, upstream"]
   RESPONSE --> CLIENT_LOOP["Client owns the agent loop<br/>tools, policy, session, memory"]
 
   subgraph neuxus["neuxus boundary: evidence enrichment only"]
+    VALIDATE_REQUEST
+    BAD_REQUEST
     HUMAN
     QUERY
     RETRIEVE
@@ -57,6 +64,9 @@ flowchart TD
     ASSEMBLE
     INJECT
     FORWARD
+    RECEIVED
+    VALIDATE_RESPONSE
+    UPSTREAM_ERROR
     RESPONSE
     NO_TURN
     NO_HITS
@@ -70,8 +80,9 @@ flowchart TD
 ```
 
 The solid path is the enrichment flow; the dashed path is retrieval failure.
-Intent classification, tool choice/execution, sessions, memory, and user
-identity stay on the client side.
+Request/response validation failures end with an HTTP error. Intent
+classification, tool choice/execution, sessions, memory, and user identity stay
+on the client side.
 
 ## Pipeline
 
@@ -79,36 +90,69 @@ The pipeline follows the usual agent shape - gather context, select evidence,
 assemble the request, call the model - with one restriction: every step stays
 capability-neutral.
 
-1. **Resolve the current query.** Select the last `role: "user"` message that
+1. **Validate the request.** Require a service token (`x-api-key` or the
+   Bearer fallback), `anthropic-version`, and `X-Neuxus-Knowledge-Base`;
+   `messages` must be a non-empty array; `model` and the knowledge base must
+   resolve. Fail before retrieval or a model call using the
+   [Appendix B](./appendix-b-protocol.md) status codes.
+2. **Resolve the current query.** Select the last `role: "user"` message that
    has at least one `text` block and no `tool_result` block. If none, forward
    the request unenriched. The query is the client's text; neuxus does not
    infer a goal or classify it as a question vs. an operation.
-2. **Build the retrieval query.** Use the current human text; recent user turns
+3. **Build the retrieval query.** Use the current human text; recent user turns
    may be included to resolve references such as "it" or "that one." Assistant
    turns, tool calls, and tool results are not used as retrieval text.
-3. **Retrieve evidence.** Run [04-retrieval.md](./04-retrieval.md) against the
+4. **Retrieve evidence.** Run [04-retrieval.md](./04-retrieval.md) against the
    knowledge base named by `X-Neuxus-Knowledge-Base`. The result is parent
    evidence plus image-description hits, each with a score.
-4. **Select evidence.** Order by retrieval score; merge duplicate parents; cap
+5. **Select evidence.** Order by retrieval score; merge duplicate parents; cap
    parents and total characters. Any ranking is over evidence only - no intent
    or tool planning. Mark `enrichment.truncated` when the budget shortens the
    block.
-5. **Assemble the context block.** Format one `<knowledge base="...">` text
+6. **Assemble the context block.** Format one `<knowledge base="...">` text
    block: reference-data preamble, then parents under source lines, with image
    descriptions folded in ([Image handling](#image-handling)).
-6. **Inject context.** Prepend that one block to the selected human turn. If
+7. **Inject context.** Prepend that one block to the selected human turn. If
    `content` is a string, convert it to one `text` block first. Leave the
    user's original blocks, `system`, `tools`, `tool_choice`, and all generation
    fields unchanged.
-7. **Call the model.** Forward the enriched Anthropic Messages request to the
+8. **Call the model.** Forward the enriched Anthropic Messages request to the
    selected provider's Anthropic-compatible `/v1/messages`. Tools pass through;
    the client runs the tool loop.
-8. **Return provenance.** Return the Anthropic response plus `neuxus`
-   (`sources`, `signals`, `enrichment`, `upstream`).
+9. **Validate the response.** The upstream body must be a well-formed Anthropic
+   Messages response: `type: "message"`, `role: "assistant"`, content blocks,
+   `stop_reason`, and `usage`. Validate the envelope, not the prose. A malformed
+   or non-Anthropic response is `502` (`upstream_error` /
+   `non_anthropic_upstream`); do not attach `neuxus`.
+10. **Attach provenance and return.** After validation, attach `neuxus`
+    (`sources`, `signals`, `enrichment`, `upstream`) and preserve every
+    Anthropic field unchanged.
 
 Sessions, memory, and end-user identity are client state. The client puts the
 context it wants used into `messages`/`system`; neuxus does not fetch or store
 it. The chat adapter (`apps/api-chat`) is one such client.
+
+## Validation
+
+### Request
+
+- A service token (`x-api-key` or the Bearer fallback), `anthropic-version`,
+  and `X-Neuxus-Knowledge-Base` are required.
+- `messages` must be a non-empty array; `model` must resolve; the knowledge base
+  must exist.
+- Failures return the [Appendix B](./appendix-b-protocol.md) status codes (for
+  example `400`, `401`, `404`, `503`) and never reach retrieval or the model.
+- neuxus validates shape and scope, not the semantic content of the client's
+  messages.
+
+### Response
+
+- The upstream body must be a well-formed Anthropic Messages response: `type`,
+  `role`, `content` blocks, `stop_reason`, and `usage`.
+- Validate the envelope, not the prose; no claim checking.
+- A malformed or non-Anthropic upstream is `502` (`upstream_error` /
+  `non_anthropic_upstream`); no `neuxus` object is attached.
+- After validation, attach `neuxus`; every Anthropic field is preserved.
 
 ## Context layout and ordering
 
@@ -339,6 +383,8 @@ implementation.
 | `buildSynthesisPrompt`                                                | chat request assembly         | split: KB becomes the block; memory/history become `system`/`messages` |
 | `answerFromContext` / provider `textChat`                             | provider message forwarding   | new messages/tools path; provider connections reused                   |
 | `Query.ask`                                                           | chat client of `/v1/messages` | replaces in-process retrieval/synthesis; persists messages             |
+| request parsing/auth                                                  | neuxus request validation     | required headers, resolvable model/KB, non-empty `messages`            |
+| provider response                                                     | neuxus response validation    | validate the Anthropic envelope before attaching `neuxus`              |
 | `{ userId, sessionId, mode, answer }`                                 | Anthropic response + `neuxus` | chat extracts `content` for its own response                           |
 | sessions, messages, memory, users                                     | `apps/api-chat`               | already moved; neuxus stays stateless                                  |
 | fixed "You are answering..." system prompt                            | chat `system`                 | neuxus adds only the reference-data preamble                           |
