@@ -32,6 +32,91 @@ belong to `apps/api`.
 The chat database is separate from the neuxus database. Do not import code from
 `apps/api`; call it over HTTP.
 
+## Query and agent loop
+
+`POST /query` and `POST /query/stream` use `prepareAsk()` to load the session
+history and personal memory, then `runAgent()` to drive the model/tool loop.
+Each model call goes to neuxus `POST /v1/messages` with the current transcript
+and the available tool definitions.
+
+`runAgent()` follows the standard tool loop:
+
+1. Call the model with `messages` and `tools`.
+2. If the response has no `tool_use` blocks, return its text as the final answer.
+3. Execute every `tool_use` block from the registry.
+4. Append the assistant `tool_use` content and a user `tool_result` message to
+   the transcript.
+5. Call the model again with the updated transcript.
+6. Stop when the model returns without tool calls, or when the loop limit is
+   reached.
+
+Tools are owned and executed by `api-chat`. neuxus only forwards their
+definitions and returns the model's `tool_use` blocks.
+
+### Tool registry
+
+Tool code lives in `src/modules/tools/`:
+
+- `types.ts` defines `Tool`, `ToolDefinition`, `ToolUseBlock`, and
+  `ToolResultBlock`.
+- `registry.ts` exposes `toolDefinitions()` and `executeToolUse()`.
+- `fetch-url.ts` implements the first tool, `fetch_url`.
+
+To add a tool, implement a `Tool` and add it to the `TOOLS` array in
+`registry.ts`. `runAgent()` automatically sends every registered definition and
+executes matching calls. Tools run in parallel when one model response contains
+multiple independent `tool_use` blocks.
+
+### `fetch_url`
+
+`fetch_url` takes one required string argument:
+
+```json
+{ "url": "https://example.com/article" }
+```
+
+It calls DeepSeek's Fetch API (`POST https://api.deepseek.com/v1/tools/fetch`)
+with `DEEPSEEK_API_KEY`, validates that the URL is absolute HTTP or HTTPS, and
+returns the page title and Markdown content. Fetch output is capped at 30,000
+characters. Timeouts and provider errors are returned to the model as
+`tool_result` blocks with `is_error: true`.
+
+The tool list is sent on every model call, including each tool-loop iteration.
+If `DEEPSEEK_API_KEY` is unset, `fetch_url` remains advertised but returns a
+configuration error when called.
+
+### Streaming events
+
+`POST /query/stream` emits SSE events:
+
+| Event         | Payload                                        |
+| ------------- | ---------------------------------------------- |
+| `start`       | `sessionId`, `userId`                          |
+| `delta`       | Text delta from the model                      |
+| `tool_call`   | Tool `id`, `name`, and model-provided `input`  |
+| `tool_result` | Tool `id`, `name`, `isError`, and text preview |
+| `done`        | Final `sessionId`, `userId`                    |
+| `error`       | Error message                                  |
+
+Text deltas from every model iteration are streamed. Tool calls and results are
+also streamed so the UI can show progress while the loop continues.
+
+### Persistence and limits
+
+- The user message and final assistant text are persisted only after the loop
+  completes successfully.
+- Assistant text from intermediate tool iterations is streamed but not
+  persisted.
+- Tool calls and results are transient; `app_messages.content` stores plain
+  text only.
+- `MAX_TOOL_ITERATIONS` is currently 4.
+- Streaming has a 5-minute timeout.
+- There are no tool permissions, approvals, durable jobs, or resume support yet.
+
+Supporting long-running or resumable agents would require a job/event store and
+structured message persistence; the current synchronous loop is the starting
+point, not the final orchestration layer.
+
 ## Setup
 
 1. Create the database:
