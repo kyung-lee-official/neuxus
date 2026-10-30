@@ -1,4 +1,4 @@
-import { chatFetch } from "./client";
+import { ApiError, chatApiBaseUrl, chatFetch } from "./client";
 
 export { ApiError, chatApiBaseUrl } from "./client";
 
@@ -313,6 +313,135 @@ export async function postQuery(input: {
       ...(input.sessionId ? { sessionId: input.sessionId } : {}),
     }),
   });
+}
+
+export type QueryStreamEvent =
+  | { type: "start"; sessionId: string; userId: string }
+  | { type: "delta"; text: string }
+  | { type: "done"; sessionId: string; userId: string }
+  | { type: "error"; error: string };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === "object" && !Array.isArray(value);
+}
+
+function parseQueryEvent(block: string): QueryStreamEvent | null {
+  const data = block
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith("data:"))
+    .map((line) => line.slice(5).replace(/^ /, ""))
+    .join("\n");
+  if (data === "") return null;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(data) as unknown;
+  } catch {
+    return null;
+  }
+  if (!isRecord(parsed) || typeof parsed.type !== "string") return null;
+  if (parsed.type === "delta" && typeof parsed.text === "string") {
+    return { type: "delta", text: parsed.text };
+  }
+  if (
+    (parsed.type === "start" || parsed.type === "done") &&
+    typeof parsed.sessionId === "string" &&
+    typeof parsed.userId === "string"
+  ) {
+    return {
+      type: parsed.type,
+      sessionId: parsed.sessionId,
+      userId: parsed.userId,
+    };
+  }
+  if (parsed.type === "error" && typeof parsed.error === "string") {
+    return { type: "error", error: parsed.error };
+  }
+  return null;
+}
+
+function responseError(raw: string, status: number): string {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (isRecord(parsed)) {
+      if (typeof parsed.error === "string") return parsed.error;
+      if (isRecord(parsed.error) && typeof parsed.error.message === "string") {
+        return parsed.error.message;
+      }
+    }
+  } catch {
+    /* non-JSON response */
+  }
+  return raw.trim() || `HTTP ${status}`;
+}
+
+/** Consume the `/query/stream` SSE response. */
+export async function streamQuery(input: {
+  apiKey: string;
+  message: string;
+  knowledgeBaseId: string;
+  sessionId?: string | null;
+  signal?: AbortSignal;
+  onEvent: (event: QueryStreamEvent) => void;
+}): Promise<void> {
+  const res = await fetch(`${chatApiBaseUrl()}/query/stream`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${input.apiKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      message: input.message,
+      mode: "ask",
+      knowledgeBaseId: input.knowledgeBaseId,
+      ...(input.sessionId ? { sessionId: input.sessionId } : {}),
+    }),
+    signal: input.signal,
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new ApiError(responseError(await res.text(), res.status), res.status);
+  }
+  if (!res.body) throw new ApiError("No event stream", 502);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let finished = false;
+
+  const consume = (block: string) => {
+    const event = parseQueryEvent(block);
+    if (!event) return;
+    if (event.type === "error") {
+      throw new ApiError(event.error, 502);
+    }
+    if (event.type === "done") finished = true;
+    input.onEvent(event);
+  };
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      for (;;) {
+        const match = /\r?\n\r?\n/.exec(buffer);
+        if (!match || match.index === undefined) break;
+        const block = buffer.slice(0, match.index);
+        buffer = buffer.slice(match.index + match[0].length);
+        consume(block);
+      }
+    }
+    buffer += decoder.decode();
+    if (buffer.trim() !== "") consume(buffer);
+  } catch (error) {
+    await reader.cancel().catch(() => undefined);
+    throw error;
+  }
+
+  if (!finished) {
+    throw new ApiError("Stream ended before completion", 502);
+  }
 }
 
 export async function postRemember(input: {

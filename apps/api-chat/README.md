@@ -130,6 +130,7 @@ starting the app.
 | `GET`    | `/knowledge-bases`              | Bearer               | Knowledge bases from neuxus      |
 | `POST`   | `/remember`                     | Bearer               | Store a personal memory          |
 | `POST`   | `/query`                        | Bearer               | Ask via neuxus `/v1/messages`    |
+| `POST`   | `/query/stream`                 | Bearer               | Same, streamed as SSE events     |
 | `GET`    | `/log/settings`                 | Bearer (admin)       | Read log sink settings           |
 | `PUT`    | `/log/settings`                 | Bearer (admin)       | Update log sink settings         |
 | `POST`   | `/log/settings/reset`           | Bearer (admin)       | Reset log settings               |

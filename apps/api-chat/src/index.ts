@@ -89,7 +89,7 @@ console.log(
 console.log("Sessions: GET/POST /sessions, PATCH/DELETE /sessions/:id");
 console.log("Knowledge bases: GET /knowledge-bases (proxied from neuxus)");
 console.log("Memory: POST /remember");
-console.log("Query: POST /query (calls neuxus /v1/messages)");
+console.log("Query: POST /query (JSON), POST /query/stream (SSE)");
 console.log("Log: GET/PUT /log/settings; POST /log/settings/reset, /log/purge");
 
 export type App = typeof app;

@@ -11,7 +11,7 @@ import {
   listChatKnowledgeBases,
   listSessionMessages,
   listUsers,
-  postQuery,
+  streamQuery,
   UserQueryKey,
 } from "@/chat/lib/api";
 import { ActiveUserPanel } from "./active-user-panel";
@@ -32,6 +32,12 @@ function CenteredHint({ text }: { text: string }) {
   );
 }
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException
+    ? error.name === "AbortError"
+    : error instanceof Error && error.name === "AbortError";
+}
+
 export function ChatPanel() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -42,7 +48,15 @@ export function ChatPanel() {
   const [storeReady, setStoreReady] = useState(false);
   const [knowledgeBaseId, setKnowledgeBaseId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [streamedAnswer, setStreamedAnswer] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   useEffect(() => {
     setStoreReady(useActiveUserStore.persist.hasHydrated());
@@ -122,26 +136,41 @@ export function ChatPanel() {
   });
 
   const sendMutation = useMutation({
-    mutationFn: (message: string) => {
+    mutationFn: async (message: string) => {
       if (!active) throw new Error("Not signed in.");
       if (!knowledgeBaseId) throw new Error("Choose a knowledge base.");
-      return postQuery({
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setStreamedAnswer("");
+      let sessionId = activeSessionId;
+
+      await streamQuery({
         apiKey: active.apiKey,
         message,
-        mode: "ask",
         knowledgeBaseId,
         sessionId: activeSessionId,
+        signal: controller.signal,
+        onEvent: (event) => {
+          if (event.type === "start") {
+            sessionId = event.sessionId;
+          } else if (event.type === "delta") {
+            setStreamedAnswer((current) => current + event.text);
+          }
+        },
       });
+
+      return { sessionId };
     },
     onSuccess: async (result) => {
       setDraft("");
-      const sessionId = result.sessionId ?? activeSessionId;
+      setStreamedAnswer("");
       if (result.sessionId && result.sessionId !== activeSessionId) {
         setActiveSessionId(result.sessionId);
       }
-      if (sessionId) {
+      if (result.sessionId) {
         await queryClient.invalidateQueries({
-          queryKey: UserQueryKey.SessionMessages(sessionId),
+          queryKey: UserQueryKey.SessionMessages(result.sessionId),
         });
       }
       if (active) {
@@ -150,15 +179,25 @@ export function ChatPanel() {
         });
       }
     },
+    onError: () => {
+      setStreamedAnswer("");
+    },
+    onSettled: () => {
+      abortRef.current = null;
+    },
   });
 
   const messages = messagesQuery.data ?? [];
   const sending = sendMutation.isPending;
+  const sendError =
+    sendMutation.isError && !isAbortError(sendMutation.error)
+      ? sendMutation.error
+      : null;
 
   useEffect(() => {
-    if (messages.length === 0 && !sending) return;
+    if (messages.length === 0 && !sending && streamedAnswer === "") return;
     bottomRef.current?.scrollIntoView({ block: "end" });
-  }, [messages.length, sending]);
+  }, [messages.length, sending, streamedAnswer]);
 
   if (!storeReady) {
     return <CenteredHint text="Loading session…" />;
@@ -296,9 +335,18 @@ export function ChatPanel() {
             )}
 
             {sending ? (
-              <div className="flex items-center gap-2 rounded-md border border-line bg-surface px-3.5 py-2.5 text-muted text-sm">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
-                Retrieving evidence and asking the model…
+              <div className="rounded-md border border-line bg-surface px-3.5 py-2.5">
+                {streamedAnswer ? (
+                  <div className="flex flex-col gap-2">
+                    <MarkdownBubble source={streamedAnswer} />
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-muted text-sm">
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
+                    Retrieving evidence and asking the model…
+                  </div>
+                )}
               </div>
             ) : null}
             <div ref={bottomRef} />
@@ -329,17 +377,27 @@ export function ChatPanel() {
                   }
                 }}
               />
-              <button
-                type="submit"
-                className="rounded border border-accent bg-accent px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={!canSend}
-              >
-                {sending ? "Sending…" : "Send"}
-              </button>
+              {sending ? (
+                <button
+                  type="button"
+                  className="rounded border border-danger bg-transparent px-4 py-2 text-danger text-sm"
+                  onClick={() => abortRef.current?.abort()}
+                >
+                  Stop
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  className="rounded border border-accent bg-accent px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={!canSend}
+                >
+                  Send
+                </button>
+              )}
             </div>
-            {sendMutation.isError ? (
+            {sendError ? (
               <p className="m-0 text-danger text-sm">
-                {errorMessage(sendMutation.error)}
+                {errorMessage(sendError)}
               </p>
             ) : null}
             <p className="m-0 text-muted text-xs">
