@@ -30,5 +30,7 @@ export type ToolContext = {
 
 export type Tool = {
   definition: ToolDefinition;
+  /** Tools without an `available` callback are always available. */
+  available?: () => boolean;
   execute(input: JsonObject, context: ToolContext): Promise<string>;
 };

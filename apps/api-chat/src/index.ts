@@ -1,6 +1,8 @@
 import { openapi } from "@elysia/openapi";
 import { cors } from "@elysiajs/cors";
 import { Elysia, status } from "elysia";
+import { agentRuns } from "./modules/agent-runs/route.ts";
+import { startAgentRunWorker } from "./modules/agent-runs/worker.ts";
 import { health } from "./modules/health/route.ts";
 import { knowledgeBases } from "./modules/knowledge-bases/route.ts";
 import { Logger, LogSettings, PostgresTransport } from "./modules/log/index.ts";
@@ -67,11 +69,14 @@ const app = new Elysia()
   })
   .use(health)
   .use(query)
+  .use(agentRuns)
   .use(knowledgeBases)
   .use(chatSessions)
   .use(users)
   .use(logRoutes)
   .listen(serverPort());
+
+await startAgentRunWorker();
 
 if (usePostgres) {
   Logger.startWorker();
@@ -90,6 +95,9 @@ console.log("Sessions: GET/POST /sessions, PATCH/DELETE /sessions/:id");
 console.log("Knowledge bases: GET /knowledge-bases (proxied from neuxus)");
 console.log("Memory: POST /remember");
 console.log("Query: POST /query (JSON), POST /query/stream (SSE)");
+console.log(
+  "Durable runs: POST /query/async; GET /query/runs/:id, /query/runs/:id/events",
+);
 console.log("Log: GET/PUT /log/settings; POST /log/settings/reset, /log/purge");
 
 export type App = typeof app;

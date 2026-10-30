@@ -12,6 +12,7 @@ and persists both messages.
 - Personal memory (`/remember`)
 - User data export
 - Structured app logging (`app_log`, `app_log_settings`)
+- Durable agent runs (`agent_runs`, `agent_events`) with retry and event replay
 - Chat dialog: calls `POST /v1/messages` on the neuxus API
   (`NEUXUS_API_URL`, `NEUXUS_SERVICE_TOKEN`) and runs chat-owned tools such as
   `fetch_url` (`DEEPSEEK_API_KEY`)
@@ -24,7 +25,7 @@ belong to `apps/api`.
 | Piece                    | Role                                      |
 | ------------------------ | ----------------------------------------- |
 | Bun + Elysia             | HTTP API on `:3002`                       |
-| Postgres (`neuxus-chat`) | Users, memories, sessions, messages, logs |
+| Postgres (`neuxus-chat`) | Users, memories, sessions, messages, runs, logs |
 | Prisma                   | Schema and migrations                     |
 | User API keys            | `Authorization: Bearer <api-key>`         |
 | `apps/web`               | Chat UI at `/chat`                        |
@@ -69,7 +70,10 @@ Current summary:
 - `/query` runs the same tool loop without a stream.
 - `/query/stream` emits `start`, `delta`, `tool_call`, `tool_result`, `done`,
   and `error`.
-- Only the final assistant text is persisted; tool calls are transient.
+- `/query/async` queues a durable run; its event log can be replayed from
+  `/query/runs/:runId/events`.
+- Only the final assistant text is persisted in `app_messages`; the durable run
+  log retains tool calls and transcripts.
 
 ## Setup
 
@@ -101,6 +105,12 @@ DEEPSEEK_API_KEY=<DeepSeek API key for chat tools>
 bun install
 bun run prisma:generate
 bun run prisma -- migrate dev --name init
+```
+
+For an existing database, apply the latest migration and restart the app:
+
+```powershell
+bun run prisma -- migrate dev --name agent-runs
 ```
 
 4. Seed chat users (optional; from `apps/api-chat`):
@@ -172,6 +182,9 @@ starting the app.
 | `POST`   | `/remember`                     | Bearer               | Store a personal memory          |
 | `POST`   | `/query`                        | Bearer               | Ask via neuxus `/v1/messages`    |
 | `POST`   | `/query/stream`                 | Bearer               | Same, streamed as SSE events     |
+| `POST`   | `/query/async`                  | Bearer               | Create a durable agent run       |
+| `GET`    | `/query/runs/:runId`            | Bearer               | Read durable run status          |
+| `GET`    | `/query/runs/:runId/events`     | Bearer               | Replay/follow run SSE events     |
 | `GET`    | `/log/settings`                 | Bearer (admin)       | Read log sink settings           |
 | `PUT`    | `/log/settings`                 | Bearer (admin)       | Update log sink settings         |
 | `POST`   | `/log/settings/reset`           | Bearer (admin)       | Reset log settings               |

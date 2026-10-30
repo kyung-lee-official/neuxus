@@ -4,6 +4,7 @@
  * text answer.
  */
 
+import { chatMaxToolIterations } from "../../shared/config.ts";
 import {
   executeToolUse,
   type JsonObject,
@@ -17,7 +18,6 @@ import {
   streamNeuxus,
 } from "./core-client.ts";
 
-const MAX_TOOL_ITERATIONS = 4;
 const TOOL_PREVIEW_CHARS = 500;
 
 export type AgentToolEvent =
@@ -71,16 +71,26 @@ export async function runAgent(input: {
   userId: string;
   sessionId: string;
   stream: boolean;
+  startIteration?: number;
   signal?: AbortSignal;
   onText?: (text: string) => void;
   onTool?: (event: AgentToolEvent) => void;
+  onCheckpoint?: (state: {
+    messages: unknown[];
+    iteration: number;
+  }) => Promise<void> | void;
 }): Promise<AgentResult> {
   const tools = toolDefinitions();
+  const maxIterations = chatMaxToolIterations();
   let messages = Array.isArray(input.requestBody.messages)
     ? input.requestBody.messages
     : [];
 
-  for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
+  for (
+    let iteration = input.startIteration ?? 0;
+    iteration < maxIterations;
+    iteration++
+  ) {
     const body: Record<string, unknown> = {
       ...input.requestBody,
       messages,
@@ -140,10 +150,15 @@ export async function runAgent(input: {
       { role: "assistant", content: response.content },
       { role: "user", content: results },
     ];
+    await input.onCheckpoint?.({
+      messages,
+      iteration: iteration + 1,
+    });
   }
 
   throw new NeuxusClientError(
     502,
-    `Tool loop exceeded ${MAX_TOOL_ITERATIONS} iterations`,
+    `Tool loop exceeded ${maxIterations} iterations`,
+    false,
   );
 }

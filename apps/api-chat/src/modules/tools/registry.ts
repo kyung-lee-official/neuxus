@@ -13,7 +13,9 @@ const TOOLS: readonly Tool[] = [fetchUrlTool];
 const TOOL_BY_NAME = new Map(TOOLS.map((tool) => [tool.definition.name, tool]));
 
 export function toolDefinitions(): ToolDefinition[] {
-  return TOOLS.map((tool) => tool.definition);
+  return TOOLS.filter((tool) => tool.available?.() ?? true).map(
+    (tool) => tool.definition,
+  );
 }
 
 function errorText(error: unknown): string {
@@ -35,6 +37,14 @@ export async function executeToolUse(
       type: "tool_result",
       tool_use_id: block.id,
       content: `Unknown tool: ${block.name}`,
+      is_error: true,
+    };
+  }
+  if (!(tool.available?.() ?? true)) {
+    return {
+      type: "tool_result",
+      tool_use_id: block.id,
+      content: `Tool is unavailable: ${block.name}`,
       is_error: true,
     };
   }

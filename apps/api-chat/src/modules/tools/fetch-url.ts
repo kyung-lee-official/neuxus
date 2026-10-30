@@ -115,6 +115,9 @@ export const fetchUrlTool: Tool = {
       additionalProperties: false,
     },
   },
+  available() {
+    return deepseekApiKey() !== "";
+  },
   execute(input, context) {
     return executeFetch(input, context.signal);
   },

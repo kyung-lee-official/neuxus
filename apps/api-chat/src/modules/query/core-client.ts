@@ -7,11 +7,17 @@ import { neuxusApiUrl, neuxusServiceToken } from "../../shared/config.ts";
 
 export class NeuxusClientError extends Error {
   readonly status: number;
+  readonly retryable: boolean;
 
-  constructor(status: number, message: string) {
+  constructor(
+    status: number,
+    message: string,
+    retryable = status === 429 || status >= 500,
+  ) {
     super(message);
     this.name = "NeuxusClientError";
     this.status = status;
+    this.retryable = retryable;
   }
 }
 
@@ -281,10 +287,18 @@ export async function streamNeuxus(input: {
     try {
       input = JSON.parse(state.partialJson) as unknown;
     } catch {
-      throw new NeuxusClientError(502, "neuxus returned malformed tool input");
+      throw new NeuxusClientError(
+        502,
+        "neuxus returned malformed tool input",
+        false,
+      );
     }
     if (!isObject(input)) {
-      throw new NeuxusClientError(502, "neuxus returned malformed tool input");
+      throw new NeuxusClientError(
+        502,
+        "neuxus returned malformed tool input",
+        false,
+      );
     }
     state.block.input = input;
     state.partialJson = "";

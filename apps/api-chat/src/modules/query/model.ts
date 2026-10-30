@@ -13,6 +13,12 @@ export const QueryModel = {
         examples: ["5f9c3b1a-1234-5678-9abc-def012345678"],
       }),
     ),
+    idempotencyKey: t.Optional(
+      t.String({
+        maxLength: 200,
+        examples: ["chat-request-123"],
+      }),
+    ),
   }),
   queryResponse: t.Object({
     userId: t.String({ examples: ["lily"] }),

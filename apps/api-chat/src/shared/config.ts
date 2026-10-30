@@ -36,6 +36,27 @@ export function deepseekApiKey(): string {
   return process.env.DEEPSEEK_API_KEY?.trim() || "";
 }
 
+function positiveIntEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  const value = raw ? Number.parseInt(raw, 10) : Number.NaN;
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+/** Maximum model/tool iterations in one agent run. */
+export function chatMaxToolIterations(): number {
+  return positiveIntEnv("CHAT_MAX_TOOL_ITERATIONS", 4);
+}
+
+/** Maximum wall-clock time for one streaming run. */
+export function chatStreamTimeoutMs(): number {
+  return positiveIntEnv("CHAT_STREAM_TIMEOUT_MS", 300_000);
+}
+
+/** Maximum attempts for a durable agent run before it is marked failed. */
+export function chatRunMaxAttempts(): number {
+  return positiveIntEnv("CHAT_RUN_MAX_ATTEMPTS", 2);
+}
+
 /** Seeded into `app_users` by `bun run seed` (ids are lowercase; `haewon` is admin). */
 export const SEED_USER_IDS = [
   "lily",
