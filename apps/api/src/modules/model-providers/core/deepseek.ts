@@ -136,6 +136,28 @@ export class DeepSeekProvider extends ModelProvider<DeepSeekConnection> {
     return parts.join("\n\n");
   }
 
+  override async forwardMessages(
+    modelId: string,
+    body: Record<string, unknown>,
+    headers?: Record<string, string>,
+  ): Promise<unknown> {
+    const conn = await this.loadConnection();
+    if (!conn || !("apiKey" in conn) || typeof conn.apiKey !== "string")
+      throw new Error(`No api key saved for provider ${this.id}`);
+    return this.forwardAnthropicMessages(conn.apiKey, modelId, body, headers);
+  }
+
+  override async forwardMessagesStream(
+    modelId: string,
+    body: Record<string, unknown>,
+    headers?: Record<string, string>,
+  ): Promise<Response> {
+    const conn = await this.loadConnection();
+    if (!conn || !("apiKey" in conn) || typeof conn.apiKey !== "string")
+      throw new Error(`No api key saved for provider ${this.id}`);
+    return this.forwardAnthropicStream(conn.apiKey, modelId, body, headers);
+  }
+
   override async imageChat(
     modelId: string,
     prompt: string,

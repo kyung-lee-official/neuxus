@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { status } from "elysia";
+import { ProtocolError } from "../../shared/protocol.ts";
 
 export abstract class NeuxusAuth {
   static expectedToken(): string {
@@ -23,9 +23,12 @@ export abstract class NeuxusAuth {
     return timingSafeEqual(expectedBytes, presentedBytes);
   }
 
-  static unauthorized() {
-    return status(401, {
-      error: "Unauthorized. Use the neuxus service token.",
-    });
+  static unauthorized(): never {
+    throw new ProtocolError(
+      401,
+      "authentication_error",
+      "invalid_token",
+      "Unauthorized. Use the neuxus service token.",
+    );
   }
 }

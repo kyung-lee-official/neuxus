@@ -7,6 +7,9 @@
  */
 export const API_TAGS = {
   health: "health",
+  messages: "messages",
+  retrieve: "retrieve",
+  models: "models",
   knowledge: "knowledge",
   knowledgeCorpus: "knowledge/corpus",
   knowledgeRetriever: "knowledge/retriever",
@@ -21,6 +24,19 @@ export type ApiTag = (typeof API_TAGS)[keyof typeof API_TAGS];
 /** Top-level `tags` block for the OpenAPI document, ordered by module. */
 export const apiTagList: { name: string; description: string }[] = [
   { name: API_TAGS.health, description: "Liveness probes" },
+  {
+    name: API_TAGS.messages,
+    description:
+      "Anthropic-compatible enriched messages: retrieval evidence injected into the current human turn",
+  },
+  {
+    name: API_TAGS.retrieve,
+    description: "Evidence-only retrieval, no LLM call",
+  },
+  {
+    name: API_TAGS.models,
+    description: "Model ids available to POST /v1/messages",
+  },
   {
     name: API_TAGS.knowledge,
     description: "Knowledge base inspection",
