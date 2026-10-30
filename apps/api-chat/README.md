@@ -13,7 +13,8 @@ and persists both messages.
 - User data export
 - Structured app logging (`app_log`, `app_log_settings`)
 - Chat dialog: calls `POST /v1/messages` on the neuxus API
-  (`NEUXUS_API_URL`, `NEUXUS_SERVICE_TOKEN`)
+  (`NEUXUS_API_URL`, `NEUXUS_SERVICE_TOKEN`) and runs chat-owned tools such as
+  `fetch_url` (`DEEPSEEK_API_KEY`)
 
 It does not own knowledge, model providers, logs, or server settings. Those
 belong to `apps/api`.
@@ -52,6 +53,7 @@ DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/neuxus-chat
 PORT=3002
 NEUXUS_API_URL=http://localhost:3001
 NEUXUS_SERVICE_TOKEN=<same value as apps/api/.env>
+DEEPSEEK_API_KEY=<DeepSeek API key for chat tools>
 ```
 
 3. Install, generate, and migrate (from `apps/api-chat`):
