@@ -109,6 +109,12 @@ export type RetrieveParentsByQuestionResult = {
   parents: RetrievedParent[];
   /** Ranked image-description hits, independent of the parent hits. */
   images: RetrievedImage[];
+  /** Child hits before duplicate parents are merged. */
+  hits: number;
+  /** Raw child hits, best first. */
+  children: ChildHit[];
+  /** A parent or character cap removed part of the result. */
+  truncated: boolean;
 };
 
 function numberFromSql(value: unknown): number {
@@ -155,7 +161,14 @@ export abstract class Retriever {
         childLimit: knobs.childLimit,
         latencyMs: 0,
       });
-      return { currentModel, parents: [], images: [] };
+      return {
+        currentModel,
+        parents: [],
+        images: [],
+        hits: 0,
+        children: [],
+        truncated: false,
+      };
     }
 
     try {
@@ -212,7 +225,14 @@ export abstract class Retriever {
       });
 
       if (topK.length === 0) {
-        return { currentModel, parents: [], images };
+        return {
+          currentModel,
+          parents: [],
+          images,
+          hits: 0,
+          children: [],
+          truncated: false,
+        };
       }
 
       const hits: ChildHit[] = childRows.map((row) => ({
@@ -225,7 +245,14 @@ export abstract class Retriever {
 
       const parentIds = uniqueParentIdsByBestScore(hits);
       if (parentIds.length === 0) {
-        return { currentModel, parents: [], images };
+        return {
+          currentModel,
+          parents: [],
+          images,
+          hits: topK.length,
+          children: hits,
+          truncated: false,
+        };
       }
 
       const scores = scoreByParentFromHits(hits);
@@ -253,10 +280,15 @@ export abstract class Retriever {
         if (parent) ordered.push(parent);
       }
 
+      const capped = capParents(ordered, knobs.maxParents, knobs.maxCharacters);
+
       return {
         currentModel,
-        parents: capParents(ordered, knobs.maxParents, knobs.maxCharacters),
+        parents: capped,
         images,
+        hits: topK.length,
+        children: hits,
+        truncated: capped.length < ordered.length,
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
