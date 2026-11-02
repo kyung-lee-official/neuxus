@@ -6,16 +6,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useActiveUserStore } from "@/chat/lib/active-user-store";
 import {
   ApiError,
+  answerChatRunQuestion,
+  cancelChatRun,
   chatApiBaseUrl,
   getHealth,
   listChatKnowledgeBases,
   listSessionMessages,
   listUsers,
-  streamQuery,
+  type QueryStreamEvent,
+  streamDurableQuery,
   UserQueryKey,
 } from "@/chat/lib/api";
 import { ActiveUserPanel } from "./active-user-panel";
 import { MarkdownBubble } from "./markdown-bubble";
+import { QuestionCard } from "./question-card";
 import { SessionStatusChip } from "./session-status-chip";
 
 function errorMessage(err: unknown): string {
@@ -47,6 +51,8 @@ type StreamTool = {
   preview?: string;
 };
 
+type PendingQuestion = Extract<QueryStreamEvent, { type: "question" }>;
+
 function toolTitle(tool: StreamTool): string {
   if (tool.status === "calling") {
     const url = tool.input.url;
@@ -67,8 +73,13 @@ export function ChatPanel() {
   const [draft, setDraft] = useState("");
   const [streamedAnswer, setStreamedAnswer] = useState("");
   const [streamTools, setStreamTools] = useState<StreamTool[]>([]);
+  const [pendingQuestion, setPendingQuestion] =
+    useState<PendingQuestion | null>(null);
+  const [questionSubmitting, setQuestionSubmitting] = useState(false);
+  const [questionError, setQuestionError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const runIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -160,20 +171,24 @@ export function ChatPanel() {
 
       const controller = new AbortController();
       abortRef.current = controller;
+      runIdRef.current = null;
       setStreamedAnswer("");
       setStreamTools([]);
-      let sessionId = activeSessionId;
+      setPendingQuestion(null);
+      setQuestionError(null);
 
-      await streamQuery({
+      return streamDurableQuery({
         apiKey: active.apiKey,
         message,
         knowledgeBaseId,
         sessionId: activeSessionId,
+        idempotencyKey: crypto.randomUUID(),
         signal: controller.signal,
+        onRun: (run) => {
+          runIdRef.current = run.id;
+        },
         onEvent: (event) => {
-          if (event.type === "start") {
-            sessionId = event.sessionId;
-          } else if (event.type === "delta") {
+          if (event.type === "delta") {
             setStreamedAnswer((current) => current + event.text);
           } else if (event.type === "tool_call") {
             setStreamTools((current) => [
@@ -198,24 +213,26 @@ export function ChatPanel() {
                   : tool,
               ),
             );
+          } else if (event.type === "question") {
+            setQuestionError(null);
+            setPendingQuestion(event);
           }
         },
       });
-
-      return { sessionId };
     },
     onSuccess: async (result) => {
       setDraft("");
       setStreamedAnswer("");
       setStreamTools([]);
+      setPendingQuestion(null);
+      setQuestionError(null);
+      runIdRef.current = null;
       if (result.sessionId && result.sessionId !== activeSessionId) {
         setActiveSessionId(result.sessionId);
       }
-      if (result.sessionId) {
-        await queryClient.invalidateQueries({
-          queryKey: UserQueryKey.SessionMessages(result.sessionId),
-        });
-      }
+      await queryClient.invalidateQueries({
+        queryKey: UserQueryKey.SessionMessages(result.sessionId),
+      });
       if (active) {
         await queryClient.invalidateQueries({
           queryKey: UserQueryKey.Sessions(active.id),
@@ -225,11 +242,45 @@ export function ChatPanel() {
     onError: () => {
       setStreamedAnswer("");
       setStreamTools([]);
+      setPendingQuestion(null);
+      setQuestionError(null);
+      runIdRef.current = null;
     },
     onSettled: () => {
       abortRef.current = null;
     },
   });
+
+  async function submitQuestion(answer: string | string[]) {
+    if (!active || !runIdRef.current || !pendingQuestion) return;
+    setQuestionSubmitting(true);
+    setQuestionError(null);
+    try {
+      await answerChatRunQuestion({
+        apiKey: active.apiKey,
+        runId: runIdRef.current,
+        questionId: pendingQuestion.questionId,
+        answer,
+      });
+      setPendingQuestion(null);
+    } catch (error) {
+      setQuestionError(errorMessage(error));
+    } finally {
+      setQuestionSubmitting(false);
+    }
+  }
+
+  async function stopRun() {
+    const runId = runIdRef.current;
+    if (runId && active) {
+      try {
+        await cancelChatRun({ apiKey: active.apiKey, runId });
+      } catch {
+        /* stopping the stream still detaches the UI */
+      }
+    }
+    abortRef.current?.abort();
+  }
 
   const messages = messagesQuery.data ?? [];
   const sending = sendMutation.isPending;
@@ -243,12 +294,19 @@ export function ChatPanel() {
       messages.length === 0 &&
       !sending &&
       streamedAnswer === "" &&
-      streamTools.length === 0
+      streamTools.length === 0 &&
+      !pendingQuestion
     ) {
       return;
     }
     bottomRef.current?.scrollIntoView({ block: "end" });
-  }, [messages.length, sending, streamedAnswer, streamTools.length]);
+  }, [
+    messages.length,
+    sending,
+    streamedAnswer,
+    streamTools.length,
+    pendingQuestion,
+  ]);
 
   if (!storeReady) {
     return <CenteredHint text="Loading session…" />;
@@ -418,9 +476,19 @@ export function ChatPanel() {
                   </div>
                 ) : null}
 
+                {pendingQuestion ? (
+                  <QuestionCard
+                    key={pendingQuestion.questionId}
+                    question={pendingQuestion}
+                    submitting={questionSubmitting}
+                    error={questionError}
+                    onSubmit={(answer) => void submitQuestion(answer)}
+                  />
+                ) : null}
+
                 {streamedAnswer ? (
                   <MarkdownBubble source={streamedAnswer} />
-                ) : (
+                ) : pendingQuestion ? null : (
                   <div className="flex items-center gap-2 text-muted text-sm">
                     <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
                     {streamTools.length > 0
@@ -462,7 +530,7 @@ export function ChatPanel() {
                 <button
                   type="button"
                   className="rounded border border-danger bg-transparent px-4 py-2 text-danger text-sm"
-                  onClick={() => abortRef.current?.abort()}
+                  onClick={() => void stopRun()}
                 >
                   Stop
                 </button>

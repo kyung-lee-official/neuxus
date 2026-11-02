@@ -1,4 +1,4 @@
-import { Elysia, status } from "elysia";
+import { Elysia, status, t } from "elysia";
 import { API_TAGS, bearerSecurity } from "../../shared/openapi.ts";
 import { auth } from "../auth/index.ts";
 import { QueryModel } from "../query/model.ts";
@@ -122,6 +122,41 @@ export const agentRuns = new Elysia()
       detail: {
         tags: [API_TAGS.query],
         summary: "Read a durable agent run",
+        security: [bearerSecurity],
+      },
+    },
+  )
+  .post(
+    "/query/runs/:runId/questions/:questionId/answer",
+    ({ user, params, body }) =>
+      AgentRuns.answer(user, params.runId, params.questionId, body.answer),
+    {
+      requireUser: true,
+      body: t.Object({
+        answer: t.Union([
+          t.String({ minLength: 1 }),
+          t.Array(t.String({ minLength: 1 }), { minItems: 1 }),
+        ]),
+      }),
+      detail: {
+        tags: [API_TAGS.query],
+        summary: "Answer a pending agent question",
+        description:
+          "Resumes a `waiting` durable run by appending the answer as a `tool_result`.",
+        security: [bearerSecurity],
+      },
+    },
+  )
+  .post(
+    "/query/runs/:runId/cancel",
+    ({ user, params }) => AgentRuns.cancel(user, params.runId),
+    {
+      requireUser: true,
+      detail: {
+        tags: [API_TAGS.query],
+        summary: "Cancel a durable agent run",
+        description:
+          "Cancels queued/waiting runs immediately. Running runs are cancelled cooperatively at the next agent step.",
         security: [bearerSecurity],
       },
     },

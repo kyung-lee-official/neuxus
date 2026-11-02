@@ -332,7 +332,18 @@ export type QueryStreamEvent =
       isError: boolean;
       preview: string;
     }
+  | {
+      type: "question";
+      questionId: string;
+      toolUseId: string;
+      question: string;
+      header?: string;
+      options?: Array<{ label: string; description?: string }>;
+      multiple: boolean;
+      allowCustom: boolean;
+    }
   | { type: "done"; sessionId: string; userId: string }
+  | { type: "cancelled" }
   | { type: "error"; error: string };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -398,6 +409,35 @@ function parseQueryEvent(block: string): QueryStreamEvent | null {
       isError: parsed.isError,
       preview: parsed.preview,
     };
+  }
+  if (
+    parsed.type === "question" &&
+    typeof parsed.questionId === "string" &&
+    typeof parsed.toolUseId === "string" &&
+    typeof parsed.question === "string" &&
+    typeof parsed.multiple === "boolean" &&
+    typeof parsed.allowCustom === "boolean"
+  ) {
+    return {
+      type: "question",
+      questionId: parsed.questionId,
+      toolUseId: parsed.toolUseId,
+      question: parsed.question,
+      ...(typeof parsed.header === "string" ? { header: parsed.header } : {}),
+      ...(Array.isArray(parsed.options)
+        ? {
+            options: parsed.options.filter(
+              (option): option is { label: string; description?: string } =>
+                isRecord(option) && typeof option.label === "string",
+            ),
+          }
+        : {}),
+      multiple: parsed.multiple,
+      allowCustom: parsed.allowCustom,
+    };
+  }
+  if (parsed.type === "cancelled") {
+    return { type: "cancelled" };
   }
   return null;
 }
@@ -484,6 +524,176 @@ export async function streamQuery(input: {
   if (!finished) {
     throw new ApiError("Stream ended before completion", 502);
   }
+}
+
+export type ChatQuestionView = {
+  id: string;
+  toolUseId: string;
+  question: string;
+  header: string | null;
+  options: unknown;
+  multiple: boolean;
+  allowCustom: boolean;
+  createdAt: string | null;
+};
+
+export type ChatRunView = {
+  id: string;
+  userId: string;
+  sessionId: string;
+  knowledgeBaseId: string;
+  status: string;
+  answer: string | null;
+  error: string | null;
+  iteration: number;
+  attempts: number;
+  pendingQuestion: ChatQuestionView | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+};
+
+export async function createChatRun(input: {
+  apiKey: string;
+  message: string;
+  knowledgeBaseId: string;
+  sessionId?: string | null;
+  idempotencyKey?: string;
+}): Promise<ChatRunView> {
+  return chatFetch<ChatRunView>("/query/async", {
+    method: "POST",
+    apiKey: input.apiKey,
+    body: JSON.stringify({
+      message: input.message,
+      mode: "ask",
+      knowledgeBaseId: input.knowledgeBaseId,
+      ...(input.sessionId ? { sessionId: input.sessionId } : {}),
+      ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
+    }),
+  });
+}
+
+export async function getChatRun(
+  apiKey: string,
+  runId: string,
+): Promise<ChatRunView> {
+  return chatFetch<ChatRunView>(`/query/runs/${encodeURIComponent(runId)}`, {
+    apiKey,
+  });
+}
+
+export async function followChatRunEvents(input: {
+  apiKey: string;
+  runId: string;
+  after?: number;
+  signal?: AbortSignal;
+  onEvent: (event: QueryStreamEvent) => void;
+}): Promise<void> {
+  const after = input.after && input.after > 0 ? `?after=${input.after}` : "";
+  const res = await fetch(
+    `${chatApiBaseUrl()}/query/runs/${encodeURIComponent(input.runId)}/events${after}`,
+    {
+      headers: { Authorization: `Bearer ${input.apiKey}` },
+      signal: input.signal,
+      cache: "no-store",
+    },
+  );
+  if (!res.ok) {
+    throw new ApiError(responseError(await res.text(), res.status), res.status);
+  }
+  if (!res.body) throw new ApiError("No event stream", 502);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let terminal = false;
+
+  const consume = (block: string) => {
+    const event = parseQueryEvent(block);
+    if (!event) return;
+    if (event.type === "error") throw new ApiError(event.error, 502);
+    if (event.type === "done" || event.type === "cancelled") terminal = true;
+    input.onEvent(event);
+  };
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      for (;;) {
+        const match = /\r?\n\r?\n/.exec(buffer);
+        if (!match || match.index === undefined) break;
+        const block = buffer.slice(0, match.index);
+        buffer = buffer.slice(match.index + match[0].length);
+        consume(block);
+      }
+    }
+    buffer += decoder.decode();
+    if (buffer.trim() !== "") consume(buffer);
+  } catch (error) {
+    await reader.cancel().catch(() => undefined);
+    throw error;
+  }
+
+  if (!terminal) throw new ApiError("Run stream ended early", 502);
+}
+
+export async function streamDurableQuery(input: {
+  apiKey: string;
+  message: string;
+  knowledgeBaseId: string;
+  sessionId?: string | null;
+  idempotencyKey?: string;
+  signal?: AbortSignal;
+  onRun?: (run: ChatRunView) => void;
+  onEvent: (event: QueryStreamEvent) => void;
+}): Promise<{ runId: string; sessionId: string }> {
+  const run = await createChatRun({
+    apiKey: input.apiKey,
+    message: input.message,
+    knowledgeBaseId: input.knowledgeBaseId,
+    sessionId: input.sessionId,
+    idempotencyKey: input.idempotencyKey,
+  });
+  input.onRun?.(run);
+  await followChatRunEvents({
+    apiKey: input.apiKey,
+    runId: run.id,
+    signal: input.signal,
+    onEvent: input.onEvent,
+  });
+  return { runId: run.id, sessionId: run.sessionId };
+}
+
+export async function answerChatRunQuestion(input: {
+  apiKey: string;
+  runId: string;
+  questionId: string;
+  answer: string | string[];
+}): Promise<ChatRunView> {
+  return chatFetch<ChatRunView>(
+    `/query/runs/${encodeURIComponent(input.runId)}/questions/${encodeURIComponent(input.questionId)}/answer`,
+    {
+      method: "POST",
+      apiKey: input.apiKey,
+      body: JSON.stringify({ answer: input.answer }),
+    },
+  );
+}
+
+export async function cancelChatRun(input: {
+  apiKey: string;
+  runId: string;
+}): Promise<ChatRunView> {
+  return chatFetch<ChatRunView>(
+    `/query/runs/${encodeURIComponent(input.runId)}/cancel`,
+    {
+      method: "POST",
+      apiKey: input.apiKey,
+    },
+  );
 }
 
 export async function postRemember(input: {

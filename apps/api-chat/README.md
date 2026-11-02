@@ -15,20 +15,21 @@ and persists both messages.
 - Durable agent runs (`agent_runs`, `agent_events`) with retry and event replay
 - Chat dialog: calls `POST /v1/messages` on the neuxus API
   (`NEUXUS_API_URL`, `NEUXUS_SERVICE_TOKEN`) and runs chat-owned tools such as
-  `fetch_url`; tool credentials and budgets are configured in the admin UI
+  `fetch_url` and durable `question`; tool credentials and budgets are
+  configured in the admin UI
 
 It does not own knowledge, model providers, logs, or server settings. Those
 belong to `apps/api`.
 
 ## Stack
 
-| Piece                    | Role                                                      |
-| ------------------------ | --------------------------------------------------------- |
-| Bun + Elysia             | HTTP API on `:3002`                                       |
-| Postgres (`neuxus-chat`) | Users, memories, sessions, messages, runs, settings, logs |
-| Prisma                   | Schema and migrations                                     |
-| User API keys            | `Authorization: Bearer <api-key>`                         |
-| `apps/web`               | Chat UI at `/chat`                                        |
+| Piece                    | Role                                                                 |
+| ------------------------ | -------------------------------------------------------------------- |
+| Bun + Elysia             | HTTP API on `:3002`                                                  |
+| Postgres (`neuxus-chat`) | Users, memories, sessions, messages, runs, questions, settings, logs |
+| Prisma                   | Schema and migrations                                                |
+| User API keys            | `Authorization: Bearer <api-key>`                                    |
+| `apps/web`               | Chat UI at `/chat`                                                   |
 
 The chat database is separate from the neuxus database. Do not import code from
 `apps/api`; call it over HTTP.
@@ -44,7 +45,8 @@ and the available tool definitions.
 
 1. Call the model with `messages` and `tools`.
 2. If the response has no `tool_use` blocks, return its text as the final answer.
-3. Execute every `tool_use` block from the registry.
+3. Execute every `tool_use` block from the registry. A lone `question` in a
+   durable run pauses the run until the user answers.
 4. Append the assistant `tool_use` content and a user `tool_result` message to
    the transcript.
 5. Call the model again with the updated transcript.
@@ -68,11 +70,14 @@ Current summary:
 
 - `fetch_url` uses DeepSeek's Fetch API; configure its key in the admin agent
   settings.
+- `question` asks the user and pauses the durable run until answered.
 - `/query` runs the same tool loop without a stream.
 - `/query/stream` emits `start`, `delta`, `tool_call`, `tool_result`, `done`,
-  and `error`.
+  and `error`; it does not expose durable `question`.
 - `/query/async` queues a durable run; its event log can be replayed from
   `/query/runs/:runId/events`.
+- The chat UI uses durable runs and supports pausing on `question`, answering,
+  then resuming.
 - Only the final assistant text is persisted in `app_messages`; the durable run
   log retains tool calls and transcripts.
 
@@ -166,35 +171,37 @@ starting the app.
 
 ## API
 
-| Method   | Path                            | Auth                 | Purpose                          |
-| -------- | ------------------------------- | -------------------- | -------------------------------- |
-| `GET`    | `/health`                       | none                 | Liveness                         |
-| `GET`    | `/users`                        | none                 | List users (sign-in screen)      |
-| `POST`   | `/users`                        | first user or Bearer | Create a user                    |
-| `GET`    | `/users/:id`                    | none                 | Get a user                       |
-| `PATCH`  | `/users/:id`                    | Bearer               | Rotate/set the API key           |
-| `DELETE` | `/users/:id`                    | Bearer               | Delete a user (cascades)         |
-| `GET`    | `/users/:id/data`               | Bearer               | Memories, sessions, messages     |
-| `GET`    | `/users/:id/logs`               | Bearer               | Paged user logs from `app_log`   |
-| `DELETE` | `/users/:id/memories/:memoryId` | Bearer               | Delete a memory                  |
-| `GET`    | `/sessions`                     | Bearer               | List the current user's sessions |
-| `POST`   | `/sessions`                     | Bearer               | Create a session                 |
-| `GET`    | `/sessions/:sessionId/messages` | Bearer               | List messages in a session       |
-| `PATCH`  | `/sessions/:sessionId`          | Bearer               | Rename or clear a title          |
-| `DELETE` | `/sessions/:sessionId`          | Bearer               | Delete a session                 |
-| `GET`    | `/knowledge-bases`              | Bearer               | Knowledge bases from neuxus      |
-| `GET`    | `/agent-settings`               | Bearer (admin)       | Read agent settings              |
-| `PUT`    | `/agent-settings`               | Bearer (admin)       | Update agent settings            |
-| `POST`   | `/remember`                     | Bearer               | Store a personal memory          |
-| `POST`   | `/query`                        | Bearer               | Ask via neuxus `/v1/messages`    |
-| `POST`   | `/query/stream`                 | Bearer               | Same, streamed as SSE events     |
-| `POST`   | `/query/async`                  | Bearer               | Create a durable agent run       |
-| `GET`    | `/query/runs/:runId`            | Bearer               | Read durable run status          |
-| `GET`    | `/query/runs/:runId/events`     | Bearer               | Replay/follow run SSE events     |
-| `GET`    | `/log/settings`                 | Bearer (admin)       | Read log sink settings           |
-| `PUT`    | `/log/settings`                 | Bearer (admin)       | Update log sink settings         |
-| `POST`   | `/log/settings/reset`           | Bearer (admin)       | Reset log settings               |
-| `POST`   | `/log/purge`                    | Bearer (admin)       | Delete all `app_log` rows        |
+| Method   | Path                                              | Auth                 | Purpose                          |
+| -------- | ------------------------------------------------- | -------------------- | -------------------------------- |
+| `GET`    | `/health`                                         | none                 | Liveness                         |
+| `GET`    | `/users`                                          | none                 | List users (sign-in screen)      |
+| `POST`   | `/users`                                          | first user or Bearer | Create a user                    |
+| `GET`    | `/users/:id`                                      | none                 | Get a user                       |
+| `PATCH`  | `/users/:id`                                      | Bearer               | Rotate/set the API key           |
+| `DELETE` | `/users/:id`                                      | Bearer               | Delete a user (cascades)         |
+| `GET`    | `/users/:id/data`                                 | Bearer               | Memories, sessions, messages     |
+| `GET`    | `/users/:id/logs`                                 | Bearer               | Paged user logs from `app_log`   |
+| `DELETE` | `/users/:id/memories/:memoryId`                   | Bearer               | Delete a memory                  |
+| `GET`    | `/sessions`                                       | Bearer               | List the current user's sessions |
+| `POST`   | `/sessions`                                       | Bearer               | Create a session                 |
+| `GET`    | `/sessions/:sessionId/messages`                   | Bearer               | List messages in a session       |
+| `PATCH`  | `/sessions/:sessionId`                            | Bearer               | Rename or clear a title          |
+| `DELETE` | `/sessions/:sessionId`                            | Bearer               | Delete a session                 |
+| `GET`    | `/knowledge-bases`                                | Bearer               | Knowledge bases from neuxus      |
+| `GET`    | `/agent-settings`                                 | Bearer (admin)       | Read agent settings              |
+| `PUT`    | `/agent-settings`                                 | Bearer (admin)       | Update agent settings            |
+| `POST`   | `/remember`                                       | Bearer               | Store a personal memory          |
+| `POST`   | `/query`                                          | Bearer               | Ask via neuxus `/v1/messages`    |
+| `POST`   | `/query/stream`                                   | Bearer               | Same, streamed as SSE events     |
+| `POST`   | `/query/async`                                    | Bearer               | Create a durable agent run       |
+| `GET`    | `/query/runs/:runId`                              | Bearer               | Read durable run status          |
+| `GET`    | `/query/runs/:runId/events`                       | Bearer               | Replay/follow run SSE events     |
+| `POST`   | `/query/runs/:runId/questions/:questionId/answer` | Bearer               | Answer a pending question        |
+| `POST`   | `/query/runs/:runId/cancel`                       | Bearer               | Cancel a durable run             |
+| `GET`    | `/log/settings`                                   | Bearer (admin)       | Read log sink settings           |
+| `PUT`    | `/log/settings`                                   | Bearer (admin)       | Update log sink settings         |
+| `POST`   | `/log/settings/reset`                             | Bearer (admin)       | Reset log settings               |
+| `POST`   | `/log/purge`                                      | Bearer (admin)       | Delete all `app_log` rows        |
 
 The service token is for calling `apps/api`, not for authenticating chat users.
 Chat users authenticate with their own API keys.

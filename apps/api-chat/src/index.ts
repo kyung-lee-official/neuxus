@@ -107,7 +107,7 @@ console.log("Knowledge bases: GET /knowledge-bases (proxied from neuxus)");
 console.log("Memory: POST /remember");
 console.log("Query: POST /query (JSON), POST /query/stream (SSE)");
 console.log(
-  "Durable runs: POST /query/async; GET /query/runs/:id, /query/runs/:id/events",
+  "Durable runs: POST /query/async; GET /query/runs/:id, /query/runs/:id/events; POST /query/runs/:id/questions/:questionId/answer, /query/runs/:id/cancel",
 );
 console.log("Agent settings: GET/PUT /agent-settings (admin)");
 console.log("Log: GET/PUT /log/settings; POST /log/settings/reset, /log/purge");

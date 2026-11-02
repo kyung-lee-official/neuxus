@@ -1,6 +1,7 @@
 /** Registry for chat-owned tools. Add new tools to `TOOLS`. */
 
 import { fetchUrlTool } from "./fetch-url.ts";
+import { questionTool } from "./question.ts";
 import type {
   Tool,
   ToolContext,
@@ -9,13 +10,17 @@ import type {
   ToolUseBlock,
 } from "./types.ts";
 
-const TOOLS: readonly Tool[] = [fetchUrlTool];
+const TOOLS: readonly Tool[] = [fetchUrlTool, questionTool];
 const TOOL_BY_NAME = new Map(TOOLS.map((tool) => [tool.definition.name, tool]));
 
-export function toolDefinitions(): ToolDefinition[] {
-  return TOOLS.filter((tool) => tool.available?.() ?? true).map(
-    (tool) => tool.definition,
-  );
+export function toolDefinitions(options?: {
+  durable?: boolean;
+}): ToolDefinition[] {
+  return TOOLS.filter(
+    (tool) =>
+      (tool.available?.() ?? true) &&
+      (!tool.durableOnly || options?.durable === true),
+  ).map((tool) => tool.definition);
 }
 
 function errorText(error: unknown): string {

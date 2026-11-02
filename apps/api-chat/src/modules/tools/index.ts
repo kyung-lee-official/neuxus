@@ -1,3 +1,8 @@
+export {
+  type QuestionInput,
+  type QuestionOption,
+  questionFromInput,
+} from "./question.ts";
 export { executeToolUse, toolDefinitions } from "./registry.ts";
 export type {
   JsonObject,

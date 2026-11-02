@@ -30,6 +30,8 @@ export type ToolContext = {
 
 export type Tool = {
   definition: ToolDefinition;
+  /** Only advertise in durable, resumable runs. */
+  durableOnly?: boolean;
   /** Tools without an `available` callback are always available. */
   available?: () => boolean;
   execute(input: JsonObject, context: ToolContext): Promise<string>;

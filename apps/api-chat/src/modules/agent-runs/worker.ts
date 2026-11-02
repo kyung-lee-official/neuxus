@@ -7,15 +7,19 @@
  */
 
 import { AgentSettings } from "../agent-settings/service.ts";
-import { runAgent } from "../query/agent.ts";
+import { QuestionPause, RunCancelledError, runAgent } from "../query/agent.ts";
 import { NeuxusClientError } from "../query/core-client.ts";
 import {
   type AgentRun,
+  agentQuestionsReady,
   appendAgentEvent,
   claimNextQueuedRun,
   completeRun,
   failRun,
+  isCancelRequested,
+  markRunCancelled,
   maxEventSeq,
+  pauseRunForQuestion,
   requeueRunningRuns,
   retryRun,
   updateRunCheckpoint,
@@ -57,6 +61,11 @@ async function executeRun(run: AgentRun): Promise<void> {
     });
   }
 
+  if (await isCancelRequested(run.id)) {
+    await markRunCancelled({ run, seq: ++seq, expectedStatus: "running" });
+    return;
+  }
+
   const request = isObject(run.request) ? run.request : {};
   const messages = Array.isArray(run.messages) ? run.messages : [];
   const abort = new AbortController();
@@ -74,12 +83,28 @@ async function executeRun(run: AgentRun): Promise<void> {
       sessionId: run.sessionId,
       stream: true,
       startIteration: run.iteration,
+      enableQuestion: true,
+      shouldStop: () => isCancelRequested(run.id),
       signal: abort.signal,
       onText(text) {
         void append("delta", { type: "delta", text });
       },
       onTool(event) {
         void append(event.type, { ...event });
+      },
+      async onQuestion(question) {
+        await writeChain;
+        if (await isCancelRequested(run.id)) {
+          throw new RunCancelledError();
+        }
+        await pauseRunForQuestion({
+          run,
+          seq: ++seq,
+          toolUseId: question.toolUseId,
+          question,
+          assistantContent: question.assistantContent,
+        });
+        return { kind: "pause" as const };
       },
       async onCheckpoint(state) {
         await writeChain;
@@ -96,9 +121,22 @@ async function executeRun(run: AgentRun): Promise<void> {
     }
 
     await writeChain;
+    if (await isCancelRequested(run.id)) {
+      await markRunCancelled({ run, seq: ++seq, expectedStatus: "running" });
+      return;
+    }
     await completeRun({ run, seq: ++seq, answer: result.answer });
   } catch (error) {
     await writeChain.catch(() => undefined);
+    if (error instanceof QuestionPause) return;
+    if (error instanceof RunCancelledError) {
+      await markRunCancelled({ run, seq: ++seq, expectedStatus: "running" });
+      return;
+    }
+    if (await isCancelRequested(run.id)) {
+      await markRunCancelled({ run, seq: ++seq, expectedStatus: "running" });
+      return;
+    }
     const message = timedOut ? "Run timed out" : errorText(error);
     const attempts = run.attempts + 1;
     if (
@@ -136,9 +174,10 @@ export async function startAgentRunWorker(): Promise<void> {
   if (started) return;
   try {
     await requeueRunningRuns();
+    await agentQuestionsReady();
   } catch (error) {
     console.warn(
-      "agent run worker disabled: agent_runs/agent_events are not ready",
+      "agent run worker disabled: agent_runs/agent_events/agent_questions are not ready",
       error instanceof Error ? error.message : String(error),
     );
     return;

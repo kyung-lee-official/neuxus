@@ -5,11 +5,26 @@
 
 import { Prisma } from "../../generated/prisma/client.ts";
 import { getPrisma } from "../../shared/db.ts";
+import type { QuestionInput } from "../tools/index.ts";
 
-export type AgentRunStatus = "queued" | "running" | "completed" | "failed";
+export type AgentRunStatus =
+  | "queued"
+  | "running"
+  | "waiting"
+  | "completed"
+  | "failed"
+  | "cancelled";
 
 export type AgentRun = Prisma.AgentRunModel;
 export type AgentEvent = Prisma.AgentEventModel;
+export type AgentQuestion = Prisma.AgentQuestionModel;
+
+export class RunStateConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RunStateConflictError";
+  }
+}
 
 export async function createAgentRun(input: {
   userId: string;
@@ -79,6 +94,11 @@ export async function requeueRunningRuns(): Promise<number> {
     data: { status: "queued" },
   });
   return result.count;
+}
+
+/** Startup readiness probe for the question table. */
+export async function agentQuestionsReady(): Promise<void> {
+  await getPrisma().agentQuestion.findFirst({ select: { id: true } });
 }
 
 export async function claimNextQueuedRun(): Promise<AgentRun | null> {
@@ -253,5 +273,198 @@ export async function retryRun(input: {
         } as Prisma.InputJsonValue,
       },
     });
+  });
+}
+
+export async function findPendingQuestionForRun(
+  runId: string,
+): Promise<AgentQuestion | null> {
+  return getPrisma().agentQuestion.findFirst({
+    where: { runId, status: "pending" },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+export async function findQuestionForRun(
+  runId: string,
+  questionId: string,
+): Promise<AgentQuestion | null> {
+  return getPrisma().agentQuestion.findFirst({
+    where: { id: questionId, runId },
+  });
+}
+
+export async function isCancelRequested(runId: string): Promise<boolean> {
+  const run = await getPrisma().agentRun.findUnique({
+    where: { id: runId },
+    select: { cancelRequestedAt: true },
+  });
+  return run?.cancelRequestedAt != null;
+}
+
+export async function pauseRunForQuestion(input: {
+  run: AgentRun;
+  seq: number;
+  toolUseId: string;
+  question: QuestionInput;
+  assistantContent: unknown;
+}): Promise<AgentQuestion> {
+  return getPrisma().$transaction(async (tx) => {
+    const question = await tx.agentQuestion.create({
+      data: {
+        runId: input.run.id,
+        toolUseId: input.toolUseId,
+        question: input.question.question,
+        header: input.question.header ?? null,
+        options: input.question.options
+          ? (input.question.options as Prisma.InputJsonValue)
+          : Prisma.DbNull,
+        multiple: input.question.multiple,
+        allowCustom: input.question.allowCustom,
+      },
+    });
+    await tx.agentRun.update({
+      where: { id: input.run.id },
+      data: {
+        status: "waiting",
+        pendingAssistant: input.assistantContent as Prisma.InputJsonValue,
+        pendingQuestionId: question.id,
+        error: null,
+      },
+    });
+    await tx.agentEvent.create({
+      data: {
+        runId: input.run.id,
+        seq: input.seq,
+        type: "question",
+        payload: {
+          type: "question",
+          questionId: question.id,
+          toolUseId: question.toolUseId,
+          question: question.question,
+          ...(question.header ? { header: question.header } : {}),
+          ...(question.options ? { options: question.options } : {}),
+          multiple: question.multiple,
+          allowCustom: question.allowCustom,
+        } as Prisma.InputJsonValue,
+      },
+    });
+    return question;
+  });
+}
+
+export async function answerRunQuestion(input: {
+  run: AgentRun;
+  question: AgentQuestion;
+  seq: number;
+  answerValue: string | string[];
+  answerText: string;
+}): Promise<void> {
+  const assistantContent = input.run.pendingAssistant;
+  if (assistantContent == null) {
+    throw new Error("Run has no pending assistant content");
+  }
+  const messages = Array.isArray(input.run.messages)
+    ? [...input.run.messages]
+    : [];
+  messages.push(
+    { role: "assistant", content: assistantContent },
+    {
+      role: "user",
+      content: [
+        {
+          type: "tool_result",
+          tool_use_id: input.question.toolUseId,
+          content: `User answer:\n${input.answerText}`,
+        },
+      ],
+    },
+  );
+
+  await getPrisma().$transaction(async (tx) => {
+    const updatedQuestion = await tx.agentQuestion.updateMany({
+      where: { id: input.question.id, status: "pending" },
+      data: {
+        status: "answered",
+        answer: input.answerValue as Prisma.InputJsonValue,
+        answeredAt: new Date(),
+      },
+    });
+    if (updatedQuestion.count === 0) {
+      throw new RunStateConflictError("Question is no longer pending");
+    }
+
+    const updatedRun = await tx.agentRun.updateMany({
+      where: { id: input.run.id, status: "waiting" },
+      data: {
+        status: "queued",
+        messages: messages as Prisma.InputJsonValue,
+        iteration: input.run.iteration + 1,
+        pendingAssistant: Prisma.DbNull,
+        pendingQuestionId: null,
+        error: null,
+        finishedAt: null,
+      },
+    });
+    if (updatedRun.count === 0) {
+      throw new RunStateConflictError("Agent run is no longer waiting");
+    }
+
+    await tx.agentEvent.create({
+      data: {
+        runId: input.run.id,
+        seq: input.seq,
+        type: "tool_result",
+        payload: {
+          type: "tool_result",
+          id: input.question.toolUseId,
+          name: "question",
+          isError: false,
+          preview: input.answerText.slice(0, 500),
+        } as Prisma.InputJsonValue,
+      },
+    });
+  });
+}
+
+export async function markRunCancelled(input: {
+  run: AgentRun;
+  seq: number;
+  expectedStatus?: string;
+}): Promise<boolean> {
+  return getPrisma().$transaction(async (tx) => {
+    const updated = await tx.agentRun.updateMany({
+      where: input.expectedStatus
+        ? { id: input.run.id, status: input.expectedStatus }
+        : { id: input.run.id },
+      data: {
+        status: "cancelled",
+        pendingAssistant: Prisma.DbNull,
+        pendingQuestionId: null,
+        finishedAt: new Date(),
+      },
+    });
+    if (updated.count === 0) return false;
+
+    await tx.agentQuestion.updateMany({
+      where: { runId: input.run.id, status: "pending" },
+      data: { status: "cancelled", answeredAt: new Date() },
+    });
+    await tx.agentEvent.create({
+      data: {
+        runId: input.run.id,
+        seq: input.seq,
+        type: "cancelled",
+        payload: { type: "cancelled" } as Prisma.InputJsonValue,
+      },
+    });
+    return true;
+  });
+}
+
+export async function requestRunCancel(runId: string): Promise<void> {
+  await getPrisma().agentRun.update({
+    where: { id: runId },
+    data: { cancelRequestedAt: new Date() },
   });
 }
