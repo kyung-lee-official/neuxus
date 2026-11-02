@@ -127,36 +127,65 @@ model AgentSettings {
 /// Durable agent run. `messages` is the last saved transcript checkpoint;
 /// `request` is the prepared model request without the changing messages.
 model AgentRun {
-  id              String    @id @default(uuid()) @db.Uuid
-  userId          String    @map("user_id")
-  sessionId       String    @map("session_id") @db.Uuid
-  knowledgeBaseId String    @map("knowledge_base_id")
-  idempotencyKey  String?   @map("idempotency_key")
-  /// `queued` | `running` | `completed` | `failed`
-  status          String    @default("queued")
+  id                String    @id @default(uuid()) @db.Uuid
+  userId            String    @map("user_id")
+  sessionId         String    @map("session_id") @db.Uuid
+  knowledgeBaseId   String    @map("knowledge_base_id")
+  idempotencyKey    String?   @map("idempotency_key")
+  /// `queued` | `running` | `waiting` | `completed` | `failed` | `cancelled`
+  status            String    @default("queued")
   /// Current user message, written to `app_messages` on completion.
-  message         String
+  message           String
   /// Prepared request body, without the mutable `messages` value.
-  request         Json
+  request           Json
   /// Current transcript checkpoint.
-  messages        Json
-  iteration       Int       @default(0)
-  attempts        Int       @default(0)
-  answer          String?
-  error           String?
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  startedAt       DateTime? @map("started_at") @db.Timestamptz(6)
-  finishedAt      DateTime? @map("finished_at") @db.Timestamptz(6)
+  messages          Json
+  iteration         Int       @default(0)
+  attempts          Int       @default(0)
+  /// Assistant content held while a question waits for an answer.
+  pendingAssistant  Json?     @map("pending_assistant")
+  pendingQuestionId String?   @map("pending_question_id")
+  cancelRequestedAt DateTime? @map("cancel_requested_at") @db.Timestamptz(6)
+  answer            String?
+  error             String?
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  startedAt         DateTime? @map("started_at") @db.Timestamptz(6)
+  finishedAt        DateTime? @map("finished_at") @db.Timestamptz(6)
 
-  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  session Session      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  events  AgentEvent[]
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session   Session         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  events    AgentEvent[]
+  questions AgentQuestion[]
 
   @@unique([userId, idempotencyKey], map: "agent_runs_user_idempotency_key")
   @@index([status, createdAt], map: "agent_runs_status_created_at_idx")
   @@index([userId, createdAt(sort: Desc)], map: "agent_runs_user_id_created_at_idx")
   @@map("agent_runs")
+}
+
+/// One clarifying question asked by the model. At most one row per run is
+/// pending, but completed answers remain for replay.
+model AgentQuestion {
+  id          String    @id @default(uuid()) @db.Uuid
+  runId       String    @map("run_id") @db.Uuid
+  toolUseId   String    @map("tool_use_id")
+  question    String
+  header      String?
+  options     Json?
+  multiple    Boolean   @default(false)
+  allowCustom Boolean   @default(true) @map("allow_custom")
+  /// `pending` | `answered` | `cancelled`
+  status      String    @default("pending")
+  answer      Json?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  answeredAt  DateTime? @map("answered_at") @db.Timestamptz(6)
+
+  run AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, toolUseId], map: "agent_questions_run_id_tool_use_id_key")
+  @@index([runId, status], map: "agent_questions_run_id_status_idx")
+  @@map("agent_questions")
 }
 
 /// Append-only run event. `seq` is monotonic per run and is also the SSE id.
