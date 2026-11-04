@@ -73,10 +73,6 @@ function isToolResultBlock(block: unknown): boolean {
 export function messagesBody(body: unknown): MessagesRequestBody {
   if (!isObject(body)) invalid("Request body must be a JSON object.");
 
-  const model = body.model;
-  if (typeof model !== "string" || model.trim() === "") {
-    invalid("model must be a non-empty string.");
-  }
   const maxTokens = body.max_tokens;
   if (
     typeof maxTokens !== "number" ||
@@ -122,7 +118,6 @@ export function messagesBody(body: unknown): MessagesRequestBody {
 
   return {
     ...body,
-    model: model.trim(),
     max_tokens: maxTokens,
     messages: checked,
   };

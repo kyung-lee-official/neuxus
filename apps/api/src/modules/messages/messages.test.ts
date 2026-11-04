@@ -193,4 +193,12 @@ describe("request validation", () => {
     });
     expect(body.stream).toBe(true);
   });
+
+  test("accepts a request without model", () => {
+    const body = messagesBody({
+      max_tokens: 10,
+      messages: [{ role: "user", content: "hello" }],
+    });
+    expect("model" in body).toBe(false);
+  });
 });

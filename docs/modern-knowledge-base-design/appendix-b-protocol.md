@@ -7,7 +7,7 @@ neuxus reuses Anthropic's request layout (`system`, `messages`, `tools`,
 `tool_choice`) and does not define a parallel context schema. It only inserts
 one `<knowledge>` block into the last human turn.
 
-For `POST /v1/messages`, the **request** is the Anthropic Messages API. A client sends a plain HTTP/JSON request with a neuxus model id or alias. An Anthropic SDK pointed at neuxus also works. neuxus selects the current human turn, enriches it with knowledge-base context, forwards the request to the configured model, and returns the model's response.
+For `POST /v1/messages`, the **request** is the Anthropic Messages API. The `model` field is ignored: neuxus uses the model configured for the `text-synthesis` task in its own settings. An Anthropic SDK pointed at neuxus also works; its `model` value is ignored. neuxus selects the current human turn, enriches it with knowledge-base context, forwards the request to the configured model, and returns the model's response.
 
 The **response** for that endpoint is a superset of Anthropic's response. Every Anthropic field is preserved, and a top-level `neuxus` object carries provenance: request id, the knowledge base used, the evidence supplied, retrieval signals, and the upstream model. Clients can rely on Anthropic's shape and, when they want provenance, read `neuxus`.
 
@@ -26,7 +26,6 @@ curl https://neuxus.example/v1/messages \
   -H "content-type: application/json" \
   -H "X-Neuxus-Knowledge-Base: docs-chitubox-com" \
   -d '{
-    "model": "deepseek::deepseek-flash",
     "max_tokens": 1024,
     "messages": [
       { "role": "user", "content": "Which profiles support layer height 0.2 mm?" }
@@ -34,7 +33,7 @@ curl https://neuxus.example/v1/messages \
   }'
 ```
 
-`model` is a neuxus model id or alias; the knowledge base is selected with a header, not a body field.
+The `model` field is ignored and may be omitted. neuxus selects the `text-synthesis` model from its server settings; the knowledge base is selected with a header, not a body field.
 
 ---
 
@@ -47,13 +46,13 @@ curl https://neuxus.example/v1/messages \
 
 ### Endpoints
 
-| Method | Path               | Purpose                                | Scope            |
-| ------ | ------------------ | -------------------------------------- | ---------------- |
-| `POST` | `/v1/messages`     | Anthropic-compatible, enriched message | `messages:write` |
-| `POST` | `/retrieve`        | Evidence only, no LLM call             | `retrieve:read`  |
-| `GET`  | `/v1/models`       | List model ids and aliases             | `models:read`    |
-| `GET`  | `/knowledge-bases` | List knowledge bases                   | `knowledge:read` |
-| `GET`  | `/health`          | Health check                           | none             |
+| Method | Path               | Purpose                                  | Scope            |
+| ------ | ------------------ | ---------------------------------------- | ---------------- |
+| `POST` | `/v1/messages`     | Anthropic-compatible, enriched message   | `messages:write` |
+| `POST` | `/retrieve`        | Evidence only, no LLM call               | `retrieve:read`  |
+| `GET`  | `/v1/models`       | List catalog text models (informational) | `models:read`    |
+| `GET`  | `/knowledge-bases` | List knowledge bases                     | `knowledge:read` |
+| `GET`  | `/health`          | Health check                             | none             |
 
 ### Request headers
 
@@ -107,11 +106,11 @@ The client app verifies its own users. It calls neuxus with its service token. `
 
 ### Request
 
-The body is the Anthropic Messages API. Only `messages` are modified, by the enrichment described below; everything else is passed through unchanged.
+The body is the Anthropic Messages API. `messages` are enriched as described below, and `model` is ignored and replaced with the configured `text-synthesis` model; everything else is passed through unchanged.
 
 Only these differ from Anthropic:
 
-- `model` is a value from `GET /v1/models`: a neuxus model id such as `deepseek::deepseek-flash`, or an alias that resolves to one. An unknown model is `404 model_not_found`; a model with no provider connection is `503 model_not_configured`.
+- `model` is ignored. Clients may omit it or send any value. neuxus uses the catalog model linked to the `text-synthesis` task; an unassigned model or missing provider connection is `503 model_not_configured`.
 - `x-api-key` is a neuxus service token, not an Anthropic key.
 - The knowledge base is selected with the required `X-Neuxus-Knowledge-Base` header, not a body field.
 
@@ -157,7 +156,7 @@ type MessageResponse = {
   id: string;
   type: "message";
   role: "assistant";
-  /** Echoed from the request. */
+  /** The configured neuxus text-synthesis model identifier. */
   model: string;
   content: AnthropicContentBlock[];
   stop_reason:
@@ -253,7 +252,6 @@ content-type: application/json
 X-Neuxus-Knowledge-Base: docs-chitubox-com
 
 {
-  "model": "deepseek::deepseek-flash",
   "max_tokens": 1024,
   "system": "You are a support assistant.",
   "messages": [
@@ -396,7 +394,7 @@ type RetrieveResponse = {
 
 ## `GET /v1/models`
 
-Lists the model ids and aliases a client may send to `POST /v1/messages`. It mirrors Anthropic's model-list shape:
+Lists catalog text models for diagnostics and compatibility. Clients do not use this list to select a model; `POST /v1/messages` ignores the request `model`. It mirrors Anthropic's model-list shape:
 
 ```json
 {
@@ -414,7 +412,7 @@ Lists the model ids and aliases a client may send to `POST /v1/messages`. It mir
 }
 ```
 
-Model ids are neuxus ids, not Anthropic ids. Each `id` is a value a client may send: a canonical id or an alias. The `id` echoed in a response is the value the client sent; when extensions are enabled, the upstream provider and model are in `neuxus.upstream`.
+Model ids are neuxus catalog identifiers, not Anthropic ids. The `model` in a message response is the configured `text-synthesis` identifier; when extensions are enabled, the actual upstream provider and model are in `neuxus.upstream`.
 
 ---
 
@@ -457,25 +455,25 @@ The `X-Request-Id` response header carries the request id on every response, inc
 
 ### Status codes
 
-| Status | `error.type`            | `X-Neuxus-Code`                               | Retry               |
-| ------ | ----------------------- | --------------------------------------------- | ------------------- |
-| `400`  | `invalid_request_error` | `invalid_request`, `missing_knowledge_base`   | no                  |
-| `401`  | `authentication_error`  | `invalid_token`                               | no                  |
-| `403`  | `permission_error`      | `insufficient_scope`                          | no                  |
-| `404`  | `not_found_error`       | `knowledge_base_not_found`, `model_not_found` | no                  |
-| `413`  | `request_too_large`     | `request_too_large`                           | no                  |
-| `429`  | `rate_limit_error`      | `rate_limited`                                | after `Retry-After` |
-| `500`  | `api_error`             | `internal_error`                              | no                  |
-| `502`  | `api_error`             | `upstream_error`                              | yes                 |
-| `502`  | `api_error`             | `non_anthropic_upstream`                      | no                  |
-| `503`  | `api_error`             | `model_not_configured`                        | no                  |
-| `504`  | `api_error`             | `upstream_timeout`                            | yes                 |
+| Status | `error.type`            | `X-Neuxus-Code`                             | Retry               |
+| ------ | ----------------------- | ------------------------------------------- | ------------------- |
+| `400`  | `invalid_request_error` | `invalid_request`, `missing_knowledge_base` | no                  |
+| `401`  | `authentication_error`  | `invalid_token`                             | no                  |
+| `403`  | `permission_error`      | `insufficient_scope`                        | no                  |
+| `404`  | `not_found_error`       | `knowledge_base_not_found`                  | no                  |
+| `413`  | `request_too_large`     | `request_too_large`                         | no                  |
+| `429`  | `rate_limit_error`      | `rate_limited`                              | after `Retry-After` |
+| `500`  | `api_error`             | `internal_error`                            | no                  |
+| `502`  | `api_error`             | `upstream_error`                            | yes                 |
+| `502`  | `api_error`             | `non_anthropic_upstream`                    | no                  |
+| `503`  | `api_error`             | `model_not_configured`                      | no                  |
+| `504`  | `api_error`             | `upstream_timeout`                          | yes                 |
 
 ---
 
 ## Compatibility notes
 
-- The request is Anthropic Messages API shape. `model` is a neuxus id or alias; the knowledge base and response-extension controls are headers.
+- The request is Anthropic Messages API shape. `model` is ignored; the knowledge base and response-extension controls are headers.
 - The response preserves Anthropic's fields and adds `neuxus`. Clients with strict response validators should send `X-Neuxus-Extensions: none`.
 - `neuxus.sources` is parent evidence supplied to the model, not verified claim-level citations.
 - Tools are forwarded untouched. neuxus never executes a tool; the client decides.

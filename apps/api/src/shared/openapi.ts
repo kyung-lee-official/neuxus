@@ -35,7 +35,8 @@ export const apiTagList: { name: string; description: string }[] = [
   },
   {
     name: API_TAGS.models,
-    description: "Model ids available to POST /v1/messages",
+    description:
+      "Catalog text models (informational; request model is ignored)",
   },
   {
     name: API_TAGS.knowledge,

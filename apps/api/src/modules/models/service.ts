@@ -15,7 +15,7 @@ export type ModelListResponse = {
 };
 
 export abstract class Models {
-  /** Text models clients may send to `POST /v1/messages`. */
+  /** Catalog text models, for diagnostics; request `model` is ignored. */
   static list(): ModelListResponse {
     const data = allModels()
       .filter((model) => model.capabilities.text === true)

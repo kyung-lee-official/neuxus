@@ -11,8 +11,8 @@ export const models = new Elysia()
     detail: {
       security: [bearerSecurity],
       tags: [API_TAGS.models],
-      summary: "List neuxus model ids",
+      summary: "List neuxus catalog text models",
       description:
-        "Lists the text-capable catalog model ids a client may send to `POST /v1/messages`, in Anthropic's model-list shape.",
+        "Lists the text-capable catalog models in Anthropic's model-list shape. Informational only: `POST /v1/messages` ignores the request `model` and uses the configured `text-synthesis` model.",
     },
   });

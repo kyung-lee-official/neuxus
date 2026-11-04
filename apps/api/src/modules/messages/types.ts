@@ -1,6 +1,6 @@
 /**
  * Anthropic Messages protocol types used at the neuxus boundary. The request is
- * passed through; neuxus only inspects and rewrites `messages`.
+ * passed through; neuxus replaces `model` and rewrites `messages`.
  *
  * @see docs/modern-knowledge-base-design/appendix-b-protocol.md
  */
@@ -13,7 +13,6 @@ export type AnthropicMessage = JsonObject & {
 };
 
 export type MessagesRequestBody = JsonObject & {
-  model: string;
   max_tokens: number;
   messages: AnthropicMessage[];
   stream?: boolean;

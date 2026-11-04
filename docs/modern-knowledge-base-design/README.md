@@ -58,4 +58,4 @@ flowchart LR
 
 A changed embedding model does not trigger a run by itself; the owning stage re-embeds on its next run.
 
-Model choice is application wiring: [`GET /v1/models`](./appendix-b-protocol.md#get-v1models) lists requestable models for synthesis, while embedding and captioning tasks are linked in [`app_model_task_config`](./appendix-a-data-model.md#model-config-tables). Provider connections live in `app_model_provider_config`; no `kb_*` settings table holds a model id.
+Model choice is application wiring: the `text-synthesis`, embedding, and captioning tasks are linked in [`app_model_task_config`](./appendix-a-data-model.md#model-config-tables). `POST /v1/messages` ignores the client `model` and uses the `text-synthesis` link; [`GET /v1/models`](./appendix-b-protocol.md#get-v1models) is informational. Provider connections live in `app_model_provider_config`; no `kb_*` settings table holds a model id.

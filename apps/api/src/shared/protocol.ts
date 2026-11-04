@@ -19,7 +19,6 @@ export type NeuxusErrorCode =
   | "invalid_token"
   | "insufficient_scope"
   | "knowledge_base_not_found"
-  | "model_not_found"
   | "request_too_large"
   | "rate_limited"
   | "internal_error"

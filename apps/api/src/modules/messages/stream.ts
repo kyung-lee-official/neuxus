@@ -1,6 +1,6 @@
 /**
  * Proxy Anthropic SSE events unchanged except `message_start.message`, which
- * gets the echoed request model and, when enabled, the `neuxus` extension.
+ * gets the neuxus-selected model and, when enabled, the `neuxus` extension.
  */
 
 import type { JsonObject, NeuxusExtension } from "./types.ts";
@@ -15,7 +15,7 @@ function rewriteEvent(
   event: string,
   extension: NeuxusExtension,
   includeExtension: boolean,
-  requestedModel: string,
+  responseModel: string,
   state: StreamState,
 ): string {
   const lines = event.split(/\r?\n/);
@@ -42,7 +42,7 @@ function rewriteEvent(
 
   const message: JsonObject = {
     ...parsed.message,
-    model: requestedModel,
+    model: responseModel,
     ...(includeExtension ? { neuxus: extension } : {}),
   };
   const kept = lines.filter((line) => !line.startsWith("data:"));
@@ -55,7 +55,7 @@ export function neuxusSseStream(
   source: ReadableStream<Uint8Array>,
   extension: NeuxusExtension,
   includeExtension: boolean,
-  requestedModel: string,
+  responseModel: string,
 ): ReadableStream<Uint8Array> {
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
@@ -73,7 +73,7 @@ export function neuxusSseStream(
           buffer = buffer.slice(match.index + match[0].length);
           controller.enqueue(
             encoder.encode(
-              `${rewriteEvent(event, extension, includeExtension, requestedModel, state)}\n\n`,
+              `${rewriteEvent(event, extension, includeExtension, responseModel, state)}\n\n`,
             ),
           );
         }
@@ -87,7 +87,7 @@ export function neuxusSseStream(
                 buffer,
                 extension,
                 includeExtension,
-                requestedModel,
+                responseModel,
                 state,
               ),
             ),

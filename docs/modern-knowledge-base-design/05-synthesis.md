@@ -4,9 +4,9 @@
 assembles a `<knowledge>` block, prepends it to that turn, forwards the enriched
 Anthropic request to the provider, and returns the response plus `neuxus`.
 
-**Reads** — the client request (`model`, `messages`, `system`, `tools`,
-`tool_choice`, generation fields), `X-Neuxus-Knowledge-Base`, retrieval
-results, and model/provider configuration.
+**Reads** — the client request (`messages`, `system`, `tools`, `tool_choice`,
+generation fields), `X-Neuxus-Knowledge-Base`, retrieval results, and the
+configured `text-synthesis` model/provider.
 
 **Owns** — nothing persistent. No sessions, messages, memory, or users.
 
@@ -111,8 +111,8 @@ it. The chat adapter (`apps/api-chat`) is one such client.
 
 - A service token (`x-api-key` or the Bearer fallback), `anthropic-version`,
   and `X-Neuxus-Knowledge-Base` are required.
-- `messages` must be a non-empty array; `model` must resolve; the knowledge base
-  must exist.
+- `messages` must be a non-empty array; the knowledge base must exist. The
+  client `model` is ignored and may be omitted.
 - Failures return the [Appendix B](./appendix-b-protocol.md) status codes (for
   example `400`, `401`, `404`, `503`) and never reach retrieval or the model.
 - neuxus validates shape and scope, not the semantic content of the client's
@@ -213,9 +213,10 @@ evidence block; it does not synthesize a replacement prompt.
 ## Provider
 
 Forward the enriched request to the provider's Anthropic-compatible
-`/v1/messages` endpoint. The client-selected `model` (or alias) resolves to a
-catalog model; the real provider/model is reported in `neuxus.upstream`. A
-provider that cannot accept Anthropic Messages returns `502`.
+`/v1/messages` endpoint. neuxus uses the catalog model linked to the
+`text-synthesis` task and ignores the client `model`; the real provider/model is
+reported in `neuxus.upstream`. A provider that cannot accept Anthropic Messages
+returns `502`.
 
 ## Window and budget
 
@@ -330,20 +331,20 @@ The retrieval and formatting algorithms are reused. The orchestration, provider
 call, and response mapping change. Names below refer to the pre-split
 implementation.
 
-| Existing synthesis piece                                              | New home                      | Change                                                                 |
-| --------------------------------------------------------------------- | ----------------------------- | ---------------------------------------------------------------------- |
-| Retrieval (`Retriever.parentsByQuestion`, retrieval settings)         | neuxus `/v1/messages`         | reuse the algorithm                                                    |
-| KB formatting (`formatKnowledgeContext`, image folding)               | neuxus `<knowledge>` block    | reuse; wrap as one `text` block                                        |
-| Memory/history formatting (`formatPersonalMemories`, `formatHistory`) | chat `system`/`messages`      | move to chat; neuxus does not inject                                   |
-| `buildSynthesisPrompt`                                                | chat request assembly         | split: KB becomes the block; memory/history become `system`/`messages` |
-| `answerFromContext` / provider `textChat`                             | provider message forwarding   | new messages/tools path; provider connections reused                   |
-| `Query.ask`                                                           | chat client of `/v1/messages` | replaces in-process retrieval/synthesis; persists messages             |
-| request parsing/auth                                                  | neuxus request validation     | required headers, resolvable model/KB, non-empty `messages`            |
-| provider response                                                     | neuxus response validation    | validate the Anthropic envelope before attaching `neuxus`              |
-| `{ userId, sessionId, mode, answer }`                                 | Anthropic response + `neuxus` | chat extracts `content` for its own response                           |
-| sessions, messages, memory, users                                     | `apps/api-chat`               | already moved; neuxus stays stateless                                  |
-| fixed "You are answering..." system prompt                            | chat `system`                 | neuxus adds only the reference-data preamble                           |
-| hardcoded `max_tokens: 4096`                                          | request `max_tokens`          | pass through; no hardcoded core cap                                    |
+| Existing synthesis piece                                              | New home                      | Change                                                                     |
+| --------------------------------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------- |
+| Retrieval (`Retriever.parentsByQuestion`, retrieval settings)         | neuxus `/v1/messages`         | reuse the algorithm                                                        |
+| KB formatting (`formatKnowledgeContext`, image folding)               | neuxus `<knowledge>` block    | reuse; wrap as one `text` block                                            |
+| Memory/history formatting (`formatPersonalMemories`, `formatHistory`) | chat `system`/`messages`      | move to chat; neuxus does not inject                                       |
+| `buildSynthesisPrompt`                                                | chat request assembly         | split: KB becomes the block; memory/history become `system`/`messages`     |
+| `answerFromContext` / provider `textChat`                             | provider message forwarding   | new messages/tools path; provider connections reused                       |
+| `Query.ask`                                                           | chat client of `/v1/messages` | replaces in-process retrieval/synthesis; persists messages                 |
+| request parsing/auth                                                  | neuxus request validation     | required headers, configured text-synthesis model/KB, non-empty `messages` |
+| provider response                                                     | neuxus response validation    | validate the Anthropic envelope before attaching `neuxus`                  |
+| `{ userId, sessionId, mode, answer }`                                 | Anthropic response + `neuxus` | chat extracts `content` for its own response                               |
+| sessions, messages, memory, users                                     | `apps/api-chat`               | already moved; neuxus stays stateless                                      |
+| fixed "You are answering..." system prompt                            | chat `system`                 | neuxus adds only the reference-data preamble                               |
+| hardcoded `max_tokens: 4096`                                          | request `max_tokens`          | pass through; no hardcoded core cap                                        |
 
 The one non-trivial interface change is the provider path: `textChat(modelId,
 prompt)` flattens the request to a prompt and cannot preserve Anthropic

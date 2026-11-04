@@ -6,7 +6,6 @@ import { type AppUser } from "../users/service.ts";
 import { chatMessages, chatSystem } from "./context.ts";
 import type { QueryModel } from "./model.ts";
 
-const CHAT_MODEL = "deepseek::deepseek-flash";
 const CHAT_MAX_TOKENS = 4096;
 
 export type PreparedAsk = {
@@ -45,7 +44,6 @@ export async function prepareAsk(
     message,
     knowledgeBaseId,
     requestBody: {
-      model: CHAT_MODEL,
       max_tokens: CHAT_MAX_TOKENS,
       system: chatSystem(memories),
       messages: chatMessages(recent, message),

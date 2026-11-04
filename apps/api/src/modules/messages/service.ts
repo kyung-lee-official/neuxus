@@ -8,17 +8,15 @@
 import { ProtocolError } from "../../shared/protocol.ts";
 import { KnowledgeBases } from "../knowledge/knowledge-bases/index.ts";
 import { Retriever, RetrieverSettings } from "../knowledge/retriever/index.ts";
-import type { AnyProvider } from "../model-providers/core/catalog.ts";
 import {
-  getModelByIdentifier,
-  PROVIDERS,
-} from "../model-providers/core/catalog.ts";
+  resolveTaskModelLink,
+  TASK_TEXT_SYNTHESIS,
+} from "../server-setting/task-model-map/service.ts";
 import { formatKnowledgeBlock } from "./format.ts";
 import { neuxusSseStream } from "./stream.ts";
 import type {
   JsonObject,
   MessagesHeaders,
-  MessagesRequestBody,
   NeuxusExtension,
   NeuxusSignals,
 } from "./types.ts";
@@ -30,49 +28,31 @@ import {
 } from "./validate.ts";
 import { anthropicMessageResponse } from "./validate-response.ts";
 
-function providerByModel(identifier: string): AnyProvider | null {
-  return (
-    PROVIDERS.find((provider) =>
-      provider.models.some((model) => model.identifier === identifier),
-    ) ?? null
-  );
-}
-
 function zeroSignals(): NeuxusSignals {
   return { hits: 0, usedParents: 0, topScore: null, margin: null };
 }
 
-async function resolveTarget(body: MessagesRequestBody): Promise<{
-  provider: AnyProvider;
-  model: NonNullable<ReturnType<typeof getModelByIdentifier>>;
-}> {
-  const model = getModelByIdentifier(body.model);
-  if (model?.capabilities.text !== true) {
-    throw new ProtocolError(
-      404,
-      "not_found_error",
-      "model_not_found",
-      `No text model with id '${body.model}'.`,
-    );
-  }
-  const provider = providerByModel(model.identifier);
-  if (!provider) {
-    throw new ProtocolError(
-      404,
-      "not_found_error",
-      "model_not_found",
-      `No text model with id '${body.model}'.`,
-    );
-  }
-  if (!(await provider.loadConnection())) {
+async function resolveTarget(): Promise<
+  NonNullable<Awaited<ReturnType<typeof resolveTaskModelLink>>>
+> {
+  const link = await resolveTaskModelLink(TASK_TEXT_SYNTHESIS);
+  if (!link) {
     throw new ProtocolError(
       503,
       "api_error",
       "model_not_configured",
-      `Model '${body.model}' has no provider connection.`,
+      `No model is configured for '${TASK_TEXT_SYNTHESIS}'.`,
     );
   }
-  return { provider, model };
+  if (!(await link.provider.loadConnection())) {
+    throw new ProtocolError(
+      503,
+      "api_error",
+      "model_not_configured",
+      `Model '${link.model.identifier}' has no provider connection.`,
+    );
+  }
+  return link;
 }
 
 export abstract class Messages {
@@ -95,7 +75,7 @@ export abstract class Messages {
         `No knowledge base with id '${requestHeaders.knowledgeBaseId}'.`,
       );
     }
-    const { provider, model } = await resolveTarget(body);
+    const { provider, model } = await resolveTarget();
 
     const human = humanTurnFrom(body.messages);
     let reason: NeuxusExtension["enrichment"]["reason"];
@@ -174,7 +154,11 @@ export abstract class Messages {
       signals,
     };
     const includeExtension = requestHeaders.extensions !== "none";
-    const forwardBody = { ...body, messages: enrichedMessages };
+    const forwardBody = {
+      ...body,
+      model: model.modelId,
+      messages: enrichedMessages,
+    };
 
     if (body.stream === true) {
       let upstream: Response;
@@ -219,7 +203,7 @@ export abstract class Messages {
           upstream.body as ReadableStream<Uint8Array>,
           extension,
           includeExtension,
-          body.model,
+          model.identifier,
         ),
         { status: upstream.status, headers },
       );
@@ -240,7 +224,7 @@ export abstract class Messages {
         "Upstream model request failed.",
       );
     }
-    const response = anthropicMessageResponse(raw, body.model);
+    const response = anthropicMessageResponse(raw, model.identifier);
 
     return includeExtension ? { ...response, neuxus: extension } : response;
   }

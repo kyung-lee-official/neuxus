@@ -23,10 +23,10 @@ function malformed(): never {
   );
 }
 
-/** Validate the Anthropic envelope, then echo the client's requested model. */
+/** Validate the Anthropic envelope, then set the neuxus-selected model. */
 export function anthropicMessageResponse(
   value: unknown,
-  requestedModel: string,
+  responseModel: string,
 ): MessageResponse {
   if (!isObject(value)) malformed();
   if (value.type !== "message" || value.role !== "assistant") malformed();
@@ -46,5 +46,5 @@ export function anthropicMessageResponse(
   }
   if (!isObject(value.usage)) malformed();
 
-  return { ...value, model: requestedModel };
+  return { ...value, model: responseModel };
 }

@@ -20,7 +20,7 @@ export const messages = new Elysia().use(serviceAuth).post(
       tags: [API_TAGS.messages],
       summary: "Enriched Anthropic message",
       description:
-        "Accepts the Anthropic Messages API, injects one `<knowledge>` block into the last human turn, forwards the request, and returns the provider response plus the `neuxus` extension. Requires `x-api-key` (or Bearer), `anthropic-version`, and `X-Neuxus-Knowledge-Base`.",
+        "Accepts the Anthropic Messages API, ignores the request `model`, uses the configured `text-synthesis` model, injects one `<knowledge>` block into the last human turn, forwards the request, and returns the provider response plus the `neuxus` extension. Requires `x-api-key` (or Bearer), `anthropic-version`, and `X-Neuxus-Knowledge-Base`.",
     },
   },
 );
