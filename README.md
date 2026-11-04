@@ -66,7 +66,7 @@ bun run dev
 
 - neuxus API: http://localhost:3001
 - Chat API: http://localhost:3002
-- Web: http://localhost:3000
+- Web: `http://localhost:<PORT>` from `apps/web/.env.local` (default `3000`)
 - OpenAPI (neuxus): http://localhost:3001/openapi
 - OpenAPI (chat): http://localhost:3002/openapi
 - OpenAPI spec (neuxus): http://localhost:3001/openapi/json

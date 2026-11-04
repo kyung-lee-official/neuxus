@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3000",
+    "dev": "bun --env-file=.env.local ./node_modules/next/dist/bin/next dev",
     "build": "next build",
-    "start": "next start --port 3000",
+    "start": "bun --env-file=.env.local ./node_modules/next/dist/bin/next start",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
