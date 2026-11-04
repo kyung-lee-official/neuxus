@@ -40,7 +40,7 @@ CREATE DATABASE neuxus;
 
 ```powershell
 Copy-Item apps/api/.env.example apps/api/.env
-Copy-Item apps/web/.env.example apps/web/.env.local
+Copy-Item apps/web/.env.local.example apps/web/.env.local
 # edit DATABASE_URL if your local Postgres differs
 ```
 
