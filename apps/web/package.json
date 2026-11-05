@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "bun --env-file=.env.local ./node_modules/next/dist/bin/next dev",
+    "dev": "bun scripts/next.ts dev",
     "build": "next build",
-    "start": "bun --env-file=.env.local ./node_modules/next/dist/bin/next start",
+    "start": "bun scripts/next.ts start",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {

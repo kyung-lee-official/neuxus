@@ -8,7 +8,7 @@ neuxus/
 ├── apps/
 │   ├── api/                 # stateless neuxus API (@neuxus/api) :3001
 │   ├── api-chat/            # stateful chat adapter (@neuxus/api-chat) :3002
-│   └── web/                 # Next.js UI (@neuxus/web) :3000
+│   └── web/                 # Next.js UI (@neuxus/web), PORT from .env.local
 ├── packages/
 │   └── typescript-config/
 └── docs/
