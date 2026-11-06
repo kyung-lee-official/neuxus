@@ -1,6 +1,6 @@
 # Retrieval (query to ranked parents + image descriptions)
 
-**Does** — embed the retrieval query once, then similarity-search `kb_children.embedding` and `kb_image_descriptions.embedding` in the selected knowledge base, expand child hits to parents, and return two capped lists (parents + image-description hits).
+**Does** — embed the retrieval query once, then similarity-search `kb_children.embedding` and `kb_image_descriptions.embedding` for every valid requested knowledge base, expand child hits to parents, merge the successful bases, and return two globally capped lists (parents + image-description hits).
 
 **Reads** — `kb_children`, `kb_parents`, `kb_pages.title`, `kb_image_descriptions`, `kb_knowledge_bases`; the global cap knobs ([`kb_retrieve_settings`](./appendix-a-data-model.md#retrieval-knobs-table)).
 
@@ -12,33 +12,44 @@
 
 ## Flow
 
-1. Embed the retrieval query once (same model as children)
-2. Similarity-search children in the selected knowledge base
-3. Resolve parents (+ page title)
-4. Dedupe by `parentId`; keep best child score per parent
-5. Cap the set by max parents / max characters
-6. Similarity-search [image descriptions](#image-description-search) in the same knowledge base, independent of step 2
+1. Normalize and deduplicate the requested `knowledgeBaseIds`.
+2. Resolve the current embedding model and embed the retrieval query once.
+3. Similarity-search children in each valid knowledge base.
+4. Resolve parents (+ page title) per knowledge base.
+5. Deduplicate parents by `(knowledgeBaseId, parentId)`; keep the best child score per parent.
+6. Merge all successful parents and apply the global max-parents / max-characters cap.
+7. Similarity-search [image descriptions](#image-description-search) in each knowledge base, independent of step 3.
+8. Merge image hits by `(knowledgeBaseId, pageId, imagePath)`, then apply the global image cap.
 
-Cap knobs (`child_limit`, `max_parents`, `max_characters`) are **global** ([`kb_retrieve_settings`](./appendix-a-data-model.md#retrieval-knobs-table), one row `id = "default"`) — they apply to the selected knowledge base's result. App defaults when null.
+Cap knobs (`child_limit`, `max_parents`, `max_characters`) are **global** ([`kb_retrieve_settings`](./appendix-a-data-model.md#retrieval-knobs-table), one row `id = "default"`). They apply to the merged result. App defaults when null.
+
+Multi-KB retrieval is a supplement, not a coverage guarantee: one knowledge base may contribute every parent, and another may contribute none. There are no per-KB quotas.
 
 ## Knowledge base selection
 
-A request names one knowledge base: `X-Neuxus-Knowledge-Base` on `/v1/messages`, or `knowledgeBaseId` on `/retrieve` ([Appendix B](./appendix-b-protocol.md)). The service queries exactly it. Clients discover valid ids from the [`kb_knowledge_bases`](./appendix-a-data-model.md) registry.
+A request names one or more knowledge bases with the required `knowledgeBaseIds` body array on both `/v1/messages` and `/retrieve` ([Appendix B](./appendix-b-protocol.md)). A single-KB request is a one-element array.
 
-Page and parent ids are scoped to the knowledge base. Multi-KB retrieval is not part of this contract; it would be an additive change.
+Clients discover valid ids from the [`kb_knowledge_bases`](./appendix-a-data-model.md) registry.
+
+The retriever validates each requested ID:
+
+- A missing KB is skipped and reported as a warning when at least one other KB succeeds.
+- A valid KB that returns no hits is not a failure.
+- If every requested KB fails, the request returns an error instead of an empty successful result.
 
 ## Query embed
 
-Embed the retrieval query with the current **embedding** model — the same model the children were embedded with — so the query and children share one vector space.
+Embed the retrieval query with the current **embedding** model — the same model the children were embedded with — so the query and all requested knowledge bases share one vector space.
 
 ## Similarity SQL (cosine)
 
 `<=>` = cosine distance (lower is closer). Display score: `1 - distance`.
 
-`$current_model` is the current embedding model `identifier` (`{providerId}::{modelId}`).
+`$current_model` is the current embedding model `identifier` (`{providerId}::{modelId}`). The search runs once per knowledge base so a single KB failure can be isolated.
 
 ```sql
 SELECT
+  c.knowledge_base_id,
   c.id AS child_id,
   c.parent_id,
   c.page_id,
@@ -64,6 +75,8 @@ WHERE p.knowledge_base_id = $kb
   AND p.id = ANY($1::text[]);
 ```
 
+Parent identity is `(knowledgeBaseId, parentId)`; never key a merged map by bare `parentId`.
+
 ## Image-description search
 
 The same embedded retrieval query drives a **second vector search**, over `kb_image_descriptions.embedding`, independent of the child search. The description vectors are produced by [03.2-image-descriptions.md](./03.2-image-descriptions.md):
@@ -88,7 +101,7 @@ ORDER BY d.embedding <=> $1::vector
 LIMIT 3;
 ```
 
-Its top **3** hits (a hardcoded cap, not a knob) are the image-description list; the row shape is defined under [Result](#result).
+Each KB returns up to 3 image hits. Merge all successful hits, sort by score, and keep the global top 3 (a hardcoded cap, not a knob).
 
 ## Result
 
@@ -99,9 +112,13 @@ Retrieval returns two independent lists:
 | Parents                | `{ knowledgeBaseId, parentId, pageId, title, text, score }`         |
 | Image-description hits | `{ knowledgeBaseId, pageId, title, imagePath, description, score }` |
 
-Both lists are ordered by score, best first.
+Both lists are ordered by score, best first. Ties are broken deterministically by the composite key.
 
 `05-synthesis.md` folds both into the `<knowledge>` block ([05-synthesis.md](./05-synthesis.md#image-handling)).
+
+## Partial failure
+
+When at least one KB succeeds, retrieval returns the merged results from successful KBs and reports missing/failed KBs as warnings. When every requested KB fails, retrieval throws instead of returning a successful empty result.
 
 ## Stale vectors
 
