@@ -184,13 +184,13 @@ export abstract class Retriever {
 
       const [childRows, imageRows] = await Promise.all([
         scanChildVectors({
-          knowledgeBaseId: options.knowledgeBaseId,
+          knowledgeBaseIds: [options.knowledgeBaseId],
           currentModel,
           embeddingLiteral,
           limit: knobs.childLimit,
         }),
         scanImageDescriptionVectors({
-          knowledgeBaseId: options.knowledgeBaseId,
+          knowledgeBaseIds: [options.knowledgeBaseId],
           currentModel,
           embeddingLiteral,
           policies: [...DESCRIBED_IMAGE_POLICIES],
@@ -257,8 +257,10 @@ export abstract class Retriever {
 
       const scores = scoreByParentFromHits(hits);
       const parentRows = await findParentsByIds(
-        options.knowledgeBaseId,
-        parentIds,
+        parentIds.map((parentId) => ({
+          knowledgeBaseId: options.knowledgeBaseId,
+          parentId,
+        })),
       );
 
       const byId = new Map(
