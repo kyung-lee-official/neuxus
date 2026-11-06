@@ -69,7 +69,7 @@ export function ChatPanel() {
   const setActiveUserId = useActiveUserStore((s) => s.setActiveUserId);
   const setActiveSessionId = useActiveUserStore((s) => s.setActiveSessionId);
   const [storeReady, setStoreReady] = useState(false);
-  const [knowledgeBaseId, setKnowledgeBaseId] = useState<string | null>(null);
+  const [knowledgeBaseIds, setKnowledgeBaseIds] = useState<string[]>([]);
   const [draft, setDraft] = useState("");
   const [streamedAnswer, setStreamedAnswer] = useState("");
   const [streamTools, setStreamTools] = useState<StreamTool[]>([]);
@@ -137,18 +137,15 @@ export function ChatPanel() {
   const knowledgeBases = knowledgeBasesQuery.data ?? [];
 
   useEffect(() => {
-    if (knowledgeBases.length === 0) {
-      setKnowledgeBaseId(null);
-      return;
-    }
-    if (
-      knowledgeBaseId &&
-      knowledgeBases.some((base) => base.id === knowledgeBaseId)
-    ) {
-      return;
-    }
-    setKnowledgeBaseId(knowledgeBases[0]?.id ?? null);
-  }, [knowledgeBases, knowledgeBaseId]);
+    const data = knowledgeBasesQuery.data;
+    if (!data) return;
+    setKnowledgeBaseIds((current) => {
+      const valid = current.filter((id) => data.some((base) => base.id === id));
+      if (valid.length > 0) return valid;
+      if (current.length === 0 && data[0]) return [data[0].id];
+      return [];
+    });
+  }, [knowledgeBasesQuery.data]);
 
   const messagesQuery = useQuery({
     queryKey: activeSessionId
@@ -167,7 +164,8 @@ export function ChatPanel() {
   const sendMutation = useMutation({
     mutationFn: async (message: string) => {
       if (!active) throw new Error("Not signed in.");
-      if (!knowledgeBaseId) throw new Error("Choose a knowledge base.");
+      if (knowledgeBaseIds.length === 0)
+        throw new Error("Choose a knowledge base.");
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -180,7 +178,7 @@ export function ChatPanel() {
       return streamDurableQuery({
         apiKey: active.apiKey,
         message,
-        knowledgeBaseId,
+        knowledgeBaseIds,
         sessionId: activeSessionId,
         idempotencyKey: crypto.randomUUID(),
         signal: controller.signal,
@@ -354,7 +352,8 @@ export function ChatPanel() {
   const healthError = healthQuery.isError
     ? errorMessage(healthQuery.error)
     : null;
-  const canSend = Boolean(knowledgeBaseId) && draft.trim() !== "" && !sending;
+  const canSend =
+    knowledgeBaseIds.length > 0 && draft.trim() !== "" && !sending;
 
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -382,25 +381,47 @@ export function ChatPanel() {
                 Ask the knowledge base
               </h1>
             </div>
-            <label className="flex min-w-56 flex-col gap-1 text-sm">
-              <span className="text-muted text-xs">Knowledge base</span>
-              <select
-                className="rounded border border-line bg-canvas px-2.5 py-2 text-ink disabled:opacity-60"
-                value={knowledgeBaseId ?? ""}
-                disabled={knowledgeBasesQuery.isLoading || sending}
-                onChange={(event) => setKnowledgeBaseId(event.target.value)}
-              >
-                {knowledgeBases.length === 0 ? (
-                  <option value="">No knowledge bases</option>
-                ) : (
-                  knowledgeBases.map((base) => (
-                    <option key={base.id} value={base.id}>
-                      {base.name}
-                    </option>
-                  ))
-                )}
-              </select>
-            </label>
+            <div className="flex min-w-64 flex-col gap-1 text-sm">
+              <span className="text-muted text-xs">
+                Knowledge bases ({knowledgeBaseIds.length})
+              </span>
+              <details className="relative">
+                <summary className="cursor-pointer list-none rounded border border-line bg-canvas px-2.5 py-2 text-ink disabled:opacity-60">
+                  {knowledgeBases.length === 0
+                    ? "No knowledge bases"
+                    : knowledgeBases
+                        .filter((base) => knowledgeBaseIds.includes(base.id))
+                        .map((base) => base.name)
+                        .join(", ") || "Select knowledge bases"}
+                </summary>
+                <div className="absolute right-0 z-30 mt-1 max-h-64 w-72 overflow-y-auto rounded border border-line bg-surface p-2 shadow-lg">
+                  {knowledgeBases.length === 0 ? (
+                    <p className="m-0 text-muted text-sm">No knowledge bases</p>
+                  ) : (
+                    knowledgeBases.map((base) => (
+                      <label
+                        key={base.id}
+                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-canvas"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={knowledgeBaseIds.includes(base.id)}
+                          disabled={knowledgeBasesQuery.isLoading || sending}
+                          onChange={(event) => {
+                            setKnowledgeBaseIds((current) =>
+                              event.target.checked
+                                ? [...current, base.id]
+                                : current.filter((id) => id !== base.id),
+                            );
+                          }}
+                        />
+                        <span>{base.name}</span>
+                      </label>
+                    ))
+                  )}
+                </div>
+              </details>
+            </div>
           </div>
           {knowledgeBasesQuery.isError ? (
             <p className="mx-auto mt-2 mb-0 w-full max-w-3xl text-danger text-sm">
@@ -421,7 +442,7 @@ export function ChatPanel() {
               <div className="rounded-md border border-line bg-surface p-5">
                 <p className="m-0 text-muted text-sm">
                   No messages yet. Ask a question and the answer will use the
-                  selected knowledge base.
+                  selected knowledge bases.
                 </p>
               </div>
             ) : (
@@ -517,7 +538,7 @@ export function ChatPanel() {
                 className="min-h-20 flex-1 resize-y rounded border border-line bg-canvas px-3 py-2 text-ink text-sm disabled:opacity-60"
                 placeholder="Ask a question…"
                 value={draft}
-                disabled={sending || !knowledgeBaseId}
+                disabled={sending || knowledgeBaseIds.length === 0}
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey) {

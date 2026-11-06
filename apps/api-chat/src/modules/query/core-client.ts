@@ -148,7 +148,7 @@ export async function listCoreKnowledgeBases(): Promise<CoreKnowledgeBase[]> {
 
 /** Send one enriched Anthropic Messages request and extract the text answer. */
 export async function askNeuxus(input: {
-  knowledgeBaseId: string;
+  knowledgeBaseIds: string[];
   body: Record<string, unknown>;
   signal?: AbortSignal;
 }): Promise<NeuxusAnswer> {
@@ -168,9 +168,11 @@ export async function askNeuxus(input: {
         "x-api-key": token,
         "content-type": "application/json",
         "anthropic-version": "2023-06-01",
-        "X-Neuxus-Knowledge-Base": input.knowledgeBaseId,
       },
-      body: JSON.stringify(input.body),
+      body: JSON.stringify({
+        ...input.body,
+        knowledgeBaseIds: input.knowledgeBaseIds,
+      }),
       signal: input.signal ?? AbortSignal.timeout(120_000),
     });
   } catch (error) {
@@ -219,7 +221,7 @@ function sseData(block: string): string | null {
  * arrive. Returns the complete answer after the stream closes.
  */
 export async function streamNeuxus(input: {
-  knowledgeBaseId: string;
+  knowledgeBaseIds: string[];
   body: Record<string, unknown>;
   signal?: AbortSignal;
   onText: (text: string) => void;
@@ -240,9 +242,12 @@ export async function streamNeuxus(input: {
         "x-api-key": token,
         "content-type": "application/json",
         "anthropic-version": "2023-06-01",
-        "X-Neuxus-Knowledge-Base": input.knowledgeBaseId,
       },
-      body: JSON.stringify({ ...input.body, stream: true }),
+      body: JSON.stringify({
+        ...input.body,
+        knowledgeBaseIds: input.knowledgeBaseIds,
+        stream: true,
+      }),
       signal: input.signal,
     });
   } catch (error) {

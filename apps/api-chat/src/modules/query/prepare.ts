@@ -11,7 +11,7 @@ const CHAT_MAX_TOKENS = 4096;
 export type PreparedAsk = {
   sessionId: string;
   message: string;
-  knowledgeBaseId: string;
+  knowledgeBaseIds: string[];
   requestBody: Record<string, unknown>;
 };
 
@@ -22,9 +22,13 @@ export async function prepareAsk(
 ): Promise<PreparedAsk> {
   const message = body.message.trim();
   if (!message) throw status(400, { error: "message is required" });
-  const knowledgeBaseId = body.knowledgeBaseId.trim();
-  if (!knowledgeBaseId) {
-    throw status(400, { error: "knowledgeBaseId is required" });
+  const knowledgeBaseIds = [
+    ...new Set(
+      body.knowledgeBaseIds.map((id) => id.trim()).filter((id) => id !== ""),
+    ),
+  ];
+  if (knowledgeBaseIds.length === 0) {
+    throw status(400, { error: "knowledgeBaseIds is required" });
   }
 
   const requested = body.sessionId?.trim();
@@ -42,8 +46,9 @@ export async function prepareAsk(
   return {
     sessionId,
     message,
-    knowledgeBaseId,
+    knowledgeBaseIds,
     requestBody: {
+      knowledgeBaseIds,
       max_tokens: CHAT_MAX_TOKENS,
       system: chatSystem(memories),
       messages: chatMessages(recent, message),

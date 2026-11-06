@@ -77,7 +77,7 @@ async function executeRun(run: AgentRun): Promise<void> {
 
   try {
     const result = await runAgent({
-      knowledgeBaseId: run.knowledgeBaseId,
+      knowledgeBaseIds: run.knowledgeBaseIds,
       requestBody: { ...request, messages },
       userId: run.userId,
       sessionId: run.sessionId,

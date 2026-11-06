@@ -33,7 +33,7 @@ export type AgentRunView = {
   id: string;
   userId: string;
   sessionId: string;
-  knowledgeBaseId: string;
+  knowledgeBaseIds: string[];
   status: string;
   answer: string | null;
   error: string | null;
@@ -67,7 +67,7 @@ function toView(
     id: run.id,
     userId: run.userId,
     sessionId: run.sessionId,
-    knowledgeBaseId: run.knowledgeBaseId,
+    knowledgeBaseIds: run.knowledgeBaseIds,
     status: run.status,
     answer: run.answer,
     error: run.error,
@@ -153,7 +153,7 @@ export abstract class AgentRuns {
     const run = await createAgentRun({
       userId: user.id,
       sessionId: prepared.sessionId,
-      knowledgeBaseId: prepared.knowledgeBaseId,
+      knowledgeBaseIds: prepared.knowledgeBaseIds,
       idempotencyKey,
       message: prepared.message,
       request: prepared.requestBody,

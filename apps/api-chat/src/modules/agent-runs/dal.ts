@@ -29,7 +29,7 @@ export class RunStateConflictError extends Error {
 export async function createAgentRun(input: {
   userId: string;
   sessionId: string;
-  knowledgeBaseId: string;
+  knowledgeBaseIds: string[];
   idempotencyKey?: string | null;
   message: string;
   request: Record<string, unknown>;
@@ -50,7 +50,7 @@ export async function createAgentRun(input: {
       data: {
         userId: input.userId,
         sessionId: input.sessionId,
-        knowledgeBaseId: input.knowledgeBaseId,
+        knowledgeBaseIds: input.knowledgeBaseIds,
         idempotencyKey,
         message: input.message,
         request: input.request as Prisma.InputJsonValue,

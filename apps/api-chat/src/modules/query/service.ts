@@ -17,7 +17,7 @@ export abstract class Query {
     try {
       const prepared = await prepareAsk(user, body);
       const result = await runAgent({
-        knowledgeBaseId: prepared.knowledgeBaseId,
+        knowledgeBaseIds: prepared.knowledgeBaseIds,
         requestBody: prepared.requestBody,
         userId: user.id,
         sessionId: prepared.sessionId,
@@ -101,7 +101,7 @@ export abstract class Query {
         let answer = "";
         try {
           const result = await runAgent({
-            knowledgeBaseId: prepared.knowledgeBaseId,
+            knowledgeBaseIds: prepared.knowledgeBaseIds,
             requestBody: prepared.requestBody,
             userId: user.id,
             sessionId: prepared.sessionId,

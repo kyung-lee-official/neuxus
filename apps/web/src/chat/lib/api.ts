@@ -301,7 +301,7 @@ export async function postQuery(input: {
   apiKey: string;
   message: string;
   mode: AskMode;
-  knowledgeBaseId: string;
+  knowledgeBaseIds: string[];
   sessionId?: string | null;
 }): Promise<QueryResult> {
   return chatFetch<QueryResult>("/query", {
@@ -310,7 +310,7 @@ export async function postQuery(input: {
     body: JSON.stringify({
       message: input.message,
       mode: input.mode,
-      knowledgeBaseId: input.knowledgeBaseId,
+      knowledgeBaseIds: input.knowledgeBaseIds,
       ...(input.sessionId ? { sessionId: input.sessionId } : {}),
     }),
   });
@@ -461,7 +461,7 @@ function responseError(raw: string, status: number): string {
 export async function streamQuery(input: {
   apiKey: string;
   message: string;
-  knowledgeBaseId: string;
+  knowledgeBaseIds: string[];
   sessionId?: string | null;
   signal?: AbortSignal;
   onEvent: (event: QueryStreamEvent) => void;
@@ -475,7 +475,7 @@ export async function streamQuery(input: {
     body: JSON.stringify({
       message: input.message,
       mode: "ask",
-      knowledgeBaseId: input.knowledgeBaseId,
+      knowledgeBaseIds: input.knowledgeBaseIds,
       ...(input.sessionId ? { sessionId: input.sessionId } : {}),
     }),
     signal: input.signal,
@@ -541,7 +541,7 @@ export type ChatRunView = {
   id: string;
   userId: string;
   sessionId: string;
-  knowledgeBaseId: string;
+  knowledgeBaseIds: string[];
   status: string;
   answer: string | null;
   error: string | null;
@@ -557,7 +557,7 @@ export type ChatRunView = {
 export async function createChatRun(input: {
   apiKey: string;
   message: string;
-  knowledgeBaseId: string;
+  knowledgeBaseIds: string[];
   sessionId?: string | null;
   idempotencyKey?: string;
 }): Promise<ChatRunView> {
@@ -567,7 +567,7 @@ export async function createChatRun(input: {
     body: JSON.stringify({
       message: input.message,
       mode: "ask",
-      knowledgeBaseId: input.knowledgeBaseId,
+      knowledgeBaseIds: input.knowledgeBaseIds,
       ...(input.sessionId ? { sessionId: input.sessionId } : {}),
       ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
     }),
@@ -643,7 +643,7 @@ export async function followChatRunEvents(input: {
 export async function streamDurableQuery(input: {
   apiKey: string;
   message: string;
-  knowledgeBaseId: string;
+  knowledgeBaseIds: string[];
   sessionId?: string | null;
   idempotencyKey?: string;
   signal?: AbortSignal;
@@ -653,7 +653,7 @@ export async function streamDurableQuery(input: {
   const run = await createChatRun({
     apiKey: input.apiKey,
     message: input.message,
-    knowledgeBaseId: input.knowledgeBaseId,
+    knowledgeBaseIds: input.knowledgeBaseIds,
     sessionId: input.sessionId,
     idempotencyKey: input.idempotencyKey,
   });

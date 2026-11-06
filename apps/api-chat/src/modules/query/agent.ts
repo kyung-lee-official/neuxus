@@ -93,7 +93,7 @@ function toolUsesFrom(content: NeuxusContentBlock[]): ToolUseBlock[] {
 
 /** Run model → tool → model until there are no more tool calls. */
 export async function runAgent(input: {
-  knowledgeBaseId: string;
+  knowledgeBaseIds: string[];
   requestBody: Record<string, unknown>;
   userId: string;
   sessionId: string;
@@ -149,13 +149,13 @@ export async function runAgent(input: {
     const response =
       input.stream && input.onText
         ? await streamNeuxus({
-            knowledgeBaseId: input.knowledgeBaseId,
+            knowledgeBaseIds: input.knowledgeBaseIds,
             body,
             signal: input.signal,
             onText: input.onText,
           })
         : await askNeuxus({
-            knowledgeBaseId: input.knowledgeBaseId,
+            knowledgeBaseIds: input.knowledgeBaseIds,
             body,
             signal: input.signal,
           });

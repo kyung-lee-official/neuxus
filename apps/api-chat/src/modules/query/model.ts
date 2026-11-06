@@ -6,7 +6,10 @@ export const QueryModel = {
       minLength: 1,
       examples: ["What is neuxus?"],
     }),
-    knowledgeBaseId: t.String({ examples: ["docs"] }),
+    knowledgeBaseIds: t.Array(t.String({ minLength: 1 }), {
+      minItems: 1,
+      examples: [["docs"]],
+    }),
     mode: t.Optional(t.Literal("ask")),
     sessionId: t.Optional(
       t.String({
