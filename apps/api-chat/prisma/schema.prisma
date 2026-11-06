@@ -130,7 +130,7 @@ model AgentRun {
   id                String    @id @default(uuid()) @db.Uuid
   userId            String    @map("user_id")
   sessionId         String    @map("session_id") @db.Uuid
-  knowledgeBaseId   String    @map("knowledge_base_id")
+  knowledgeBaseIds  String[]  @default([]) @map("knowledge_base_ids")
   idempotencyKey    String?   @map("idempotency_key")
   /// `queued` | `running` | `waiting` | `completed` | `failed` | `cancelled`
   status            String    @default("queued")
