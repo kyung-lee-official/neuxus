@@ -53,6 +53,10 @@ and the available tool definitions.
 6. Stop when the model returns without tool calls, or when the loop limit is
    reached.
 
+The chat request carries `knowledgeBaseIds`; the chat UI is multi-select, and a
+single-KB request is a one-element array. Core retrieval warnings are propagated
+to the chat UI.
+
 Tools are owned and executed by `api-chat`. neuxus only forwards their
 definitions and returns the model's `tool_use` blocks.
 
@@ -76,6 +80,7 @@ Current summary:
   and `error`; it does not expose durable `question`.
 - `/query/async` queues a durable run; its event log can be replayed from
   `/query/runs/:runId/events`.
+- Partial core retrieval warnings are forwarded to the chat UI.
 - The chat UI uses durable runs and supports pausing on `question`, answering,
   then resuming.
 - Only the final assistant text is persisted in `app_messages`; the durable run
@@ -160,8 +165,9 @@ The chat app has its own structured log system, mirroring `apps/api`:
   `createdAt`).
 - `app_log_settings` is the singleton sink configuration row (`id = "default"`).
 - `Logger.child(...)` writes through the bounded `PostgresTransport` queue.
-- The default sink is `console`; enable `postgres` via `PUT /log/settings` to
-  persist rows in `app_log`.
+- The supported sink configurations are `["postgres"]` or
+  `["console", "postgres"]`; `postgres` is mandatory and writes rows into
+  `app_log`. The default is `["console", "postgres"]`.
 - `GET /users/:id/logs` pages a user's own `app_log` rows.
 - Log settings and purge are admin-only:
   `GET/PUT /log/settings`, `POST /log/settings/reset`, `POST /log/purge`.
