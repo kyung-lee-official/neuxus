@@ -808,6 +808,7 @@ export type RetrieveImageResult = {
 };
 
 export type RetrieveChildResult = {
+  knowledgeBaseId: string;
   childId: string;
   parentId: string;
   pageId: string;
@@ -823,9 +824,17 @@ export type RetrieveSignalsResult = {
   truncated: boolean;
 };
 
+export type RetrieveWarning = {
+  code: "knowledge_base_not_found" | "retrieval_failed";
+  knowledgeBaseId: string;
+  message: string;
+};
+
 export type RetrieveResponse = {
   requestId: string;
-  knowledgeBaseId: string;
+  knowledgeBaseIds: string[];
+  searchedKnowledgeBaseIds: string[];
+  warnings?: RetrieveWarning[];
   embeddingModel: string;
   latencyMs: number;
   outcome:
@@ -845,7 +854,7 @@ export type RetrieveResponse = {
 
 export async function retrieveEvidence(input: {
   apiKey: string;
-  knowledgeBaseId: string;
+  knowledgeBaseIds: string[];
   question: string;
   includeChildren?: boolean;
 }): Promise<RetrieveResponse> {
@@ -853,7 +862,7 @@ export async function retrieveEvidence(input: {
     method: "POST",
     apiKey: input.apiKey,
     body: JSON.stringify({
-      knowledgeBaseId: input.knowledgeBaseId,
+      knowledgeBaseIds: input.knowledgeBaseIds,
       question: input.question,
       ...(input.includeChildren ? { options: { includeChildren: true } } : {}),
     }),

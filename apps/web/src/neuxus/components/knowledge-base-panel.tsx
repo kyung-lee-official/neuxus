@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -18,7 +19,6 @@ import { CorpusSettingsBlock } from "./corpus-settings-block";
 import { KnowledgeBaseSelector } from "./knowledge-base-selector";
 import { KnowledgePagesBlock } from "./knowledge-pages-block";
 import { useNeuxusToken } from "./neuxus-shell";
-import { RetrievalTesterBlock } from "./retrieval-tester-block";
 
 function errorMessage(err: unknown): string {
   if (err instanceof ApiError) return err.message;
@@ -344,6 +344,14 @@ export function KnowledgeBasePanel() {
           >
             Delete
           </button>
+          {selected ? (
+            <Link
+              href={`/neuxus/retrieval?kb=${encodeURIComponent(selected.id)}`}
+              className={`${secondaryButton} inline-block no-underline`}
+            >
+              Test retrieval
+            </Link>
+          ) : null}
         </div>
         {panel === "create" ? (
           <CreateBaseForm
@@ -416,11 +424,6 @@ export function KnowledgeBasePanel() {
               knowledgeBaseId={selected.id}
             />
           )}
-          <RetrievalTesterBlock
-            key={selected.id}
-            actorApiKey={token}
-            knowledgeBaseId={selected.id}
-          />
           <Suspense
             fallback={
               <section className="flex flex-col gap-2 rounded-md border border-line bg-surface p-6">

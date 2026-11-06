@@ -12,6 +12,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { href: "/neuxus/server-settings", label: "Server settings" },
   { href: "/neuxus/server-settings/providers", label: "Providers" },
   { href: "/neuxus/knowledge-base", label: "Knowledge base" },
+  { href: "/neuxus/retrieval", label: "Retrieval" },
   { href: `${apiBaseUrl()}/openapi`, label: "OpenAPI", external: true },
 ];
 

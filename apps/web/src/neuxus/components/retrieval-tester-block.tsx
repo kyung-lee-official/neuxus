@@ -36,7 +36,7 @@ function ParentCard({ parent }: { parent: RetrieveParentResult }) {
         </span>
       </div>
       <p className="m-0 font-mono text-muted text-xs">
-        {parent.pageId} · {parent.parentId}
+        {parent.knowledgeBaseId} · {parent.pageId} · {parent.parentId}
       </p>
       <pre className="m-0 whitespace-pre-wrap break-words font-sans text-ink text-sm leading-snug">
         {parent.text}
@@ -57,20 +57,20 @@ function ImageCard({ image }: { image: RetrieveImageResult }) {
         </span>
       </div>
       <p className="m-0 font-mono text-muted text-xs">
-        {image.pageId} · {image.imagePath}
+        {image.knowledgeBaseId} · {image.pageId} · {image.imagePath}
       </p>
       <p className="m-0 text-ink text-sm leading-snug">{image.description}</p>
     </article>
   );
 }
 
-/** Evidence-only retrieval test for one knowledge base. */
+/** Evidence-only retrieval test for one or more knowledge bases. */
 export function RetrievalTesterBlock({
   actorApiKey,
-  knowledgeBaseId,
+  knowledgeBaseIds,
 }: {
   actorApiKey: string;
-  knowledgeBaseId: string;
+  knowledgeBaseIds: string[];
 }) {
   const [question, setQuestion] = useState("");
   const [includeChildren, setIncludeChildren] = useState(false);
@@ -79,7 +79,7 @@ export function RetrievalTesterBlock({
     mutationFn: () =>
       retrieveEvidence({
         apiKey: actorApiKey,
-        knowledgeBaseId,
+        knowledgeBaseIds,
         question,
         includeChildren,
       }),
@@ -94,8 +94,8 @@ export function RetrievalTesterBlock({
       <h2 className="m-0 font-display text-ink text-lg">Test retrieval</h2>
       <p className="m-0 text-muted text-sm">
         Runs the same retrieval as Ask against{" "}
-        <span className="font-mono">{knowledgeBaseId}</span>: embed the
-        question, search child vectors, expand and cap parents, then search
+        <span className="font-mono">{knowledgeBaseIds.join(", ")}</span>: embed
+        the question, search child vectors, expand and cap parents, then search
         image descriptions. No model call.
       </p>
 
@@ -150,6 +150,20 @@ export function RetrievalTesterBlock({
 
       {result ? (
         <div className="flex flex-col gap-3 border-line border-t pt-3">
+          {result.warnings && result.warnings.length > 0 ? (
+            <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+              {result.warnings.map((warning) => (
+                <li
+                  key={`${warning.code}:${warning.knowledgeBaseId}`}
+                  className="rounded border border-danger bg-canvas px-2.5 py-1.5 text-danger text-xs"
+                >
+                  <span className="font-mono">{warning.knowledgeBaseId}</span> ·{" "}
+                  {warning.message}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
           {result.outcome.kind === "no_hits" ? (
             <p className="m-0 text-muted text-sm">
               No hits. The question embedded successfully, but neither parents
@@ -177,7 +191,10 @@ export function RetrievalTesterBlock({
                 </h3>
                 {hits && hits.parents.length > 0 ? (
                   hits.parents.map((parent) => (
-                    <ParentCard key={parent.parentId} parent={parent} />
+                    <ParentCard
+                      key={`${parent.knowledgeBaseId}:${parent.parentId}`}
+                      parent={parent}
+                    />
                   ))
                 ) : (
                   <p className="m-0 text-muted text-sm">No parent hits.</p>
@@ -191,7 +208,7 @@ export function RetrievalTesterBlock({
                 {hits && hits.images.length > 0 ? (
                   hits.images.map((image) => (
                     <ImageCard
-                      key={`${image.pageId}:${image.imagePath}`}
+                      key={`${image.knowledgeBaseId}:${image.pageId}:${image.imagePath}`}
                       image={image}
                     />
                   ))
@@ -208,12 +225,12 @@ export function RetrievalTesterBlock({
                   <ul className="m-0 mt-2 flex list-none flex-col gap-2 p-0">
                     {hits.children.map((child) => (
                       <li
-                        key={child.childId}
+                        key={`${child.knowledgeBaseId}:${child.childId}`}
                         className="border-line border-t pt-2 first:border-t-0 first:pt-0"
                       >
                         <p className="m-0 font-mono text-muted text-xs">
-                          {child.childId} · {child.pageId} · score{" "}
-                          {scoreText(child.score)}
+                          {child.knowledgeBaseId} · {child.childId} ·{" "}
+                          {child.pageId} · score {scoreText(child.score)}
                         </p>
                         <pre className="m-0 mt-1 whitespace-pre-wrap break-words font-sans text-ink text-sm leading-snug">
                           {child.text}
