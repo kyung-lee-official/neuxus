@@ -5,6 +5,8 @@
  * @see docs/modern-knowledge-base-design/appendix-b-protocol.md
  */
 
+import type { KnowledgeWarning } from "../../shared/knowledge.ts";
+
 export type JsonObject = Record<string, unknown>;
 
 export type AnthropicMessage = JsonObject & {
@@ -13,6 +15,7 @@ export type AnthropicMessage = JsonObject & {
 };
 
 export type MessagesRequestBody = JsonObject & {
+  knowledgeBaseIds: string[];
   max_tokens: number;
   messages: AnthropicMessage[];
   stream?: boolean;
@@ -35,15 +38,14 @@ export type NeuxusSignals = {
   margin: number | null;
 };
 
-export type NeuxusEnrichmentReason =
-  | "no_human_turn"
-  | "no_hits"
-  | "retrieval_error";
+export type NeuxusEnrichmentReason = "no_human_turn" | "no_hits";
 
 export type NeuxusExtension = {
   protocolVersion: "1";
   requestId: string;
-  knowledgeBaseId: string;
+  knowledgeBaseIds: string[];
+  searchedKnowledgeBaseIds: string[];
+  warnings?: KnowledgeWarning[];
   enriched: boolean;
   enrichment: {
     turnIndex: number | null;
@@ -59,7 +61,6 @@ export type NeuxusExtension = {
 export type MessageResponse = JsonObject & { neuxus?: NeuxusExtension };
 
 export type MessagesHeaders = {
-  knowledgeBaseId: string;
   extensions: "sources" | "none";
   anthropicVersion: string;
   anthropicBeta: string;

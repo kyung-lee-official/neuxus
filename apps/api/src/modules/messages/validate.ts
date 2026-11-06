@@ -28,15 +28,6 @@ function header(headers: Record<string, unknown>, name: string): string {
 export function messagesHeaders(
   headers: Record<string, unknown>,
 ): MessagesHeaders {
-  const knowledgeBaseId = header(headers, "X-Neuxus-Knowledge-Base");
-  if (knowledgeBaseId === "") {
-    throw new ProtocolError(
-      400,
-      "invalid_request_error",
-      "missing_knowledge_base",
-      "X-Neuxus-Knowledge-Base is required.",
-    );
-  }
   const anthropicVersion = header(headers, "anthropic-version");
   if (anthropicVersion === "") {
     invalid("anthropic-version is required for POST /v1/messages.");
@@ -46,7 +37,6 @@ export function messagesHeaders(
     invalid('X-Neuxus-Extensions must be "sources" or "none".');
   }
   return {
-    knowledgeBaseId,
     extensions: extensions === "none" ? "none" : "sources",
     anthropicVersion,
     anthropicBeta: header(headers, "anthropic-beta"),
@@ -72,6 +62,19 @@ function isToolResultBlock(block: unknown): boolean {
 /** Validate the Anthropic request shape that neuxus reads, not its content. */
 export function messagesBody(body: unknown): MessagesRequestBody {
   if (!isObject(body)) invalid("Request body must be a JSON object.");
+
+  const rawKnowledgeBaseIds = body.knowledgeBaseIds;
+  if (!Array.isArray(rawKnowledgeBaseIds) || rawKnowledgeBaseIds.length === 0) {
+    invalid("knowledgeBaseIds must be a non-empty array.");
+  }
+  const knowledgeBaseIds: string[] = [];
+  for (const [index, value] of rawKnowledgeBaseIds.entries()) {
+    if (typeof value !== "string" || value.trim() === "") {
+      invalid(`knowledgeBaseIds[${index}] must be a non-empty string.`);
+    }
+    knowledgeBaseIds.push(value.trim());
+  }
+  const uniqueKnowledgeBaseIds = [...new Set(knowledgeBaseIds)];
 
   const maxTokens = body.max_tokens;
   if (
@@ -118,6 +121,7 @@ export function messagesBody(body: unknown): MessagesRequestBody {
 
   return {
     ...body,
+    knowledgeBaseIds: uniqueKnowledgeBaseIds,
     max_tokens: maxTokens,
     messages: checked,
   };

@@ -18,7 +18,7 @@ export const retrieve = new Elysia()
         tags: [API_TAGS.retrieve],
         summary: "Retrieve knowledge-base evidence",
         description:
-          "Runs the same retrieval as `/v1/messages` against one knowledge base and returns ranked parents, image-description hits, signals, and optional raw child hits. No LLM call.",
+          "Runs the same multi-KB retrieval as `/v1/messages` and returns ranked parents, image-description hits, signals, partial warnings, and optional raw child hits. No LLM call.",
       },
     },
   );

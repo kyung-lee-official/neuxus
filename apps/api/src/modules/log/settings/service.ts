@@ -4,6 +4,7 @@
  * `sinks/`) stays function/singleton based.
  */
 
+import { status } from "elysia";
 import { findLogSettingsRecord, upsertLogSettings } from "./dal.ts";
 import {
   LOG_DEFAULTS,
@@ -126,6 +127,13 @@ export abstract class LogSettings {
   /** Upsert `app_log_settings` id `default`. Invalid values stored as null. */
   static async save(row: LogSettingsRow): Promise<ResolvedLogSettings> {
     const sinks = normalizeSinks(row.sinks);
+    if (
+      Array.isArray(row.sinks) &&
+      row.sinks.length > 0 &&
+      !sinks.includes("postgres")
+    ) {
+      throw status(400, { error: "postgres sink is required" });
+    }
     await upsertLogSettings({
       sinks: sinks.length > 0 ? [...sinks] : [],
       queueSize: normalizePositiveInt(row.queueSize),

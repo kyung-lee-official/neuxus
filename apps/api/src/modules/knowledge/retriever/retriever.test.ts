@@ -17,6 +17,7 @@ function hit(
   childId = `${parentId}-c`,
 ): ChildHit {
   return {
+    knowledgeBaseId: "docs",
     childId,
     parentId,
     pageId: "p",
@@ -31,6 +32,7 @@ function parent(
   score: number,
 ): RetrievedParent {
   return {
+    knowledgeBaseId: "docs",
     parentId,
     pageId: "p",
     title: "T",

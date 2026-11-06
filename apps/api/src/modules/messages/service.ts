@@ -5,9 +5,11 @@
  * @see docs/modern-knowledge-base-design/05-synthesis.md
  */
 
+import type { KnowledgeWarning } from "../../shared/knowledge.ts";
 import { ProtocolError } from "../../shared/protocol.ts";
 import { KnowledgeBases } from "../knowledge/knowledge-bases/index.ts";
 import { Retriever, RetrieverSettings } from "../knowledge/retriever/index.ts";
+import { logRetrievalWarnings } from "../knowledge/retriever/warnings.ts";
 import {
   resolveTaskModelLink,
   TASK_TEXT_SYNTHESIS,
@@ -63,18 +65,27 @@ export abstract class Messages {
   }): Promise<JsonObject | Response> {
     const requestHeaders: MessagesHeaders = messagesHeaders(input.headers);
     const body = messagesBody(input.body);
+    const requestedKnowledgeBaseIds = body.knowledgeBaseIds;
 
-    const knowledgeBase = await KnowledgeBases.get(
-      requestHeaders.knowledgeBaseId,
+    const { found, missing } = await KnowledgeBases.getMany(
+      requestedKnowledgeBaseIds,
     );
-    if (!knowledgeBase) {
+    if (found.length === 0) {
       throw new ProtocolError(
         404,
         "not_found_error",
         "knowledge_base_not_found",
-        `No knowledge base with id '${requestHeaders.knowledgeBaseId}'.`,
+        `No knowledge base found: ${missing.join(", ")}.`,
       );
     }
+
+    const warnings: KnowledgeWarning[] = missing.map((knowledgeBaseId) => ({
+      code: "knowledge_base_not_found",
+      knowledgeBaseId,
+      message: `No knowledge base with id '${knowledgeBaseId}'.`,
+    }));
+    const validKnowledgeBaseIds = found.map((kb) => kb.id);
+
     const { provider, model } = await resolveTarget();
 
     const human = humanTurnFrom(body.messages);
@@ -87,44 +98,63 @@ export abstract class Messages {
     let usedParents = 0;
     let topScore: number | null = null;
     let margin: number | null = null;
+    let searchedKnowledgeBaseIds: string[] = [];
 
     if (!human) {
       reason = "no_human_turn";
     } else {
-      try {
-        const settings = await RetrieverSettings.load();
-        const userId =
-          typeof body.metadata?.user_id === "string"
-            ? body.metadata.user_id
-            : undefined;
-        const retrieval = await Retriever.parentsByQuestion(human.text, {
-          ...settings,
-          knowledgeBaseId: requestHeaders.knowledgeBaseId,
-          userId,
-        });
-        hits = retrieval.hits;
-        truncated = retrieval.truncated;
-        const formatted = formatKnowledgeBlock(
-          requestHeaders.knowledgeBaseId,
-          retrieval.parents,
-          retrieval.images,
+      const settings = await RetrieverSettings.load();
+      const userId =
+        typeof body.metadata?.user_id === "string"
+          ? body.metadata.user_id
+          : undefined;
+      const startedAt = performance.now();
+      const retrieval = await Retriever.parentsByQuestion(human.text, {
+        ...settings,
+        knowledgeBaseIds: validKnowledgeBaseIds,
+        userId,
+      });
+      warnings.push(...retrieval.warnings);
+      searchedKnowledgeBaseIds = retrieval.searchedKnowledgeBaseIds;
+      hits = retrieval.hits;
+      truncated = retrieval.truncated;
+
+      if (searchedKnowledgeBaseIds.length === 0) {
+        throw new ProtocolError(
+          500,
+          "api_error",
+          "internal_error",
+          "All requested knowledge bases failed retrieval.",
         );
-        if (formatted) {
-          block = formatted.block;
-          sources = formatted.sources;
-          usedParents = retrieval.parents.length;
-          topScore = retrieval.parents[0]?.score ?? null;
-          const [first, second] = retrieval.parents;
-          if (first && second) {
-            margin = first.score - second.score;
-          }
-          enrichedMessages = messagesWithKnowledge(body.messages, human, block);
-        } else {
-          reason = "no_hits";
-        }
-      } catch {
-        reason = "retrieval_error";
       }
+
+      const formatted = formatKnowledgeBlock(
+        searchedKnowledgeBaseIds,
+        retrieval.parents,
+        retrieval.images,
+      );
+      if (formatted) {
+        block = formatted.block;
+        sources = formatted.sources;
+        usedParents = retrieval.parents.length;
+        topScore = retrieval.parents[0]?.score ?? null;
+        const [first, second] = retrieval.parents;
+        if (first && second) {
+          margin = first.score - second.score;
+        }
+        enrichedMessages = messagesWithKnowledge(body.messages, human, block);
+      } else {
+        reason = "no_hits";
+      }
+
+      logRetrievalWarnings({
+        userId,
+        requestedKnowledgeBaseIds,
+        warnings,
+        embeddingModel: retrieval.currentModel,
+        hits,
+        latencyMs: Math.round(performance.now() - startedAt),
+      });
     }
 
     const upstreamHeaders: Record<string, string> = {
@@ -141,7 +171,9 @@ export abstract class Messages {
     const extension: NeuxusExtension = {
       protocolVersion: "1",
       requestId: input.requestId,
-      knowledgeBaseId: requestHeaders.knowledgeBaseId,
+      knowledgeBaseIds: requestedKnowledgeBaseIds,
+      searchedKnowledgeBaseIds,
+      ...(warnings.length > 0 ? { warnings } : {}),
       enriched,
       enrichment: {
         turnIndex: human?.index ?? null,
@@ -154,8 +186,9 @@ export abstract class Messages {
       signals,
     };
     const includeExtension = requestHeaders.extensions !== "none";
+    const { knowledgeBaseIds: _knowledgeBaseIds, ...forwardBodyBase } = body;
     const forwardBody = {
-      ...body,
+      ...forwardBodyBase,
       model: model.modelId,
       messages: enrichedMessages,
     };

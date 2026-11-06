@@ -3,12 +3,14 @@
  * model call and no enrichment.
  */
 
+import type { KnowledgeWarning } from "../../shared/knowledge.ts";
 import { ProtocolError } from "../../shared/protocol.ts";
 import { KnowledgeBases } from "../knowledge/knowledge-bases/index.ts";
 import { Retriever, RetrieverSettings } from "../knowledge/retriever/index.ts";
+import { logRetrievalWarnings } from "../knowledge/retriever/warnings.ts";
 
 type RetrieveBody = {
-  knowledgeBaseId: string;
+  knowledgeBaseIds: string[];
   question: string;
   options?: { includeChildren?: boolean };
 };
@@ -32,6 +34,7 @@ type ImageView = {
 };
 
 type ChildView = {
+  knowledgeBaseId: string;
   childId: string;
   parentId: string;
   pageId: string;
@@ -49,7 +52,9 @@ type Signals = {
 
 export type RetrieveResponse = {
   requestId: string;
-  knowledgeBaseId: string;
+  knowledgeBaseIds: string[];
+  searchedKnowledgeBaseIds: string[];
+  warnings?: KnowledgeWarning[];
   embeddingModel: string;
   latencyMs: number;
   outcome:
@@ -80,12 +85,23 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
 }
 
+function knowledgeBaseIdsFromBody(value: unknown): string[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    invalid("knowledgeBaseIds must be a non-empty array.");
+  }
+  const ids: string[] = [];
+  for (const [index, item] of value.entries()) {
+    if (typeof item !== "string" || item.trim() === "") {
+      invalid(`knowledgeBaseIds[${index}] must be a non-empty string.`);
+    }
+    ids.push(item.trim());
+  }
+  return [...new Set(ids)];
+}
+
 function retrieveBody(value: unknown): RetrieveBody {
   if (!isObject(value)) invalid("Request body must be a JSON object.");
-  const knowledgeBaseId = value.knowledgeBaseId;
-  if (typeof knowledgeBaseId !== "string" || knowledgeBaseId.trim() === "") {
-    invalid("knowledgeBaseId must be a non-empty string.");
-  }
+  const knowledgeBaseIds = knowledgeBaseIdsFromBody(value.knowledgeBaseIds);
   const question = value.question;
   if (typeof question !== "string") {
     invalid("question must be a string.");
@@ -101,7 +117,7 @@ function retrieveBody(value: unknown): RetrieveBody {
     invalid("options.includeChildren must be a boolean.");
   }
   return {
-    knowledgeBaseId: knowledgeBaseId.trim(),
+    knowledgeBaseIds,
     question,
     ...(includeChildren === undefined ? {} : { options: { includeChildren } }),
   };
@@ -113,15 +129,23 @@ export abstract class Retrieve {
     requestId: string;
   }): Promise<RetrieveResponse> {
     const body = retrieveBody(input.body);
-    const knowledgeBase = await KnowledgeBases.get(body.knowledgeBaseId);
-    if (!knowledgeBase) {
+    const { found, missing } = await KnowledgeBases.getMany(
+      body.knowledgeBaseIds,
+    );
+    if (found.length === 0) {
       throw new ProtocolError(
         404,
         "not_found_error",
         "knowledge_base_not_found",
-        `No knowledge base with id '${body.knowledgeBaseId}'.`,
+        `No knowledge base found: ${missing.join(", ")}.`,
       );
     }
+
+    const warnings: KnowledgeWarning[] = missing.map((knowledgeBaseId) => ({
+      code: "knowledge_base_not_found",
+      knowledgeBaseId,
+      message: `No knowledge base with id '${knowledgeBaseId}'.`,
+    }));
 
     const start = performance.now();
     let result: Awaited<ReturnType<typeof Retriever.parentsByQuestion>>;
@@ -129,7 +153,7 @@ export abstract class Retrieve {
       const settings = await RetrieverSettings.load();
       result = await Retriever.parentsByQuestion(body.question, {
         ...settings,
-        knowledgeBaseId: body.knowledgeBaseId,
+        knowledgeBaseIds: found.map((kb) => kb.id),
       });
     } catch {
       throw new ProtocolError(
@@ -140,8 +164,27 @@ export abstract class Retrieve {
       );
     }
 
+    warnings.push(...result.warnings);
+    if (result.searchedKnowledgeBaseIds.length === 0) {
+      throw new ProtocolError(
+        500,
+        "api_error",
+        "internal_error",
+        "All requested knowledge bases failed retrieval.",
+      );
+    }
+
+    const latencyMs = Math.round(performance.now() - start);
+    logRetrievalWarnings({
+      requestedKnowledgeBaseIds: body.knowledgeBaseIds,
+      warnings,
+      embeddingModel: result.currentModel,
+      hits: result.hits,
+      latencyMs,
+    });
+
     const parents: ParentView[] = result.parents.map((parent) => ({
-      knowledgeBaseId: body.knowledgeBaseId,
+      knowledgeBaseId: parent.knowledgeBaseId,
       parentId: parent.parentId,
       pageId: parent.pageId,
       title: parent.title,
@@ -149,7 +192,7 @@ export abstract class Retrieve {
       score: parent.score,
     }));
     const images: ImageView[] = result.images.map((image) => ({
-      knowledgeBaseId: body.knowledgeBaseId,
+      knowledgeBaseId: image.knowledgeBaseId,
       pageId: image.pageId,
       title: image.title,
       imagePath: image.imagePath,
@@ -169,9 +212,11 @@ export abstract class Retrieve {
 
     const base = {
       requestId: input.requestId,
-      knowledgeBaseId: body.knowledgeBaseId,
+      knowledgeBaseIds: body.knowledgeBaseIds,
+      searchedKnowledgeBaseIds: result.searchedKnowledgeBaseIds,
+      ...(warnings.length > 0 ? { warnings } : {}),
       embeddingModel: result.currentModel,
-      latencyMs: Math.round(performance.now() - start),
+      latencyMs,
     };
 
     const hasEvidence =
@@ -195,6 +240,7 @@ export abstract class Retrieve {
 
     const children: ChildView[] | undefined = body.options?.includeChildren
       ? result.children.map((child) => ({
+          knowledgeBaseId: child.knowledgeBaseId,
           childId: child.childId,
           parentId: child.parentId,
           pageId: child.pageId,

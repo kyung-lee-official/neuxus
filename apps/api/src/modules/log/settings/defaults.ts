@@ -4,7 +4,7 @@
  */
 
 export const LOG_DEFAULTS = {
-  sinks: ["console"] as const,
+  sinks: ["console", "postgres"] as const,
   queueSize: 1000,
   drainTimeoutMs: 2000,
   pretty: false,
@@ -64,7 +64,8 @@ function resolveSinks(
     seen.add(t);
     out.push(t);
   }
-  return out.length > 0 ? out : [...LOG_DEFAULTS.sinks];
+  if (!out.includes("postgres")) return [...LOG_DEFAULTS.sinks];
+  return out.includes("console") ? ["console", "postgres"] : ["postgres"];
 }
 
 export function storedLogSettings(

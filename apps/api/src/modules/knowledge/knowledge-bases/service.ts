@@ -47,6 +47,24 @@ export abstract class KnowledgeBases {
     return row ? toView(row) : null;
   }
 
+  /** Resolve many ids, preserving request order within `found`/`missing`. */
+  static async getMany(
+    ids: string[],
+  ): Promise<{ found: KnowledgeBaseView[]; missing: string[] }> {
+    const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+    const rows = await Promise.all(unique.map((id) => KnowledgeBases.get(id)));
+    const found: KnowledgeBaseView[] = [];
+    const missing: string[] = [];
+    for (const [index, row] of rows.entries()) {
+      if (row) found.push(row);
+      else {
+        const id = unique[index];
+        if (id) missing.push(id);
+      }
+    }
+    return { found, missing };
+  }
+
   /** Create a knowledge base. 409 when the id already exists. */
   static async create(input: {
     id: string;

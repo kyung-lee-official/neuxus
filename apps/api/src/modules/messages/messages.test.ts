@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { ProtocolError } from "../../shared/protocol.ts";
 import type {
   RetrievedImage,
   RetrievedParent,
@@ -10,12 +9,12 @@ import type { NeuxusExtension } from "./types.ts";
 import {
   humanTurnFrom,
   messagesBody,
-  messagesHeaders,
   messagesWithKnowledge,
 } from "./validate.ts";
 
 function parent(overrides: Partial<RetrievedParent> = {}): RetrievedParent {
   return {
+    knowledgeBaseId: "docs",
     parentId: "guide/relay:par:0",
     pageId: "guide/relay",
     title: "North Quay Relay",
@@ -27,6 +26,7 @@ function parent(overrides: Partial<RetrievedParent> = {}): RetrievedParent {
 
 function image(overrides: Partial<RetrievedImage> = {}): RetrievedImage {
   return {
+    knowledgeBaseId: "docs",
     pageId: "guide/relay",
     title: "North Quay Relay",
     imagePath: "guide/assets/wiring.png",
@@ -38,11 +38,11 @@ function image(overrides: Partial<RetrievedImage> = {}): RetrievedImage {
 
 describe("formatKnowledgeBlock", () => {
   test("labels the parent page and folds an attached image", () => {
-    const formatted = formatKnowledgeBlock("docs", [parent()], [image()]);
+    const formatted = formatKnowledgeBlock(["docs"], [parent()], [image()]);
     if (!formatted) throw new Error("expected formatted knowledge");
-    expect(formatted.block).toContain('<knowledge base="docs">');
+    expect(formatted.block).toContain('<knowledge bases="docs">');
     expect(formatted.block).toContain(
-      'From page "guide/relay" (title "North Quay Relay"):',
+      'From knowledge base "docs", page "guide/relay" (title "North Quay Relay"):',
     );
     expect(formatted.block).toContain(
       "A relay switch between two quays, with a 12V line labeled A.",
@@ -56,19 +56,45 @@ describe("formatKnowledgeBlock", () => {
 
   test("appends an unmatched image as a standalone sentence", () => {
     const formatted = formatKnowledgeBlock(
-      "docs",
+      ["docs"],
       [parent()],
       [image({ pageId: "other", imagePath: "other.png", title: "Other Page" })],
     );
     if (!formatted) throw new Error("expected formatted knowledge");
     expect(formatted.block).toContain("![North quay](assets/wiring.png)");
     expect(formatted.block).toContain(
-      'An image from page "other" (title "Other Page") shows: A relay switch between two quays, with a 12V line labeled A.',
+      'An image from knowledge base "docs", page "other" (title "Other Page") shows: A relay switch between two quays, with a 12V line labeled A.',
     );
   });
 
   test("returns null when there is no evidence", () => {
-    expect(formatKnowledgeBlock("docs", [], [])).toBeNull();
+    expect(formatKnowledgeBlock(["docs"], [], [])).toBeNull();
+  });
+
+  test("keeps same page ids from different KBs separate", () => {
+    const formatted = formatKnowledgeBlock(
+      ["docs", "handbook"],
+      [parent(), parent({ knowledgeBaseId: "handbook" })],
+      [
+        image(),
+        image({
+          knowledgeBaseId: "handbook",
+          description: "Handbook wiring description.",
+        }),
+      ],
+    );
+    if (!formatted) throw new Error("expected formatted knowledge");
+    expect(formatted.block).toContain('<knowledge bases="docs,handbook">');
+    expect(formatted.block).toContain(
+      'From knowledge base "docs", page "guide/relay"',
+    );
+    expect(formatted.block).toContain(
+      'From knowledge base "handbook", page "guide/relay"',
+    );
+    expect(formatted.block).toContain(
+      "A relay switch between two quays, with a 12V line labeled A.",
+    );
+    expect(formatted.block).toContain("Handbook wiring description.");
   });
 });
 
@@ -76,6 +102,7 @@ describe("humanTurnFrom", () => {
   test("selects the last user message with text", () => {
     const body = messagesBody({
       model: "deepseek::deepseek-flash",
+      knowledgeBaseIds: ["docs"],
       max_tokens: 10,
       messages: [
         { role: "assistant", content: "hi" },
@@ -90,6 +117,7 @@ describe("humanTurnFrom", () => {
   test("ignores a trailing tool result turn", () => {
     const body = messagesBody({
       model: "deepseek::deepseek-flash",
+      knowledgeBaseIds: ["docs"],
       max_tokens: 10,
       messages: [
         {
@@ -110,6 +138,7 @@ describe("humanTurnFrom", () => {
   test("prepends the block without modifying the original turn", () => {
     const body = messagesBody({
       model: "deepseek::deepseek-flash",
+      knowledgeBaseIds: ["docs"],
       max_tokens: 10,
       messages: [{ role: "user", content: "question" }],
     });
@@ -133,7 +162,8 @@ describe("neuxusSseStream", () => {
     const extension: NeuxusExtension = {
       protocolVersion: "1",
       requestId: "req-1",
-      knowledgeBaseId: "docs",
+      knowledgeBaseIds: ["docs"],
+      searchedKnowledgeBaseIds: ["docs"],
       enriched: true,
       enrichment: { turnIndex: 0, injectedChars: 12, truncated: false },
       upstream: { provider: "deepseek", model: "deepseek-flash" },
@@ -174,19 +204,19 @@ describe("neuxusSseStream", () => {
 });
 
 describe("request validation", () => {
-  test("requires the knowledge-base header", () => {
-    try {
-      messagesHeaders({ "anthropic-version": "2023-06-01" });
-      throw new Error("expected failure");
-    } catch (error) {
-      expect(error).toBeInstanceOf(ProtocolError);
-      expect((error as ProtocolError).code).toBe("missing_knowledge_base");
-    }
+  test("requires knowledgeBaseIds", () => {
+    expect(() =>
+      messagesBody({
+        max_tokens: 10,
+        messages: [{ role: "user", content: "hello" }],
+      }),
+    ).toThrow("knowledgeBaseIds");
   });
 
   test("accepts stream as a boolean", () => {
     const body = messagesBody({
       model: "deepseek::deepseek-flash",
+      knowledgeBaseIds: ["docs"],
       max_tokens: 10,
       stream: true,
       messages: [{ role: "user", content: "hello" }],
@@ -196,6 +226,7 @@ describe("request validation", () => {
 
   test("accepts a request without model", () => {
     const body = messagesBody({
+      knowledgeBaseIds: ["docs"],
       max_tokens: 10,
       messages: [{ role: "user", content: "hello" }],
     });

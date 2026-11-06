@@ -127,7 +127,19 @@ describe("resolveLogSettings", () => {
     const row: LogSettingsRow = {
       sinks: ["postgres", "postgres", "invalid", "console", ""],
     };
-    expect(resolveLogSettings(row).sinks).toEqual(["postgres", "console"]);
+    expect(resolveLogSettings(row).sinks).toEqual(["console", "postgres"]);
+  });
+
+  test("console-only sinks fall back because postgres is mandatory", () => {
+    expect(resolveLogSettings({ sinks: ["console"] }).sinks).toEqual([
+      ...LOG_DEFAULTS.sinks,
+    ]);
+  });
+
+  test("postgres-only sinks are preserved", () => {
+    expect(resolveLogSettings({ sinks: ["postgres"] }).sinks).toEqual([
+      "postgres",
+    ]);
   });
 
   test("empty / blank sink array falls back to defaults", () => {

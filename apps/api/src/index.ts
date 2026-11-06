@@ -55,7 +55,6 @@ const app = new Elysia()
         "x-api-key",
         "anthropic-version",
         "anthropic-beta",
-        "X-Neuxus-Knowledge-Base",
         "X-Neuxus-Extensions",
         "X-Request-Id",
       ],

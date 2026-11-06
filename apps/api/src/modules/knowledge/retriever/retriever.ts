@@ -1,3 +1,4 @@
+import type { KnowledgeWarning } from "../../../shared/knowledge.ts";
 import { Logger } from "../../log/index.ts";
 import {
   resolveTaskModelLink,
@@ -16,6 +17,7 @@ import {
 } from "./settings/defaults.ts";
 
 export type ChildHit = {
+  knowledgeBaseId: string;
   childId: string;
   parentId: string;
   pageId: string;
@@ -24,6 +26,7 @@ export type ChildHit = {
 };
 
 export type RetrievedParent = {
+  knowledgeBaseId: string;
   parentId: string;
   pageId: string;
   title: string;
@@ -33,6 +36,7 @@ export type RetrievedParent = {
 
 /** One ranked image-description hit: its caption and page title. */
 export type RetrievedImage = {
+  knowledgeBaseId: string;
   pageId: string;
   title: string;
   imagePath: string;
@@ -40,7 +44,7 @@ export type RetrievedImage = {
   score: number;
 };
 
-/** First occurrence of each `parentId` (hits must already be best-first). */
+/** First occurrence of each `parentId` within one knowledge base. */
 export function uniqueParentIdsByBestScore(hits: ChildHit[]): string[] {
   const seen = new Set<string>();
   const ids: string[] = [];
@@ -52,6 +56,7 @@ export function uniqueParentIdsByBestScore(hits: ChildHit[]): string[] {
   return ids;
 }
 
+/** First score per parent within one knowledge base. */
 export function scoreByParentFromHits(hits: ChildHit[]): Map<string, number> {
   const scores = new Map<string, number>();
   for (const hit of hits) {
@@ -83,19 +88,9 @@ export function capParents(
 
 const retrieveLog = Logger.child({ module: "retrieve" }, "retrieve");
 
-/** One row of the raw top-K result from the vector scan. */
-type TopKHit = {
-  childId: string;
-  parentId: string;
-  pageId: string;
-  score: number;
-  /** Full child text. The log is the source of truth, so we keep the whole row. */
-  text: string;
-};
-
 export type RetrieveParentsByQuestionOptions = RetrieveOptions & {
-  /** The knowledge base to search. A query binds exactly one. */
-  knowledgeBaseId: string;
+  /** The knowledge bases to search. A query requires at least one. */
+  knowledgeBaseIds: string[];
   embedder?: EmbedFn;
   /**
    * Owner of the request. Stamped on every `app_log` row this call emits so
@@ -115,6 +110,18 @@ export type RetrieveParentsByQuestionResult = {
   children: ChildHit[];
   /** A parent or character cap removed part of the result. */
   truncated: boolean;
+  /** Requested knowledge bases that completed retrieval. */
+  searchedKnowledgeBaseIds: string[];
+  /** Requested knowledge bases that failed retrieval. */
+  warnings: KnowledgeWarning[];
+};
+
+type KnowledgeBaseResult = {
+  knowledgeBaseId: string;
+  parents: RetrievedParent[];
+  images: RetrievedImage[];
+  hits: number;
+  children: ChildHit[];
 };
 
 function numberFromSql(value: unknown): number {
@@ -126,17 +133,110 @@ function numberFromSql(value: unknown): number {
   return 0;
 }
 
+function parentKey(parent: RetrievedParent): string {
+  return `${parent.knowledgeBaseId}\u0000${parent.parentId}`;
+}
+
+function imageKey(image: RetrievedImage): string {
+  return `${image.knowledgeBaseId}\u0000${image.pageId}\u0000${image.imagePath}`;
+}
+
+function childKey(child: ChildHit): string {
+  return `${child.knowledgeBaseId}\u0000${child.childId}`;
+}
+
+/** Retrieve one KB with an already-computed query vector. */
+async function retrieveOneKnowledgeBase(input: {
+  knowledgeBaseId: string;
+  currentModel: string;
+  embeddingLiteral: string;
+  childLimit: number;
+}): Promise<KnowledgeBaseResult> {
+  const [childRows, imageRows] = await Promise.all([
+    scanChildVectors({
+      knowledgeBaseIds: [input.knowledgeBaseId],
+      currentModel: input.currentModel,
+      embeddingLiteral: input.embeddingLiteral,
+      limit: input.childLimit,
+    }),
+    scanImageDescriptionVectors({
+      knowledgeBaseIds: [input.knowledgeBaseId],
+      currentModel: input.currentModel,
+      embeddingLiteral: input.embeddingLiteral,
+      policies: [...DESCRIBED_IMAGE_POLICIES],
+    }),
+  ]);
+
+  const images: RetrievedImage[] = imageRows.map((row) => ({
+    knowledgeBaseId: row.knowledge_base_id,
+    pageId: row.page_id,
+    title: row.title ?? "",
+    imagePath: row.image_path,
+    description: row.description ?? "",
+    score: numberFromSql(row.score),
+  }));
+
+  const hits: ChildHit[] = childRows.map((row) => ({
+    knowledgeBaseId: row.knowledge_base_id,
+    childId: row.child_id,
+    parentId: row.parent_id,
+    pageId: row.page_id,
+    childText: row.child_text ?? "",
+    score: numberFromSql(row.score),
+  }));
+
+  if (hits.length === 0) {
+    return {
+      knowledgeBaseId: input.knowledgeBaseId,
+      parents: [],
+      images,
+      hits: 0,
+      children: [],
+    };
+  }
+
+  const parentIds = uniqueParentIdsByBestScore(hits);
+  const scores = scoreByParentFromHits(hits);
+  const parentRows = await findParentsByIds(
+    parentIds.map((parentId) => ({
+      knowledgeBaseId: input.knowledgeBaseId,
+      parentId,
+    })),
+  );
+
+  const byId = new Map(
+    parentRows.map((row) => [
+      row.id,
+      {
+        knowledgeBaseId: row.knowledge_base_id,
+        parentId: row.id,
+        pageId: row.page_id,
+        title: row.title ?? "",
+        text: row.text ?? "",
+        score: scores.get(row.id) ?? 0,
+      } satisfies RetrievedParent,
+    ]),
+  );
+
+  const parents: RetrievedParent[] = [];
+  for (const id of parentIds) {
+    const parent = byId.get(id);
+    if (parent) parents.push(parent);
+  }
+
+  return {
+    knowledgeBaseId: input.knowledgeBaseId,
+    parents,
+    images,
+    hits: hits.length,
+    children: hits,
+  };
+}
+
 export abstract class Retriever {
   /**
-   * Embed the question and return ranked unique parents plus ranked image
-   * descriptions for the LLM. Empty question → no hits. Does not call the
-   * synthesizer.
-   *
-   * Logs:
-   *  - `retrieve skipped` (status: "empty_question") when question is blank
-   *  - `retrieve ok`       (status: "ok" | "no_hits") after the vector scans,
-   *                          with the raw top-K child hits + image hits
-   *  - `retrieve error`    (status: "error") on any throw; rethrown after logging
+   * Embed the question once and retrieve from every requested knowledge base.
+   * Successful bases are merged; failed bases are returned as warnings.
    *
    * @see docs/modern-knowledge-base-design/04-retrieval.md
    */
@@ -145,6 +245,17 @@ export abstract class Retriever {
     options: RetrieveParentsByQuestionOptions,
   ): Promise<RetrieveParentsByQuestionResult> {
     const trimmed = question.trim();
+    const knowledgeBaseIds = [
+      ...new Set(
+        options.knowledgeBaseIds
+          .map((id) => id.trim())
+          .filter((id) => id !== ""),
+      ),
+    ];
+    if (knowledgeBaseIds.length === 0) {
+      throw new Error("At least one knowledge base is required");
+    }
+
     const knobs = resolveRetrieveOptions(options);
     const link = await resolveTaskModelLink(TASK_EMBEDDING);
     if (!link) {
@@ -157,6 +268,7 @@ export abstract class Retriever {
       retrieveLog.info("retrieve skipped", {
         userId: options.userId,
         status: "empty_question",
+        knowledgeBaseIds,
         embeddingModel: currentModel,
         childLimit: knobs.childLimit,
         latencyMs: 0,
@@ -168,6 +280,8 @@ export abstract class Retriever {
         hits: 0,
         children: [],
         truncated: false,
+        searchedKnowledgeBaseIds: knowledgeBaseIds,
+        warnings: [],
       };
     }
 
@@ -182,115 +296,110 @@ export abstract class Retriever {
       }
       const embeddingLiteral = Embedder.pgvectorLiteral(vector);
 
-      const [childRows, imageRows] = await Promise.all([
-        scanChildVectors({
-          knowledgeBaseIds: [options.knowledgeBaseId],
-          currentModel,
-          embeddingLiteral,
-          limit: knobs.childLimit,
-        }),
-        scanImageDescriptionVectors({
-          knowledgeBaseIds: [options.knowledgeBaseId],
-          currentModel,
-          embeddingLiteral,
-          policies: [...DESCRIBED_IMAGE_POLICIES],
-        }),
-      ]);
-
-      const images: RetrievedImage[] = imageRows.map((row) => ({
-        pageId: row.page_id,
-        title: row.title ?? "",
-        imagePath: row.image_path,
-        description: row.description ?? "",
-        score: numberFromSql(row.score),
-      }));
-
-      const topK: TopKHit[] = childRows.map((row) => ({
-        childId: row.child_id,
-        parentId: row.parent_id,
-        pageId: row.page_id,
-        score: numberFromSql(row.score),
-        text: row.child_text ?? "",
-      }));
-
-      retrieveLog.info(topK.length === 0 ? "retrieve no_hits" : "retrieve ok", {
-        userId: options.userId,
-        status: topK.length === 0 ? "no_hits" : "ok",
-        question: trimmed,
-        embeddingModel: currentModel,
-        childLimit: knobs.childLimit,
-        topK,
-        images,
-        latencyMs: Math.round(performance.now() - start),
-      });
-
-      if (topK.length === 0) {
-        return {
-          currentModel,
-          parents: [],
-          images,
-          hits: 0,
-          children: [],
-          truncated: false,
-        };
-      }
-
-      const hits: ChildHit[] = childRows.map((row) => ({
-        childId: row.child_id,
-        parentId: row.parent_id,
-        pageId: row.page_id,
-        childText: row.child_text ?? "",
-        score: numberFromSql(row.score),
-      }));
-
-      const parentIds = uniqueParentIdsByBestScore(hits);
-      if (parentIds.length === 0) {
-        return {
-          currentModel,
-          parents: [],
-          images,
-          hits: topK.length,
-          children: hits,
-          truncated: false,
-        };
-      }
-
-      const scores = scoreByParentFromHits(hits);
-      const parentRows = await findParentsByIds(
-        parentIds.map((parentId) => ({
-          knowledgeBaseId: options.knowledgeBaseId,
-          parentId,
-        })),
+      const settled = await Promise.allSettled(
+        knowledgeBaseIds.map((knowledgeBaseId) =>
+          retrieveOneKnowledgeBase({
+            knowledgeBaseId,
+            currentModel,
+            embeddingLiteral,
+            childLimit: knobs.childLimit,
+          }),
+        ),
       );
 
-      const byId = new Map(
-        parentRows.map((row) => [
-          row.id,
+      const successes: KnowledgeBaseResult[] = [];
+      const warnings: KnowledgeWarning[] = [];
+      for (const [index, result] of settled.entries()) {
+        const knowledgeBaseId = knowledgeBaseIds[index];
+        if (!knowledgeBaseId) continue;
+        if (result.status === "fulfilled") {
+          successes.push(result.value);
+        } else {
+          warnings.push({
+            code: "retrieval_failed",
+            knowledgeBaseId,
+            message:
+              result.reason instanceof Error
+                ? result.reason.message
+                : String(result.reason),
+          });
+        }
+      }
+
+      const searchedKnowledgeBaseIds = successes.map(
+        (result) => result.knowledgeBaseId,
+      );
+
+      const parents = successes
+        .flatMap((result) => result.parents)
+        .sort(
+          (a, b) =>
+            b.score - a.score || parentKey(a).localeCompare(parentKey(b)),
+        );
+      const images = successes
+        .flatMap((result) => result.images)
+        .sort(
+          (a, b) => b.score - a.score || imageKey(a).localeCompare(imageKey(b)),
+        )
+        .slice(0, 3);
+      const children = successes
+        .flatMap((result) => result.children)
+        .sort(
+          (a, b) => b.score - a.score || childKey(a).localeCompare(childKey(b)),
+        );
+      const hits = successes.reduce((total, result) => total + result.hits, 0);
+      const capped = capParents(parents, knobs.maxParents, knobs.maxCharacters);
+      const allFailed = successes.length === 0;
+
+      if (allFailed) {
+        retrieveLog.error("retrieve all_failed", {
+          userId: options.userId,
+          status: "error",
+          question: trimmed,
+          knowledgeBaseIds,
+          embeddingModel: currentModel,
+          childLimit: knobs.childLimit,
+          warnings,
+          latencyMs: Math.round(performance.now() - start),
+        });
+      } else {
+        retrieveLog.info(
+          warnings.length > 0
+            ? "retrieve partial"
+            : children.length === 0
+              ? "retrieve no_hits"
+              : "retrieve ok",
           {
-            parentId: row.id,
-            pageId: row.page_id,
-            title: row.title ?? "",
-            text: row.text ?? "",
-            score: scores.get(row.id) ?? 0,
-          } satisfies RetrievedParent,
-        ]),
-      );
-
-      const ordered: RetrievedParent[] = [];
-      for (const id of parentIds) {
-        const parent = byId.get(id);
-        if (parent) ordered.push(parent);
+            userId: options.userId,
+            status:
+              warnings.length > 0
+                ? "partial"
+                : children.length === 0
+                  ? "no_hits"
+                  : "ok",
+            question: trimmed,
+            knowledgeBaseIds,
+            searchedKnowledgeBaseIds,
+            embeddingModel: currentModel,
+            childLimit: knobs.childLimit,
+            hits,
+            warnings,
+            topK: children,
+            images,
+            latencyMs: Math.round(performance.now() - start),
+          },
+        );
       }
-
-      const capped = capParents(ordered, knobs.maxParents, knobs.maxCharacters);
 
       return {
         currentModel,
         parents: capped,
         images,
-        hits: topK.length,
-        children: hits,
-        truncated: capped.length < ordered.length,
+        hits,
+        children,
+        truncated: capped.length < parents.length,
+        searchedKnowledgeBaseIds,
+        warnings,
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -298,6 +407,7 @@ export abstract class Retriever {
         userId: options.userId,
         status: "error",
         question: trimmed,
+        knowledgeBaseIds,
         embeddingModel: currentModel,
         childLimit: knobs.childLimit,
         error: message,

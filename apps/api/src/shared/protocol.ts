@@ -15,7 +15,6 @@ export type AnthropicErrorType =
 
 export type NeuxusErrorCode =
   | "invalid_request"
-  | "missing_knowledge_base"
   | "invalid_token"
   | "insufficient_scope"
   | "knowledge_base_not_found"

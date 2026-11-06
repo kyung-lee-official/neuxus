@@ -21,7 +21,7 @@ export const logSettings = new Elysia({ prefix: "/settings" })
       ...logDetail,
       summary: "Get log settings",
       description:
-        "Returns the stored `app_log_settings` row (or nulls) plus hardcoded `defaults`. Shape: `{ sinks, queueSize, drainTimeoutMs, pretty, defaults, availableSinks }`. `sinks` and `availableSinks` are arrays of `'console' | 'postgres'`.",
+        "Returns the stored `app_log_settings` row (or nulls) plus hardcoded `defaults`. Shape: `{ sinks, queueSize, drainTimeoutMs, pretty, defaults, availableSinks }`. Supported `sinks` are `['postgres']` and `['console', 'postgres']`; `postgres` is mandatory. `availableSinks` lists the available sink values.",
     },
   })
   .put(
@@ -37,7 +37,7 @@ export const logSettings = new Elysia({ prefix: "/settings" })
         ...logDetail,
         summary: "Update log settings",
         description:
-          "Empty / `null` fields are stored as null; runtime falls back to `defaults`. Returns the same shape as `GET /log/settings`.",
+          "Supported sink sets are `['postgres']` and `['console', 'postgres']`; `postgres` is mandatory. Empty / `null` fields are stored as null and fall back to `defaults`. Returns the same shape as `GET /log/settings`.",
       },
     },
   )
@@ -47,6 +47,6 @@ export const logSettings = new Elysia({ prefix: "/settings" })
       ...logDetail,
       summary: "Reset log settings to defaults",
       description:
-        "Writes hardcoded `LOG_DEFAULTS`: `sinks=['console']`, `queueSize=1000`, `drainTimeoutMs=2000`, `pretty=false`. Returns the same shape as `GET /log/settings`.",
+        "Writes hardcoded `LOG_DEFAULTS`: `sinks=['console', 'postgres']`, `queueSize=1000`, `drainTimeoutMs=2000`, `pretty=false`. Returns the same shape as `GET /log/settings`.",
     },
   });
