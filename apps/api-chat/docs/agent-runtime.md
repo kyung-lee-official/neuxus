@@ -158,6 +158,19 @@ to code defaults.
 The app loads the row at startup and refreshes the in-process cache after a
 successful save. Tools and the worker read that cache.
 
+## Knowledge bases
+
+`/query`, `/query/stream`, and `/query/async` require `knowledgeBaseIds` in the
+request body. A single-KB request is a one-element array.
+
+- The chat UI is multi-select and sends the selected IDs.
+- `AgentRun` stores `knowledgeBaseIds`; `runAgent()` passes the array to each
+  core `/v1/messages` call.
+- Core partial results produce warnings; chat forwards them as a `warnings` SSE
+  event and shows them in the UI.
+- If every requested KB fails, the turn fails. A successful KB with no hits is
+  not a failure.
+
 ## Tool contract
 
 Tool definitions and executors live in `src/modules/tools/`.
