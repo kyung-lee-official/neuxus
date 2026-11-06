@@ -4,69 +4,69 @@
 // Do not run migrate / db push from the agent.
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+    provider = "prisma-client"
+    output   = "../src/generated/prisma"
 }
 
 datasource db {
-  provider = "postgresql"
+    provider = "postgresql"
 }
 
 model User {
-  id        String   @id
-  apiKey    String   @unique @map("api_key")
-  /// `admin` | `member` - the first created account is admin when unseeded.
-  role      String   @default("member")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+    id        String   @id
+    apiKey    String   @unique @map("api_key")
+    /// `admin` | `member` - the first created account is admin when unseeded.
+    role      String   @default("member")
+    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  memories  Memory[]
-  sessions  Session[]
-  agentRuns AgentRun[]
+    memories  Memory[]
+    sessions  Session[]
+    agentRuns AgentRun[]
 
-  @@map("app_users")
+    @@map("app_users")
 }
 
 model Memory {
-  id        BigInt   @id @default(autoincrement())
-  userId    String   @map("user_id")
-  slug      String
-  content   String
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+    id        BigInt   @id @default(autoincrement())
+    userId    String   @map("user_id")
+    slug      String
+    content   String
+    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, slug])
-  @@index([userId, createdAt(sort: Desc)], map: "app_memories_user_id_idx")
-  @@map("app_memories")
+    @@unique([userId, slug])
+    @@index([userId, createdAt(sort: Desc)], map: "app_memories_user_id_idx")
+    @@map("app_memories")
 }
 
 model Session {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @map("user_id")
-  title     String?
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+    id        String   @id @default(uuid()) @db.Uuid
+    userId    String   @map("user_id")
+    title     String?
+    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages  Message[]
-  agentRuns AgentRun[]
+    user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+    messages  Message[]
+    agentRuns AgentRun[]
 
-  @@map("app_sessions")
+    @@map("app_sessions")
 }
 
 /// Stored as TEXT with CHECK (role IN ('user', 'assistant')) - matches the
 /// current app schema.
 model Message {
-  id        BigInt   @id @default(autoincrement())
-  sessionId String   @map("session_id") @db.Uuid
-  role      String
-  content   String
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+    id        BigInt   @id @default(autoincrement())
+    sessionId String   @map("session_id") @db.Uuid
+    role      String
+    content   String
+    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+    session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
-  @@index([sessionId, createdAt], map: "app_messages_session_id_idx")
-  @@map("app_messages")
+    @@index([sessionId, createdAt], map: "app_messages_session_id_idx")
+    @@map("app_messages")
 }
 
 /// Generic structured app log row (`app_log`). One row per log record.
@@ -75,131 +75,131 @@ model Message {
 /// filtering. No FK to `app_users`; logging must never block a request
 /// on referential checks.
 model AppLog {
-  id        BigInt   @id @default(autoincrement())
-  /// `trace` | `debug` | `info` | `warn` | `error` | `fatal`
-  level     String
-  msg       String
-  /// Child logger name (e.g. `"synthesis"`, `"auth"`). Null for root.
-  name      String?
-  /// Full log record minus the columns above.
-  meta      Json
-  /// Optional owner. Null when the log is not user-scoped. No FK.
-  userId    String?  @map("user_id")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+    id        BigInt   @id @default(autoincrement())
+    /// `trace` | `debug` | `info` | `warn` | `error` | `fatal`
+    level     String
+    msg       String
+    /// Child logger name (e.g. `"synthesis"`, `"auth"`). Null for root.
+    name      String?
+    /// Full log record minus the columns above.
+    meta      Json
+    /// Optional owner. Null when the log is not user-scoped. No FK.
+    userId    String?  @map("user_id")
+    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  @@index([createdAt(sort: Desc)], map: "app_log_created_at_idx")
-  @@index([level, createdAt(sort: Desc)], map: "app_log_level_created_at_idx")
-  @@index([name, createdAt(sort: Desc)], map: "app_log_name_created_at_idx")
-  @@index([userId, createdAt(sort: Desc)], map: "app_log_user_id_created_at_idx")
-  @@map("app_log")
+    @@index([createdAt(sort: Desc)], map: "app_log_created_at_idx")
+    @@index([level, createdAt(sort: Desc)], map: "app_log_level_created_at_idx")
+    @@index([name, createdAt(sort: Desc)], map: "app_log_name_created_at_idx")
+    @@index([userId, createdAt(sort: Desc)], map: "app_log_user_id_created_at_idx")
+    @@map("app_log")
 }
 
 /// Logger runtime config (`app_log_settings`). Single row, id = `"default"`.
 /// Nullable columns; app defaults live in code, not SQL DEFAULT. Mirrors the
 /// other single-row config tables.
 model AppLogSettings {
-  id String @id @default("default")
+    id String @id @default("default")
 
-  /// Any combination of `console` and `postgres`. Empty means app defaults.
-  sinks          String[] @default([])
-  /// Bounded queue capacity for the postgres sink. Null falls back.
-  queueSize      Int?     @map("queue_size")
-  /// Drain budget (ms) for the worker on shutdown.
-  drainTimeoutMs Int?     @map("drain_timeout_ms")
-  /// Pretty-print stdout. Null falls back.
-  pretty         Boolean?
+    /// Any combination of `console` and `postgres`. Empty means app defaults.
+    sinks          String[] @default([])
+    /// Bounded queue capacity for the postgres sink. Null falls back.
+    queueSize      Int?     @map("queue_size")
+    /// Drain budget (ms) for the worker on shutdown.
+    drainTimeoutMs Int?     @map("drain_timeout_ms")
+    /// Pretty-print stdout. Null falls back.
+    pretty         Boolean?
 
-  @@map("app_log_settings")
+    @@map("app_log_settings")
 }
 
 /// Admin-managed agent configuration. Single row, id = `"default"`.
 model AgentSettings {
-  id                String   @id @default("default")
-  deepseekApiKey    String?  @map("deepseek_api_key")
-  maxToolIterations Int?     @map("max_tool_iterations")
-  streamTimeoutMs   Int?     @map("stream_timeout_ms")
-  runMaxAttempts    Int?     @map("run_max_attempts")
-  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+    id                String   @id @default("default")
+    deepseekApiKey    String?  @map("deepseek_api_key")
+    maxToolIterations Int?     @map("max_tool_iterations")
+    streamTimeoutMs   Int?     @map("stream_timeout_ms")
+    runMaxAttempts    Int?     @map("run_max_attempts")
+    updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  @@map("agent_settings")
+    @@map("agent_settings")
 }
 
 /// Durable agent run. `messages` is the last saved transcript checkpoint;
 /// `request` is the prepared model request without the changing messages.
 model AgentRun {
-  id                String    @id @default(uuid()) @db.Uuid
-  userId            String    @map("user_id")
-  sessionId         String    @map("session_id") @db.Uuid
-  knowledgeBaseIds  String[]  @default([]) @map("knowledge_base_ids")
-  idempotencyKey    String?   @map("idempotency_key")
-  /// `queued` | `running` | `waiting` | `completed` | `failed` | `cancelled`
-  status            String    @default("queued")
-  /// Current user message, written to `app_messages` on completion.
-  message           String
-  /// Prepared request body, without the mutable `messages` value.
-  request           Json
-  /// Current transcript checkpoint.
-  messages          Json
-  iteration         Int       @default(0)
-  attempts          Int       @default(0)
-  /// Assistant content held while a question waits for an answer.
-  pendingAssistant  Json?     @map("pending_assistant")
-  pendingQuestionId String?   @map("pending_question_id")
-  cancelRequestedAt DateTime? @map("cancel_requested_at") @db.Timestamptz(6)
-  answer            String?
-  error             String?
-  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  startedAt         DateTime? @map("started_at") @db.Timestamptz(6)
-  finishedAt        DateTime? @map("finished_at") @db.Timestamptz(6)
+    id                String    @id @default(uuid()) @db.Uuid
+    userId            String    @map("user_id")
+    sessionId         String    @map("session_id") @db.Uuid
+    knowledgeBaseIds  String[]  @default([]) @map("knowledge_base_ids")
+    idempotencyKey    String?   @map("idempotency_key")
+    /// `queued` | `running` | `waiting` | `completed` | `failed` | `cancelled`
+    status            String    @default("queued")
+    /// Current user message, written to `app_messages` on completion.
+    message           String
+    /// Prepared request body, without the mutable `messages` value.
+    request           Json
+    /// Current transcript checkpoint.
+    messages          Json
+    iteration         Int       @default(0)
+    attempts          Int       @default(0)
+    /// Assistant content held while a question waits for an answer.
+    pendingAssistant  Json?     @map("pending_assistant")
+    pendingQuestionId String?   @map("pending_question_id")
+    cancelRequestedAt DateTime? @map("cancel_requested_at") @db.Timestamptz(6)
+    answer            String?
+    error             String?
+    createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+    startedAt         DateTime? @map("started_at") @db.Timestamptz(6)
+    finishedAt        DateTime? @map("finished_at") @db.Timestamptz(6)
 
-  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  session   Session         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  events    AgentEvent[]
-  questions AgentQuestion[]
+    user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+    session   Session         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+    events    AgentEvent[]
+    questions AgentQuestion[]
 
-  @@unique([userId, idempotencyKey], map: "agent_runs_user_idempotency_key")
-  @@index([status, createdAt], map: "agent_runs_status_created_at_idx")
-  @@index([userId, createdAt(sort: Desc)], map: "agent_runs_user_id_created_at_idx")
-  @@map("agent_runs")
+    @@unique([userId, idempotencyKey], map: "agent_runs_user_idempotency_key")
+    @@index([status, createdAt], map: "agent_runs_status_created_at_idx")
+    @@index([userId, createdAt(sort: Desc)], map: "agent_runs_user_id_created_at_idx")
+    @@map("agent_runs")
 }
 
 /// One clarifying question asked by the model. At most one row per run is
 /// pending, but completed answers remain for replay.
 model AgentQuestion {
-  id          String    @id @default(uuid()) @db.Uuid
-  runId       String    @map("run_id") @db.Uuid
-  toolUseId   String    @map("tool_use_id")
-  question    String
-  header      String?
-  options     Json?
-  multiple    Boolean   @default(false)
-  allowCustom Boolean   @default(true) @map("allow_custom")
-  /// `pending` | `answered` | `cancelled`
-  status      String    @default("pending")
-  answer      Json?
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  answeredAt  DateTime? @map("answered_at") @db.Timestamptz(6)
+    id          String    @id @default(uuid()) @db.Uuid
+    runId       String    @map("run_id") @db.Uuid
+    toolUseId   String    @map("tool_use_id")
+    question    String
+    header      String?
+    options     Json?
+    multiple    Boolean   @default(false)
+    allowCustom Boolean   @default(true) @map("allow_custom")
+    /// `pending` | `answered` | `cancelled`
+    status      String    @default("pending")
+    answer      Json?
+    createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+    answeredAt  DateTime? @map("answered_at") @db.Timestamptz(6)
 
-  run AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+    run AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 
-  @@unique([runId, toolUseId], map: "agent_questions_run_id_tool_use_id_key")
-  @@index([runId, status], map: "agent_questions_run_id_status_idx")
-  @@map("agent_questions")
+    @@unique([runId, toolUseId], map: "agent_questions_run_id_tool_use_id_key")
+    @@index([runId, status], map: "agent_questions_run_id_status_idx")
+    @@map("agent_questions")
 }
 
 /// Append-only run event. `seq` is monotonic per run and is also the SSE id.
 model AgentEvent {
-  id        BigInt   @id @default(autoincrement())
-  runId     String   @map("run_id") @db.Uuid
-  seq       Int
-  type      String
-  payload   Json
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+    id        BigInt   @id @default(autoincrement())
+    runId     String   @map("run_id") @db.Uuid
+    seq       Int
+    type      String
+    payload   Json
+    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  run AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+    run AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 
-  @@unique([runId, seq], map: "agent_events_run_id_seq_key")
-  @@index([runId, seq], map: "agent_events_run_id_seq_idx")
-  @@map("agent_events")
+    @@unique([runId, seq], map: "agent_events_run_id_seq_key")
+    @@index([runId, seq], map: "agent_events_run_id_seq_idx")
+    @@map("agent_events")
 }
